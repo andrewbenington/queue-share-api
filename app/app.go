@@ -1,13 +1,18 @@
 package app
 
 import (
+	"context"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/andrewbenington/go-spotify/auth"
+	"github.com/andrewbenington/go-spotify/config"
 	"github.com/andrewbenington/go-spotify/controller"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5"
 )
 
 type App struct {
@@ -25,13 +30,29 @@ func (a *App) Initialize() {
 	a.initRouter()
 }
 
+func (a *App) initDB() {
+	cfg := config.GetConfig()
+	conn, err := pgx.Connect(context.Background(), cfg.GetDBString())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	defer conn.Close(context.Background())
+}
+
 func (a *App) initRouter() {
 	a.Router = mux.NewRouter()
 	a.Router.HandleFunc("/queue", a.Controller.GetQueue).Methods("GET")
 	a.Router.HandleFunc("/queue/{song}", a.Controller.PushToQueue).Methods("POST")
 	a.Router.HandleFunc("/search", a.Controller.Search).Methods("GET")
+
 	a.Router.HandleFunc("/auth", a.Controller.Auth).Methods("GET")
 	a.Router.HandleFunc("/auth/redirect", a.Controller.RedirectHandler).Methods("GET")
+
+	a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET")
+	a.Router.HandleFunc("/room", a.Controller.CreateRoom).Methods("POST")
+	a.Router.HandleFunc("/room/{code}", a.Controller.GetRoom).Methods("GET")
 }
 
 func (a *App) Run(addr string) {
