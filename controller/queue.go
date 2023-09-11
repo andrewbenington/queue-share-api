@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/andrewbenington/go-spotify/client"
 	"github.com/andrewbenington/go-spotify/queue"
 	"github.com/gorilla/mux"
 )
@@ -15,16 +16,22 @@ var (
 )
 
 func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
-	currrentQueue, err := queue.GetUserQueue(c.Client)
+	status, spClient, err := client.FromRequest(r)
+	if err != nil {
+		w.WriteHeader(status)
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
+		return
+	}
+	currrentQueue, err := queue.GetUserQueue(spClient)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(err))
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
 	responseBytes, err := json.MarshalIndent(currrentQueue, "", " ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(err))
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
 	_, _ = w.Write(responseBytes)
@@ -32,28 +39,34 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 
 func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	songID := vars["song"]
-	if songID == "" {
+	songID, ok := vars["song"]
+	if !ok || songID == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("no song specified"))
 		return
 	}
-	err := queue.PushToUserQueue(c.Client, songID)
+	status, spClient, err := client.FromRequest(r)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(err))
+		w.WriteHeader(status)
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
-	currrentQueue, err := queue.GetUserQueue(c.Client)
+	err = queue.PushToUserQueue(spClient, songID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(err))
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
+		return
+	}
+	currrentQueue, err := queue.GetUserQueue(spClient)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
 	responseBytes, err := json.MarshalIndent(currrentQueue, "", " ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(err))
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
 	_, _ = w.Write(responseBytes)

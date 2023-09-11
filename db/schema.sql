@@ -56,32 +56,6 @@ $$;
 
 ALTER FUNCTION public.generate_unique_code() OWNER TO postgres;
 
---
--- Name: unique_random(integer, text, text); Type: FUNCTION; Schema: public; Owner: postgres
---
-
-CREATE FUNCTION public.unique_random(len integer, _table text, _col text) RETURNS text
-    LANGUAGE plpgsql
-    AS $$
-declare
-  result text;
-  numrows int;
-begin
-  select upper(substr(md5(random()::text), 0, len)) as result;
-  loop
-    execute format('select 1 from %I where %I = %L', _table, _col, result);
-    get diagnostics numrows = row_count;
-    if numrows = 0 then
-      return result; 
-    end if;
-    select upper(substr(md5(random()::text), 0, len)) as result;
-  end loop;
-end;
-$$;
-
-
-ALTER FUNCTION public.unique_random(len integer, _table text, _col text) OWNER TO postgres;
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -94,7 +68,10 @@ CREATE TABLE public.rooms (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name text NOT NULL,
     code text DEFAULT public.generate_unique_code() NOT NULL,
-    created timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+    created timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    encrypted_access_token text NOT NULL,
+    access_token_expiry timestamp with time zone NOT NULL,
+    encrypted_refresh_token text NOT NULL
 );
 
 

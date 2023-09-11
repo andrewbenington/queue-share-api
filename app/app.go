@@ -7,10 +7,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/andrewbenington/go-spotify/auth"
 	"github.com/andrewbenington/go-spotify/config"
 	"github.com/andrewbenington/go-spotify/controller"
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 )
@@ -21,12 +19,7 @@ type App struct {
 }
 
 func (a *App) Initialize() {
-	session := uuid.New()
-	client := auth.AuthenticateUser(session.String(), false)
-	if client == nil {
-		panic("error getting authenticated client")
-	}
-	a.Controller = controller.NewController(client)
+	a.Controller = &controller.Controller{}
 	a.initRouter()
 }
 
@@ -43,16 +36,14 @@ func (a *App) initDB() {
 
 func (a *App) initRouter() {
 	a.Router = mux.NewRouter()
-	a.Router.HandleFunc("/queue", a.Controller.GetQueue).Methods("GET")
-	a.Router.HandleFunc("/queue/{song}", a.Controller.PushToQueue).Methods("POST")
-	a.Router.HandleFunc("/search", a.Controller.Search).Methods("GET")
 
-	a.Router.HandleFunc("/auth", a.Controller.Auth).Methods("GET")
-	a.Router.HandleFunc("/auth/redirect", a.Controller.RedirectHandler).Methods("GET")
-
-	a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET")
+	a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room", a.Controller.CreateRoom).Methods("POST")
-	a.Router.HandleFunc("/room/{code}", a.Controller.GetRoom).Methods("GET")
+
+	a.Router.HandleFunc("/{code}", a.Controller.GetRoom).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/{code}/queue", a.Controller.GetQueue).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/{code}/queue/{song}", a.Controller.PushToQueue).Methods("POST")
+	a.Router.HandleFunc("/{code}/search", a.Controller.Search).Methods("GET", "OPTIONS")
 }
 
 func (a *App) Run(addr string) {
@@ -71,6 +62,12 @@ func corsMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "*")
-		next.ServeHTTP(w, r)
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, *")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			next.ServeHTTP(w, r)
+		}
 	})
 }

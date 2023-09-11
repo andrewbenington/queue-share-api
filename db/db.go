@@ -32,6 +32,10 @@ func (d *DBService) Initialize() error {
 		return fmt.Errorf("connect to database: %w\n", err)
 	}
 	d.DB = dbConn
+	err = dbConn.Ping()
+	if err != nil {
+		panic(err)
+	}
 
 	d.initStores()
 	return nil

@@ -6,15 +6,19 @@ package gen
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 type Room struct {
-	ID      uuid.UUID
-	Name    string
-	Code    string
-	Created sql.NullTime
+	ID                    uuid.UUID
+	Name                  string
+	Code                  string
+	Created               sql.NullTime
+	EncryptedAccessToken  string
+	AccessTokenExpiry     time.Time
+	EncryptedRefreshToken string
 }
 
 type SchemaMigration struct {

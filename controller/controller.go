@@ -2,28 +2,16 @@ package controller
 
 import (
 	"encoding/json"
-
-	"github.com/zmb3/spotify/v2"
 )
 
-type Controller struct {
-	Client     *spotify.Client
-	Session    string
-	NewSession string
-}
+type Controller struct{}
 
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
-func NewController(c *spotify.Client) *Controller {
-	return &Controller{
-		Client: c,
-	}
-}
-
-func MarshalErrorBody(e error) []byte {
-	body, err := json.MarshalIndent(ErrorResponse{Error: e.Error()}, "", " ")
+func MarshalErrorBody(e string) []byte {
+	body, err := json.MarshalIndent(ErrorResponse{Error: e}, "", " ")
 	if err != nil {
 		body, _ = json.MarshalIndent(ErrorResponse{Error: err.Error()}, "", " ")
 	}

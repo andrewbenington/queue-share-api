@@ -4,7 +4,10 @@ CREATE TABLE IF NOT EXISTS rooms (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name TEXT NOT NULL,
     code TEXT NOT NULL UNIQUE,
-    created TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    encrypted_access_token TEXT NOT NULL,
+    access_token_expiry TIMESTAMP WITH TIME ZONE NOT NULL,
+    encrypted_refresh_token TEXT NOT NULL
 );
 
 CREATE OR REPLACE FUNCTION generate_unique_code()

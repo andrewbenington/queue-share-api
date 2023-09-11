@@ -7,6 +7,10 @@ package gen
 
 import (
 	"context"
+	"database/sql"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 const allRooms = `-- name: AllRooms :many
@@ -14,15 +18,22 @@ SELECT id, name, code, created
 FROM rooms
 `
 
-func (q *Queries) AllRooms(ctx context.Context) ([]Room, error) {
+type AllRoomsRow struct {
+	ID      uuid.UUID
+	Name    string
+	Code    string
+	Created sql.NullTime
+}
+
+func (q *Queries) AllRooms(ctx context.Context) ([]AllRoomsRow, error) {
 	rows, err := q.db.QueryContext(ctx, allRooms)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Room
+	var items []AllRoomsRow
 	for rows.Next() {
-		var i Room
+		var i AllRoomsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -48,9 +59,16 @@ FROM rooms
 WHERE (code = $1)
 `
 
-func (q *Queries) FindRoomByCode(ctx context.Context, code string) (Room, error) {
+type FindRoomByCodeRow struct {
+	ID      uuid.UUID
+	Name    string
+	Code    string
+	Created sql.NullTime
+}
+
+func (q *Queries) FindRoomByCode(ctx context.Context, code string) (FindRoomByCodeRow, error) {
 	row := q.db.QueryRowContext(ctx, findRoomByCode, code)
-	var i Room
+	var i FindRoomByCodeRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
@@ -60,15 +78,66 @@ func (q *Queries) FindRoomByCode(ctx context.Context, code string) (Room, error)
 	return i, err
 }
 
+const getRoomAuthByCode = `-- name: GetRoomAuthByCode :one
+SELECT encrypted_access_token, access_token_expiry, encrypted_refresh_token
+FROM rooms
+WHERE (code = $1)
+`
+
+type GetRoomAuthByCodeRow struct {
+	EncryptedAccessToken  string
+	AccessTokenExpiry     time.Time
+	EncryptedRefreshToken string
+}
+
+func (q *Queries) GetRoomAuthByCode(ctx context.Context, code string) (GetRoomAuthByCodeRow, error) {
+	row := q.db.QueryRowContext(ctx, getRoomAuthByCode, code)
+	var i GetRoomAuthByCodeRow
+	err := row.Scan(&i.EncryptedAccessToken, &i.AccessTokenExpiry, &i.EncryptedRefreshToken)
+	return i, err
+}
+
+const getRoomIDByCode = `-- name: GetRoomIDByCode :one
+SELECT id
+FROM rooms
+WHERE (code = $1)
+`
+
+func (q *Queries) GetRoomIDByCode(ctx context.Context, code string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, getRoomIDByCode, code)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const insertRoom = `-- name: InsertRoom :one
-INSERT INTO rooms (name)
-VALUES ($1)
+INSERT INTO rooms (name, encrypted_access_token, access_token_expiry, encrypted_refresh_token)
+VALUES ($1, $2, $3, $4)
 RETURNING id, name, code, created
 `
 
-func (q *Queries) InsertRoom(ctx context.Context, name string) (Room, error) {
-	row := q.db.QueryRowContext(ctx, insertRoom, name)
-	var i Room
+type InsertRoomParams struct {
+	Name                  string
+	EncryptedAccessToken  string
+	AccessTokenExpiry     time.Time
+	EncryptedRefreshToken string
+}
+
+type InsertRoomRow struct {
+	ID      uuid.UUID
+	Name    string
+	Code    string
+	Created sql.NullTime
+}
+
+func (q *Queries) InsertRoom(ctx context.Context, arg InsertRoomParams) (InsertRoomRow, error) {
+	row := q.db.QueryRowContext(ctx, insertRoom,
+		arg.Name,
+		arg.EncryptedAccessToken,
+		arg.AccessTokenExpiry,
+		arg.EncryptedRefreshToken,
+	)
+	var i InsertRoomRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
