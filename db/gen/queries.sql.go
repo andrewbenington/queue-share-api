@@ -146,3 +146,25 @@ func (q *Queries) InsertRoom(ctx context.Context, arg InsertRoomParams) (InsertR
 	)
 	return i, err
 }
+
+const updateRoomAuthByCode = `-- name: UpdateRoomAuthByCode :exec
+UPDATE rooms SET encrypted_access_token = $2, access_token_expiry = $3, encrypted_refresh_token = $4
+WHERE code = $1
+`
+
+type UpdateRoomAuthByCodeParams struct {
+	Code                  string
+	EncryptedAccessToken  string
+	AccessTokenExpiry     time.Time
+	EncryptedRefreshToken string
+}
+
+func (q *Queries) UpdateRoomAuthByCode(ctx context.Context, arg UpdateRoomAuthByCodeParams) error {
+	_, err := q.db.ExecContext(ctx, updateRoomAuthByCode,
+		arg.Code,
+		arg.EncryptedAccessToken,
+		arg.AccessTokenExpiry,
+		arg.EncryptedRefreshToken,
+	)
+	return err
+}

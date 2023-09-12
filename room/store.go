@@ -66,6 +66,15 @@ func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (access
 	return row.EncryptedAccessToken, row.AccessTokenExpiry, row.EncryptedRefreshToken, nil
 }
 
+func (s *Store) UpdateEncryptedRoomTokens(ctx context.Context, code string, encryptedAccessToken string, accessTokenExpiry time.Time, encryptedRefreshToken string) error {
+	return gen.New(s.db).UpdateRoomAuthByCode(ctx, gen.UpdateRoomAuthByCodeParams{
+		Code:                  code,
+		EncryptedAccessToken:  encryptedAccessToken,
+		AccessTokenExpiry:     accessTokenExpiry,
+		EncryptedRefreshToken: encryptedRefreshToken,
+	})
+}
+
 type InsertRoomParams struct {
 	Name              string    `json:"name"`
 	Password          string    `json:"password"`

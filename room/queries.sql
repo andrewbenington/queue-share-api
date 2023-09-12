@@ -21,3 +21,7 @@ RETURNING id, name, code, created;
 SELECT encrypted_access_token, access_token_expiry, encrypted_refresh_token
 FROM rooms
 WHERE (code = $1);
+
+-- name: UpdateRoomAuthByCode :exec
+UPDATE rooms SET encrypted_access_token = $2, access_token_expiry = $3, encrypted_refresh_token = $4
+WHERE code = $1;
