@@ -4,7 +4,11 @@ start:
 
 .PHONY: build
 build:
-	go build -o bin/go-spotify ./cmd/main.go
+	go build -o bin/queue-share ./cmd/main.go
+
+.PHONY: build-linux
+build-linux:
+	GOOS=linux GOARCH=amd64 go build -o bin/queue-share ./cmd/main.go
 
 .PHONY: migrate-up
 migrate-up:

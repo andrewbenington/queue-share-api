@@ -22,7 +22,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Error: %s", err)
 	}
 
-	addr := "localhost:5757"
+	addr := "localhost:8080"
 	if len(os.Args) > 1 {
 		addr = os.Args[1]
 	}
