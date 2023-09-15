@@ -16,8 +16,8 @@ jobs:
       - id: 'auth'
         uses: 'google-github-actions/auth@v1'
         with:
-          workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
-          service_account: 'my-service-account@my-project.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/queue-share/locations/global/workloadIdentityPools/gh-identity-pool/providers/gh-provider'
+          service_account: 'queue-share@appspot.gserviceaccount.com'
 
       - id: 'deploy'
         uses: 'google-github-actions/deploy-appengine@v1'
@@ -27,6 +27,6 @@ jobs:
             POSTGRES_PORT='${{ vars.POSTGRES_PORT }}'
             POSTGRES_USER='${{ vars.POSTGRES_USER }}'
             POSTGRES_DB='${{ vars.POSTGRES_DB }}'
-            POSTRES_PASS='${{ secrets.POSTRES_PASS }}'
+            POSTGRES_PASS='${{ secrets.POSTGRES_PASS }}'
             SPOTIFY_ID='${{ secrets.SPOTIFY_ID }}'
-            SPOTIFY_CLIENT='${{ secrets.SPOTIFY_CLIENT }}'
+            SPOTIFY_SECRET='${{ secrets.SPOTIFY_SECRET }}'
