@@ -26,8 +26,7 @@ jobs:
         uses: 'google-github-actions/deploy-appengine@v1'
         with:
           env_vars: |-
-            POSTGRES_HOST='${{ vars.POSTGRES_HOST }}'
-            POSTGRES_PORT='${{ vars.POSTGRES_PORT }}'
+            POSTGRES_SOCKET='${{ vars.POSTGRES_SOCKET }}'
             POSTGRES_USER='${{ vars.POSTGRES_USER }}'
             POSTGRES_DB='${{ vars.POSTGRES_DB }}'
             POSTGRES_PASS='${{ secrets.POSTGRES_PASS }}'
