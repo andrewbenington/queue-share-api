@@ -2,5 +2,4 @@ runtime: go121
 
 instance_class: F1
 
-env_variables:
-  BUCKET_NAME: 'example-gcs-bucket'
+main: ./cmd
