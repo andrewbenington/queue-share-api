@@ -17,7 +17,7 @@ jobs:
         uses: 'google-github-actions/auth@v1'
         with:
           workload_identity_provider: 'projects/queue-share/locations/global/workloadIdentityPools/gh-identity-pool/providers/gh-provider'
-          service_account: 'queue-share@appspot.gserviceaccount.com'
+          service_account: 'github-actions@queue-share.iam.gserviceaccount.com'
 
       - id: 'deploy'
         uses: 'google-github-actions/deploy-appengine@v1'
