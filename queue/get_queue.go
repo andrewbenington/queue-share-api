@@ -19,8 +19,8 @@ type CurrentQueue struct {
 	Queue            []TrackInfo `json:"queue"`
 }
 
-func GetUserQueue(client *spotify.Client) (*CurrentQueue, error) {
-	queue, err := client.GetQueue(context.Background())
+func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, error) {
+	queue, err := client.GetQueue(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not get queue: %w", err)
 	}

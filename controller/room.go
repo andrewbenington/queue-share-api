@@ -66,6 +66,7 @@ func (c *Controller) GetAllRooms(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	code, password := room.ParametersFromRequest(r)
 	if code == "" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -82,7 +83,7 @@ func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	room, err := db.Service().RoomStore.GetByCode(context.Background(), code)
+	room, err := db.Service().RoomStore.GetByCode(ctx, code)
 
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)

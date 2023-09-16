@@ -8,8 +8,8 @@ import (
 	"github.com/zmb3/spotify/v2"
 )
 
-func SearchSongs(client *spotify.Client, text string) ([]queue.TrackInfo, error) {
-	results, err := client.Search(context.Background(), text, spotify.SearchTypeTrack)
+func SearchSongs(ctx context.Context, spClient *spotify.Client, text string) ([]queue.TrackInfo, error) {
+	results, err := spClient.Search(ctx, text, spotify.SearchTypeTrack)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}

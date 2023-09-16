@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/andrewbenington/go-spotify/app"
@@ -19,7 +19,7 @@ func main() {
 	a.Initialize()
 	err := db.Service().Initialize()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s", err)
+		log.Fatal(err)
 	}
 
 	addr := "localhost:8080"

@@ -29,10 +29,10 @@ func GetConfig() Config {
 
 func (c *Config) GetDBString() string {
 	if c.IsGAE {
-		return fmt.Sprintf("host=%s user=%s password=%s dbname=%s",
+		return fmt.Sprintf("host=%s user=%s password=%s dbname=%s connect_timeout=5",
 			c.PostgresSocket, c.PostgresUser, c.PostgresPass, c.PostgresDB)
 	} else {
-		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s",
+		return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s connect_timeout=5",
 			c.PostgresHost, c.PostgresPort, c.PostgresUser, c.PostgresPass, c.PostgresDB)
 	}
 }

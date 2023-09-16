@@ -37,7 +37,7 @@ func (a *App) initDB() {
 func (a *App) initRouter() {
 	a.Router = mux.NewRouter()
 
-	a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET", "OPTIONS")
+	// a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room", a.Controller.CreateRoom).Methods("POST")
 
 	a.Router.HandleFunc("/{code}", a.Controller.GetRoom).Methods("GET", "OPTIONS")
@@ -47,7 +47,8 @@ func (a *App) initRouter() {
 }
 
 func (a *App) Run(addr string) {
-	log.Fatal(http.ListenAndServe(addr, corsMW(logMW(a.Router))))
+	log.Print("serving on localhost:8080...")
+	log.Fatalf("server error: %s", http.ListenAndServe(addr, corsMW(logMW(a.Router))))
 }
 
 func logMW(next http.Handler) http.Handler {

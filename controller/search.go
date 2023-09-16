@@ -26,7 +26,7 @@ func (c *Controller) Search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(SearchMissingError)
 	}
-	results, err := search.SearchSongs(client, term)
+	results, err := search.SearchSongs(r.Context(), client, term)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))

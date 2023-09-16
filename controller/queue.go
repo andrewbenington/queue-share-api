@@ -22,7 +22,7 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
-	currrentQueue, err := queue.GetUserQueue(spClient)
+	currrentQueue, err := queue.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
@@ -51,13 +51,13 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
-	err = queue.PushToUserQueue(spClient, songID)
+	err = queue.PushToUserQueue(r.Context(), spClient, songID)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
-	currrentQueue, err := queue.GetUserQueue(spClient)
+	currrentQueue, err := queue.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
