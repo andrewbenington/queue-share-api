@@ -1,16 +1,11 @@
 package app
 
 import (
-	"context"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 
-	"github.com/andrewbenington/go-spotify/config"
 	"github.com/andrewbenington/go-spotify/controller"
 	"github.com/gorilla/mux"
-	"github.com/jackc/pgx/v5"
 )
 
 type App struct {
@@ -21,17 +16,6 @@ type App struct {
 func (a *App) Initialize() {
 	a.Controller = &controller.Controller{}
 	a.initRouter()
-}
-
-func (a *App) initDB() {
-	cfg := config.GetConfig()
-	conn, err := pgx.Connect(context.Background(), cfg.GetDBString())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		os.Exit(1)
-	}
-
-	defer conn.Close(context.Background())
 }
 
 func (a *App) initRouter() {

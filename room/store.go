@@ -21,6 +21,8 @@ func NewStore(db *sql.DB) *Store {
 }
 
 func (s *Store) All(ctx context.Context) ([]Room, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	rows, err := gen.New(s.db).AllRooms(ctx)
 	if err != nil {
 		return nil, err
@@ -38,6 +40,8 @@ func (s *Store) All(ctx context.Context) ([]Room, error) {
 }
 
 func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	row, err := gen.New(s.db).FindRoomByCode(ctx, code)
 	if err != nil {
 		return Room{}, err
@@ -51,6 +55,8 @@ func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 }
 
 func (s *Store) GetRoomExistsByCode(ctx context.Context, code string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	_, err := gen.New(s.db).GetRoomIDByCode(ctx, code)
 	if err == sql.ErrNoRows {
 		return false, nil
@@ -59,6 +65,8 @@ func (s *Store) GetRoomExistsByCode(ctx context.Context, code string) (bool, err
 }
 
 func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (accessToken string, accessTokenExpiry time.Time, refreshToken string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	row, err := gen.New(s.db).GetRoomAuthByCode(ctx, code)
 	if err != nil {
 		return
@@ -67,6 +75,8 @@ func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (access
 }
 
 func (s *Store) UpdateEncryptedRoomTokens(ctx context.Context, code string, encryptedAccessToken string, accessTokenExpiry time.Time, encryptedRefreshToken string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	return gen.New(s.db).UpdateRoomAuthByCode(ctx, gen.UpdateRoomAuthByCodeParams{
 		Code:                  code,
 		EncryptedAccessToken:  encryptedAccessToken,
@@ -84,6 +94,8 @@ type InsertRoomParams struct {
 }
 
 func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
 	encryptedAccessToken, err := auth.EncryptToken(insertParams.AccessToken, insertParams.Password)
 	if err != nil {
 		return Room{}, fmt.Errorf("encrypt access token with password: %w", err)

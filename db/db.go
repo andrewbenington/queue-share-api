@@ -1,8 +1,11 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/andrewbenington/go-spotify/config"
 	"github.com/andrewbenington/go-spotify/room"
@@ -29,12 +32,14 @@ func (d *DBService) Initialize() error {
 	cfg := config.GetConfig()
 	dbConn, err := sql.Open("pgx", cfg.GetDBString())
 	if err != nil {
-		return fmt.Errorf("connect to database: %w\n", err)
+		return fmt.Errorf("open database: %w\n", err)
 	}
 	d.DB = dbConn
-	err = dbConn.Ping()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err = dbConn.PingContext(ctx)
 	if err != nil {
-		panic(err)
+		log.Fatalf("couldn't connect to db: %s", err)
 	}
 
 	d.initStores()
