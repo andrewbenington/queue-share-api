@@ -21,23 +21,28 @@ func (a *App) Initialize() {
 func (a *App) initRouter() {
 	a.Router = mux.NewRouter()
 
+	// health
+	a.Router.HandleFunc("/health", a.Controller.Health).Methods("GET", "OPTIONS")
+
 	// a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/room", a.Controller.CreateRoom).Methods("POST")
+	a.Router.HandleFunc("/room", a.Controller.CreateRoom).Methods("POST", "OPTIONS")
 
 	a.Router.HandleFunc("/{code}", a.Controller.GetRoom).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/{code}/queue", a.Controller.GetQueue).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/{code}/queue/{song}", a.Controller.PushToQueue).Methods("POST")
+	a.Router.HandleFunc("/{code}/queue/{song}", a.Controller.PushToQueue).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/{code}/search", a.Controller.Search).Methods("GET", "OPTIONS")
 }
 
 func (a *App) Run(addr string) {
-	log.Print("serving on localhost:8080...")
+	log.Printf("serving on %s...", addr)
 	log.Fatalf("server error: %s", http.ListenAndServe(addr, corsMW(logMW(a.Router))))
 }
 
 func logMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("%s - %s (%s)", r.Method, r.URL.Path, r.RemoteAddr)
+		if r.URL.Path != "/health" {
+			log.Printf("%s - %s (%s)", r.Method, r.URL.Path, r.RemoteAddr)
+		}
 
 		next.ServeHTTP(w, r)
 	})

@@ -22,7 +22,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	addr := "localhost:8080"
+	addr := ":8080"
 	if len(os.Args) > 1 {
 		addr = os.Args[1]
 	}
