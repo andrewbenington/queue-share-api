@@ -4,47 +4,43 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
+	"crypto/sha512"
 	"io"
+
+	"github.com/andrewbenington/queue-share-api/config"
 )
 
-func passwordToKey(password string) []byte {
-	hasher := sha256.New()
-	hasher.Write([]byte(password))
+func hashTo64(value string) []byte {
+	hasher := sha512.New()
+	hasher.Write([]byte(value))
 	return hasher.Sum(nil)
 }
 
-func EncryptToken(token string, password string) (string, error) {
-	key := passwordToKey(password)
+func AESGCMEncrypt(token string) ([]byte, error) {
+	keyBytes := hashTo64(config.GetEncryptionKey())
 	tokenBytes := []byte(token)
 
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	ciphertext := aesGCM.Seal(nonce, nonce, tokenBytes, nil)
-	return fmt.Sprintf("%x", ciphertext), nil
+	return ciphertext, nil
 }
 
-func DecryptToken(encrypted string, password string) (string, error) {
-	key := passwordToKey(password)
-	enc, err := hex.DecodeString(encrypted)
-	if err != nil {
-		return "", err
-	}
+func AESGCMDecrypt(encrypted []byte, password string) (string, error) {
+	key := hashTo64(password)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -57,7 +53,7 @@ func DecryptToken(encrypted string, password string) (string, error) {
 	}
 
 	nonceSize := aesGCM.NonceSize()
-	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+	nonce, ciphertext := encrypted[:nonceSize], encrypted[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", err

@@ -8,10 +8,11 @@ import (
 
 func TestEncryptDecrypt(t *testing.T) {
 	t.Run("encrypt -> decrypt", func(t *testing.T) {
-		encrypted, err := EncryptToken("this is my token", "password")
+		t.Setenv("ENCRYPTION_KEY", "password")
+		encrypted, err := AESGCMEncrypt("this is my token")
 		assert.NoError(t, err)
 
-		decrypted, err := DecryptToken(encrypted, "password")
+		decrypted, err := AESGCMDecrypt(encrypted, "password")
 		assert.NoError(t, err)
 
 		assert.Equal(t, "this is my token", decrypted)

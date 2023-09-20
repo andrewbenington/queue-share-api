@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrewbenington/go-spotify/auth"
-	"github.com/andrewbenington/go-spotify/db"
-	"github.com/andrewbenington/go-spotify/room"
+	"github.com/andrewbenington/queue-share-api/auth"
+	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
 	"golang.org/x/oauth2"
@@ -46,15 +46,7 @@ func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err e
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("get refreshed token: %w", err)
 		}
-		encryptedAccessToken, err := auth.EncryptToken(newToken.AccessToken, password)
-		if err != nil {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
-		}
-		encryptedRefreshToken, err := auth.EncryptToken(newToken.RefreshToken, password)
-		if err != nil {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
-		}
-		err = db.Service().RoomStore.UpdateEncryptedRoomTokens(ctx, code, encryptedAccessToken, newToken.Expiry, encryptedRefreshToken)
+		err = db.Service().RoomStore.UpdateSpotifyToken(ctx, code, newToken)
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("update room tokens: %w", err)
 		}
@@ -71,11 +63,11 @@ func DecryptRoomToken(ctx context.Context, code string, password string) (int, *
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("get encrypted room token: %w", err)
 	}
-	decryptedAccessToken, err := auth.DecryptToken(encrytpedAccessToken, password)
+	decryptedAccessToken, err := auth.AESGCMDecrypt(encrytpedAccessToken, password)
 	if err != nil {
 		return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
 	}
-	decryptedRefreshToken, err := auth.DecryptToken(encryptedRefreshToken, password)
+	decryptedRefreshToken, err := auth.AESGCMDecrypt(encryptedRefreshToken, password)
 	if err != nil {
 		return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
 	}

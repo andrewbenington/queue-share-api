@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/andrewbenington/go-spotify/client"
-	"github.com/andrewbenington/go-spotify/search"
+	"github.com/andrewbenington/queue-share-api/client"
+	"github.com/andrewbenington/queue-share-api/spotify"
 )
 
 var (
@@ -26,7 +26,7 @@ func (c *Controller) Search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(SearchMissingError)
 	}
-	results, err := search.SearchSongs(r.Context(), client, term)
+	results, err := spotify.SearchSongs(r.Context(), client, term)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))

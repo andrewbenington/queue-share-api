@@ -1,4 +1,4 @@
-module github.com/andrewbenington/go-spotify
+module github.com/andrewbenington/queue-share-api
 
 go 1.20
 

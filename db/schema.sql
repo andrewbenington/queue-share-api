@@ -18,6 +18,20 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
+
+
+--
 -- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -61,6 +75,19 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: room_passwords; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.room_passwords (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    room_id uuid NOT NULL,
+    encrypted_password bytea
+);
+
+
+ALTER TABLE public.room_passwords OWNER TO postgres;
+
+--
 -- Name: rooms; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -68,10 +95,8 @@ CREATE TABLE public.rooms (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name text NOT NULL,
     code text DEFAULT public.generate_unique_code() NOT NULL,
-    created timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    encrypted_access_token text NOT NULL,
-    access_token_expiry timestamp with time zone NOT NULL,
-    encrypted_refresh_token text NOT NULL
+    created timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    host_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL
 );
 
 
@@ -88,6 +113,55 @@ CREATE TABLE public.schema_migrations (
 
 
 ALTER TABLE public.schema_migrations OWNER TO postgres;
+
+--
+-- Name: spotify_tokens; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.spotify_tokens (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    encrypted_access_token bytea NOT NULL,
+    access_token_expiry timestamp with time zone NOT NULL,
+    encrypted_refresh_token bytea NOT NULL
+);
+
+
+ALTER TABLE public.spotify_tokens OWNER TO postgres;
+
+--
+-- Name: user_passwords; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_passwords (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    encrypted_password text NOT NULL
+);
+
+
+ALTER TABLE public.user_passwords OWNER TO postgres;
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name text NOT NULL,
+    created timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: room_passwords room_passwords_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_passwords
+    ADD CONSTRAINT room_passwords_pkey PRIMARY KEY (id);
+
 
 --
 -- Name: rooms rooms_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
@@ -111,6 +185,62 @@ ALTER TABLE ONLY public.rooms
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: spotify_tokens spotify_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spotify_tokens
+    ADD CONSTRAINT spotify_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_passwords user_passwords_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_passwords
+    ADD CONSTRAINT user_passwords_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: room_passwords room_passwords_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_passwords
+    ADD CONSTRAINT room_passwords_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: rooms rooms_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.rooms
+    ADD CONSTRAINT rooms_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spotify_tokens spotify_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spotify_tokens
+    ADD CONSTRAINT spotify_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_passwords user_passwords_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_passwords
+    ADD CONSTRAINT user_passwords_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

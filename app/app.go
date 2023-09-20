@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/andrewbenington/go-spotify/controller"
+	"github.com/andrewbenington/queue-share-api/controller"
 	"github.com/gorilla/mux"
 )
 
@@ -31,6 +31,8 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/{code}/queue", a.Controller.GetQueue).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/{code}/queue/{song}", a.Controller.PushToQueue).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/{code}/search", a.Controller.Search).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/user", a.Controller.CreateUser).Methods("POST", "OPTIONS")
 }
 
 func (a *App) Run(addr string) {

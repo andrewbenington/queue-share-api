@@ -1,4 +1,4 @@
-package queue
+package spotify
 
 import (
 	"context"
@@ -43,6 +43,14 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 	}
 
 	return cq, nil
+}
+
+func PushToUserQueue(ctx context.Context, client *spotify.Client, songID string) error {
+	err := client.QueueSong(ctx, spotify.ID(songID))
+	if err != nil {
+		return fmt.Errorf("push to queue: %w", err)
+	}
+	return nil
 }
 
 func Get64Image(t spotify.SimpleAlbum) *spotify.Image {

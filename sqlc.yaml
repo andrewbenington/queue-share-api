@@ -1,7 +1,9 @@
 version: '2'
 sql:
   - schema: 'db/schema.sql'
-    queries: 'room/queries.sql'
+    queries:
+      - 'room/queries.sql'
+      - 'user/queries.sql'
     engine: 'postgresql'
     gen:
       go:
