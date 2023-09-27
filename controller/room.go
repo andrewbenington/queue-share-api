@@ -27,7 +27,7 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
-	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.Scopes...))
+	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.SpotifyScopes...))
 	httpClient := authenticator.Client(ctx, &oauth2.Token{
 		AccessToken: req.AccessToken,
 	})

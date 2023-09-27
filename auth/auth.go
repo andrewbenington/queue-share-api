@@ -1,13 +1,25 @@
 package auth
 
 import (
+	"sync"
+
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
 )
 
+type SpotifyLoginState struct {
+	UserID      string
+	RedirectURI string
+}
+
+type UserContextKeyT struct{}
+
 var (
-	Scopes = []string{
+	SpotifyScopes = []string{
 		spotifyauth.ScopeUserReadPrivate,
 		spotifyauth.ScopeUserReadPlaybackState,
 		spotifyauth.ScopeUserModifyPlaybackState,
 	}
+	SpotifyStates     = map[string]SpotifyLoginState{}
+	SpotifyStatesLock = sync.Mutex{}
+	UserContextKey    UserContextKeyT
 )

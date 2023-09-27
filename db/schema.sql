@@ -148,7 +148,11 @@ ALTER TABLE public.user_passwords OWNER TO postgres;
 
 CREATE TABLE public.users (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name text NOT NULL,
+    username text NOT NULL,
+    display_name text NOT NULL,
+    spotify_account text,
+    spotify_name text,
+    spotify_image_url text,
     created timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -196,6 +200,14 @@ ALTER TABLE ONLY public.spotify_tokens
 
 
 --
+-- Name: spotify_tokens spotify_tokens_user_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spotify_tokens
+    ADD CONSTRAINT spotify_tokens_user_id_key UNIQUE (user_id);
+
+
+--
 -- Name: user_passwords user_passwords_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -209,6 +221,13 @@ ALTER TABLE ONLY public.user_passwords
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: username_case_insensitive; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE UNIQUE INDEX username_case_insensitive ON public.users USING btree (upper(username));
 
 
 --

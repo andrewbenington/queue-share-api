@@ -5,6 +5,7 @@
 package gen
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,9 +39,13 @@ type SpotifyToken struct {
 }
 
 type User struct {
-	ID      uuid.UUID
-	Name    string
-	Created time.Time
+	ID              uuid.UUID
+	Username        string
+	DisplayName     string
+	SpotifyAccount  sql.NullString
+	SpotifyName     sql.NullString
+	SpotifyImageUrl sql.NullString
+	Created         time.Time
 }
 
 type UserPassword struct {

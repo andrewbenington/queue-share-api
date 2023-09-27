@@ -1,7 +1,6 @@
 package version
 
 import (
-	"fmt"
 	"log"
 	"runtime"
 )
@@ -52,7 +51,6 @@ var (
 )
 
 func Get() *Version {
-	fmt.Println(Commit)
 	// check if a semantic tag was provided
 	if len(Tag) == 0 {
 		log.Print("no semantic tag provided - defaulting to v0.0.0")

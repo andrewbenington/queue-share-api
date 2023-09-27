@@ -27,7 +27,7 @@ func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err e
 		return status, nil, err
 	}
 
-	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.Scopes...))
+	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.SpotifyScopes...))
 	httpClient := authenticator.Client(ctx, token)
 	spotifyClient := spotify.New(httpClient)
 

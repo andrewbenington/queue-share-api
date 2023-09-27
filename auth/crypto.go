@@ -4,14 +4,14 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha512"
+	"crypto/sha256"
 	"io"
 
 	"github.com/andrewbenington/queue-share-api/config"
 )
 
 func hashTo64(value string) []byte {
-	hasher := sha512.New()
+	hasher := sha256.New()
 	hasher.Write([]byte(value))
 	return hasher.Sum(nil)
 }

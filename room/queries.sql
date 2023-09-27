@@ -3,7 +3,8 @@ SELECT
     r.id,
     r.name,
     r.host_id,
-    u.name as host_name,
+    u.username as host_username,
+    u.display_name as host_display,
     r.code,
     r.created
 FROM rooms AS r

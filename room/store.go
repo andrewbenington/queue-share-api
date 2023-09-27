@@ -8,6 +8,7 @@ import (
 
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/db/gen"
+	"github.com/andrewbenington/queue-share-api/user"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
@@ -30,12 +31,15 @@ func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 		return Room{}, err
 	}
 	return Room{
-		ID:       row.ID.String(),
-		HostID:   row.HostID.String(),
-		HostName: row.HostName,
-		Code:     row.Code,
-		Name:     row.Name,
-		Created:  row.Created,
+		ID: row.ID.String(),
+		Host: user.User{
+			ID:          row.HostID.String(),
+			Username:    row.HostUsername,
+			DisplayName: row.HostDisplay,
+		},
+		Code:    row.Code,
+		Name:    row.Name,
+		Created: row.Created,
 	}, nil
 }
 
