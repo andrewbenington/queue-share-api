@@ -22,7 +22,7 @@ type Room struct {
 type RoomPassword struct {
 	ID                uuid.UUID
 	RoomID            uuid.UUID
-	EncryptedPassword []byte
+	EncryptedPassword sql.NullString
 }
 
 type SchemaMigration struct {

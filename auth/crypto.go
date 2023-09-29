@@ -39,8 +39,8 @@ func AESGCMEncrypt(token string) ([]byte, error) {
 	return ciphertext, nil
 }
 
-func AESGCMDecrypt(encrypted []byte, password string) (string, error) {
-	key := hashTo64(password)
+func AESGCMDecrypt(encrypted []byte) (string, error) {
+	key := hashTo64(config.GetEncryptionKey())
 
 	block, err := aes.NewCipher(key)
 	if err != nil {

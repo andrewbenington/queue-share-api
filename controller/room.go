@@ -4,20 +4,24 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/andrewbenington/queue-share-api/auth"
-	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/room"
-	"github.com/zmb3/spotify/v2"
-	spotifyauth "github.com/zmb3/spotify/v2/auth"
-	"golang.org/x/oauth2"
 )
 
 func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserContextKey).(string)
+	if !ok {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotAuthenticated))
+		return
+	}
+
 	var req room.InsertRoomParams
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -25,29 +29,22 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(MarshalErrorBody(constants.ErrorBadRequest))
 		return
 	}
-	ctx := r.Context()
 
-	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.SpotifyScopes...))
-	httpClient := authenticator.Client(ctx, &oauth2.Token{
-		AccessToken: req.AccessToken,
-	})
-	spClient := spotify.New(httpClient)
-	user, err := spClient.CurrentUser(ctx)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(MarshalErrorBody(err.Error()))
-		return
-	}
+	req.HostID = userID
 
-	req.HostID = user.ID
-	req.HostName = user.DisplayName
-
-	newRoom, err := db.Service().RoomStore.Insert(ctx, req)
+	newRoom, err := db.Service().RoomStore.Insert(r.Context(), req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error inserting room: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
 		return
+	}
+
+	user, err := db.Service().UserStore.GetByID(r.Context(), userID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "get room host after create: %s", err)
+	} else {
+		newRoom.Host = *user
 	}
 
 	body, err := json.MarshalIndent(newRoom, "", " ")
@@ -69,21 +66,24 @@ func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(MarshalErrorBody(constants.ErrorBadRequest))
 		return
 	}
-	status, _, err := client.DecryptRoomToken(r.Context(), code, password)
-	if status == http.StatusNotFound {
+	valid, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
+	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(MarshalErrorBody(err.Error()))
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotFound))
 		return
 	}
 	if err != nil {
-		w.WriteHeader(status)
-		if status == http.StatusUnauthorized {
-			_, _ = w.Write(MarshalErrorBody(constants.ErrorPassword))
-		} else {
-			fmt.Fprintf(os.Stderr, "error validating password: %s\n", err)
-		}
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
 		return
 	}
+	if !valid {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorPassword))
+		return
+	}
+
 	room, err := db.Service().RoomStore.GetByCode(ctx, code)
 
 	if err == sql.ErrNoRows {

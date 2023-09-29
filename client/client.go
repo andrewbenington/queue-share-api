@@ -16,13 +16,26 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err error) {
+func ForRoom(r *http.Request) (statusCode int, client *spotify.Client, err error) {
 	ctx := r.Context()
 	code, password := room.ParametersFromRequest(r)
 	if code == "" {
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid room code")
 	}
-	status, token, err := DecryptRoomToken(ctx, code, password)
+	authenticated, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
+	if err == sql.ErrNoRows {
+		return http.StatusNotFound, nil, fmt.Errorf("No room with code '%s'", code)
+	}
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	if !authenticated {
+		return http.StatusForbidden, nil, fmt.Errorf("Invalid room password")
+	}
+
+	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := db.Service().RoomStore.GetEncryptedRoomTokens(ctx, code)
+
+	status, token, err := DecryptRoomToken(ctx, encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken)
 	if err != nil {
 		return status, nil, err
 	}
@@ -55,21 +68,14 @@ func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err e
 	return http.StatusOK, spotifyClient, nil
 }
 
-func DecryptRoomToken(ctx context.Context, code string, password string) (int, *oauth2.Token, error) {
-	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := db.Service().RoomStore.GetEncryptedRoomTokens(ctx, code)
-	if err == sql.ErrNoRows {
-		return http.StatusNotFound, nil, fmt.Errorf("No room with code '%s'", code)
-	}
+func DecryptRoomToken(ctx context.Context, encrytpedAccessToken []byte, accessTokenExpiry time.Time, encryptedRefreshToken []byte) (int, *oauth2.Token, error) {
+	decryptedAccessToken, err := auth.AESGCMDecrypt(encrytpedAccessToken)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("get encrypted room token: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("decryption error")
 	}
-	decryptedAccessToken, err := auth.AESGCMDecrypt(encrytpedAccessToken, password)
+	decryptedRefreshToken, err := auth.AESGCMDecrypt(encryptedRefreshToken)
 	if err != nil {
-		return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
-	}
-	decryptedRefreshToken, err := auth.AESGCMDecrypt(encryptedRefreshToken, password)
-	if err != nil {
-		return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
+		return http.StatusInternalServerError, nil, fmt.Errorf("decryption error")
 	}
 	token := &oauth2.Token{
 		AccessToken:  decryptedAccessToken,

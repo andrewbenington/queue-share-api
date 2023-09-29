@@ -81,7 +81,7 @@ SET default_table_access_method = heap;
 CREATE TABLE public.room_passwords (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     room_id uuid NOT NULL,
-    encrypted_password bytea
+    encrypted_password text
 );
 
 

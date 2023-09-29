@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/spotify"
@@ -16,7 +17,7 @@ var (
 )
 
 func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
-	status, spClient, err := client.FromRequest(r)
+	status, spClient, err := client.ForRoom(r)
 	if err != nil {
 		w.WriteHeader(status)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
@@ -45,7 +46,7 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("no song specified"))
 		return
 	}
-	status, spClient, err := client.FromRequest(r)
+	status, spClient, err := client.ForRoom(r)
 	if err != nil {
 		w.WriteHeader(status)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
@@ -57,6 +58,7 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
+	time.Sleep(500 * time.Millisecond)
 	currrentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

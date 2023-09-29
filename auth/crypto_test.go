@@ -12,7 +12,7 @@ func TestEncryptDecrypt(t *testing.T) {
 		encrypted, err := AESGCMEncrypt("this is my token")
 		assert.NoError(t, err)
 
-		decrypted, err := AESGCMDecrypt(encrypted, "password")
+		decrypted, err := AESGCMDecrypt(encrypted)
 		assert.NoError(t, err)
 
 		assert.Equal(t, "this is my token", decrypted)

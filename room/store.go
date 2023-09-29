@@ -33,9 +33,11 @@ func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 	return Room{
 		ID: row.ID.String(),
 		Host: user.User{
-			ID:          row.HostID.String(),
-			Username:    row.HostUsername,
-			DisplayName: row.HostDisplay,
+			ID:           row.HostID.String(),
+			Username:     row.HostUsername,
+			DisplayName:  row.HostDisplay,
+			SpotifyName:  row.HostSpotifyName.String,
+			SpotifyImage: row.HostImage.String,
 		},
 		Code:    row.Code,
 		Name:    row.Name,
@@ -54,13 +56,9 @@ func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (access
 }
 
 type InsertRoomParams struct {
-	Name              string    `json:"name"`
-	Password          string    `json:"password"`
-	HostName          string    `json:"host_name"`
-	HostID            string    `json:"host_id"`
-	AccessToken       string    `json:"access_token"`
-	AccessTokenExpiry time.Time `json:"access_token_expiry"`
-	RefreshToken      string    `json:"refresh_token"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
+	HostID   string `json:"host_id"`
 }
 
 func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room, error) {
@@ -70,11 +68,12 @@ func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room
 	if err != nil {
 		return Room{}, fmt.Errorf("parse user UUID: %w", err)
 	}
-	row, err := gen.New(s.db).InsertRoom(
+	row, err := gen.New(s.db).InsertRoomWithPass(
 		ctx,
-		gen.InsertRoomParams{
-			Name:   insertParams.Name,
-			HostID: hostUUID,
+		gen.InsertRoomWithPassParams{
+			Name:     insertParams.Name,
+			HostID:   hostUUID,
+			RoomPass: insertParams.Password,
 		},
 	)
 	if err != nil {
@@ -105,5 +104,12 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 		EncryptedAccessToken:  encryptedAccessToken,
 		AccessTokenExpiry:     oauthToken.Expiry,
 		EncryptedRefreshToken: encryptedRefreshToken,
+	})
+}
+
+func (s *Store) ValidatePassword(ctx context.Context, code string, password string) (bool, error) {
+	return gen.New(s.db).ValidateRoomPass(ctx, gen.ValidateRoomPassParams{
+		Code:     code,
+		RoomPass: password,
 	})
 }
