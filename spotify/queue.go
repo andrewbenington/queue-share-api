@@ -12,6 +12,7 @@ type TrackInfo struct {
 	Name    string         `json:"name"`
 	Artists []string       `json:"artists"`
 	Image   *spotify.Image `json:"image"`
+	AddedBy string         `json:"added_by,omitempty"`
 }
 
 type CurrentQueue struct {

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -47,7 +48,7 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		newRoom.Host = *user
 	}
 
-	body, err := json.MarshalIndent(newRoom, "", " ")
+	body, err := json.Marshal(room.RoomResponse{Room: newRoom})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error marshalling room: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -60,31 +61,20 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 
 func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	code, password := room.ParametersFromRequest(r)
+	code, guestID, password := room.ParametersFromRequest(r)
 	if code == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(MarshalErrorBody(constants.ErrorBadRequest))
 		return
 	}
-	valid, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
-	if err == sql.ErrNoRows {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotFound))
-		return
-	}
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
-		return
-	}
-	if !valid {
-		w.WriteHeader(http.StatusForbidden)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorPassword))
+	status, errMsg := validateRoomPass(ctx, code, password)
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+		_, _ = w.Write(MarshalErrorBody(errMsg))
 		return
 	}
 
-	room, err := db.Service().RoomStore.GetByCode(ctx, code)
+	rm, err := db.Service().RoomStore.GetByCode(ctx, code)
 
 	if err == sql.ErrNoRows {
 		w.WriteHeader(http.StatusNotFound)
@@ -92,16 +82,101 @@ func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error fetching room: %s", err)
+		log.Printf("error fetching room: %s\n", err)
 		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
 		return
 	}
-	body, err := json.MarshalIndent(room, "", " ")
+
+	resp := room.RoomResponse{
+		Room: rm,
+	}
+
+	if guestID != "" {
+		guestName, err := db.Service().RoomStore.GetGuestName(ctx, rm.ID, guestID)
+		if err != nil {
+			log.Printf("error finding guest name: %s\n", err)
+		} else {
+			resp.Guest = &room.Guest{
+				ID:   guestID,
+				Name: guestName,
+			}
+		}
+	}
+
+	body, err := json.Marshal(resp)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error marshalling room: %s", err)
+		log.Printf("error marshalling room response: %s\n", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
 		return
 	}
 	w.Write(body)
+}
+
+func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	code, guestID, password := room.ParametersFromRequest(r)
+	if code == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorBadRequest))
+		return
+	}
+
+	status, errMsg := validateRoomPass(ctx, code, password)
+	if status != http.StatusOK {
+		w.WriteHeader(status)
+		_, _ = w.Write(MarshalErrorBody(errMsg))
+		return
+	}
+
+	var req room.InsertGuestRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorBadRequest))
+		return
+	}
+
+	var guest *room.Guest
+	if guestID != "" {
+		guest, err = db.Service().RoomStore.InsertGuestWithID(ctx, code, req.Name, guestID)
+	} else {
+		guest, err = db.Service().RoomStore.InsertGuest(ctx, code, req.Name)
+	}
+
+	if err == sql.ErrNoRows {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotFound))
+		return
+	}
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		return
+	}
+
+	body, err := json.Marshal(guest)
+	if err != nil {
+		log.Printf("error marshalling room guest: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+	w.Write(body)
+}
+
+func validateRoomPass(ctx context.Context, code string, password string) (status int, errorMessage string) {
+	valid, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
+	if err == sql.ErrNoRows {
+		return http.StatusNotFound, constants.ErrorNotFound
+	}
+	if err != nil {
+		log.Printf("error authenticating room: %s\n", err)
+		return http.StatusInternalServerError, constants.ErrorInternal
+	}
+	if !valid {
+		return http.StatusForbidden, constants.ErrorPassword
+	}
+	return http.StatusOK, ""
 }

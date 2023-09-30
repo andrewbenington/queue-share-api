@@ -18,7 +18,7 @@ import (
 
 func ForRoom(r *http.Request) (statusCode int, client *spotify.Client, err error) {
 	ctx := r.Context()
-	code, password := room.ParametersFromRequest(r)
+	code, _, password := room.ParametersFromRequest(r)
 	if code == "" {
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid room code")
 	}

@@ -19,10 +19,23 @@ type Room struct {
 	HostID  uuid.UUID
 }
 
+type RoomGuest struct {
+	ID     uuid.UUID
+	RoomID uuid.UUID
+	Name   string
+}
+
 type RoomPassword struct {
 	ID                uuid.UUID
 	RoomID            uuid.UUID
 	EncryptedPassword sql.NullString
+}
+
+type RoomQueueTrack struct {
+	ID      uuid.UUID
+	TrackID string
+	GuestID uuid.UUID
+	RoomID  uuid.UUID
 }
 
 type SchemaMigration struct {

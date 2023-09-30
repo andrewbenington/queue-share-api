@@ -35,6 +35,7 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/room/{code}/queue", a.Controller.GetQueue).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/queue/{song}", a.Controller.PushToQueue).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/search", a.Controller.Search).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/guest", a.Controller.AddGuest).Methods("POST", "OPTIONS")
 
 	a.Router.HandleFunc("/user", a.Controller.CreateUser).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/user", a.Controller.CurrentUser).Methods("GET", "OPTIONS")
@@ -82,7 +83,6 @@ func authMW(next http.Handler) http.Handler {
 		reqToken := r.Header.Get("Authorization")
 		splitToken := strings.Split(reqToken, "Bearer ")
 		if len(splitToken) < 2 {
-			log.Printf("No token, skipping auth")
 			next.ServeHTTP(w, r)
 			return
 		}

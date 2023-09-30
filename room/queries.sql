@@ -71,3 +71,60 @@ WHERE
     st.user_id = r.host_id
     AND r.code = $1;
 
+-- name: RoomGuestInsert :one
+INSERT INTO room_guests(room_id, name)
+SELECT
+    r.id,
+    $1
+FROM
+    rooms AS r
+WHERE
+    r.code = @room_code::text
+RETURNING
+    id,
+    name;
+
+-- name: RoomGuestInsertWithID :one
+INSERT INTO room_guests(id, room_id, name)
+SELECT
+    @guest_id::uuid,
+    r.id,
+    $1
+FROM
+    rooms AS r
+WHERE
+    r.code = @room_code::text
+RETURNING
+    id,
+    name;
+
+-- name: RoomGuestGetName :one
+SELECT
+    name
+FROM
+    room_guests
+WHERE
+    room_id = $1
+    AND id = @guest_id::uuid;
+
+-- name: RoomSetQueueTrack :exec
+INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
+SELECT
+    $1,
+    @guest_id::uuid,
+    r.id
+FROM
+    rooms AS r
+WHERE
+    r.code = @room_code::text;
+
+-- name: RoomGetQueueTracks :many
+SELECT
+    track_id,
+    g.name
+FROM
+    room_queue_tracks t
+    JOIN rooms r ON r.code = $1
+    JOIN room_guests g ON g.id = t.guest_id
+        AND t.room_id = r.id;
+

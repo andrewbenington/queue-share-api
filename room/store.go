@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/auth"
@@ -26,7 +27,7 @@ func NewStore(db *sql.DB) *Store {
 func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	row, err := gen.New(s.db).FindRoomByCode(ctx, code)
+	row, err := gen.New(s.db).FindRoomByCode(ctx, strings.ToUpper(code))
 	if err != nil {
 		return Room{}, err
 	}
@@ -53,12 +54,6 @@ func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (access
 		return
 	}
 	return row.EncryptedAccessToken, row.AccessTokenExpiry, row.EncryptedRefreshToken, nil
-}
-
-type InsertRoomParams struct {
-	Name     string `json:"name"`
-	Password string `json:"password"`
-	HostID   string `json:"host_id"`
 }
 
 func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room, error) {
@@ -100,7 +95,7 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 		return fmt.Errorf("encrypt refresh token: %w", err)
 	}
 	return gen.New(s.db).UpdateSpotifyTokensByRoomCode(ctx, gen.UpdateSpotifyTokensByRoomCodeParams{
-		Code:                  code,
+		Code:                  strings.ToUpper(code),
 		EncryptedAccessToken:  encryptedAccessToken,
 		AccessTokenExpiry:     oauthToken.Expiry,
 		EncryptedRefreshToken: encryptedRefreshToken,
@@ -109,7 +104,86 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 
 func (s *Store) ValidatePassword(ctx context.Context, code string, password string) (bool, error) {
 	return gen.New(s.db).ValidateRoomPass(ctx, gen.ValidateRoomPassParams{
-		Code:     code,
+		Code:     strings.ToUpper(code),
 		RoomPass: password,
 	})
+}
+
+func (s *Store) InsertGuest(ctx context.Context, roomCode string, name string) (*Guest, error) {
+	row, err := gen.New(s.db).RoomGuestInsert(ctx, gen.RoomGuestInsertParams{
+		RoomCode: roomCode,
+		Name:     name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Guest{
+		ID:   row.ID.String(),
+		Name: row.Name,
+	}, nil
+}
+
+func (s *Store) InsertGuestWithID(ctx context.Context, roomCode string, name string, guestID string) (*Guest, error) {
+	guestUUID, err := uuid.Parse(guestID)
+	if err != nil {
+		return nil, fmt.Errorf("parse guest UUID: %w", err)
+	}
+
+	row, err := gen.New(s.db).RoomGuestInsertWithID(ctx, gen.RoomGuestInsertWithIDParams{
+		GuestID:  guestUUID,
+		RoomCode: roomCode,
+		Name:     name,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Guest{
+		ID:   row.ID.String(),
+		Name: row.Name,
+	}, nil
+}
+
+func (s *Store) GetGuestName(ctx context.Context, roomID string, guestID string) (string, error) {
+	guestUUID, err := uuid.Parse(guestID)
+	if err != nil {
+		return "", fmt.Errorf("parse guest UUID: %w", err)
+	}
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return "", fmt.Errorf("parse guest UUID: %w", err)
+	}
+
+	return gen.New(s.db).RoomGuestGetName(ctx, gen.RoomGuestGetNameParams{
+		GuestID: guestUUID,
+		RoomID:  roomUUID,
+	})
+}
+
+func (s *Store) SetQueueTrackGuest(ctx context.Context, roomCode string, trackID string, guestID string) error {
+	guestUUID, err := uuid.Parse(guestID)
+	if err != nil {
+		return fmt.Errorf("parse guest id: %s", err)
+	}
+
+	return gen.New(s.db).RoomSetQueueTrack(ctx, gen.RoomSetQueueTrackParams{
+		GuestID:  guestUUID,
+		RoomCode: roomCode,
+		TrackID:  trackID,
+	})
+}
+
+func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (tracks []TrackWithGuest, err error) {
+	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, roomCode)
+	if err != nil {
+		return
+	}
+
+	for _, row := range rows {
+		tracks = append(tracks, TrackWithGuest{
+			TrackID:   row.TrackID,
+			GuestName: row.Name,
+		})
+	}
+
+	return
 }

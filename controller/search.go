@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -27,7 +26,6 @@ func (c *Controller) Search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(SearchMissingError)
 	}
-	fmt.Println(term)
 	results, err := spotify.SearchSongs(r.Context(), client, term)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)

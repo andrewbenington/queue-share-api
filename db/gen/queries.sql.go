@@ -220,6 +220,154 @@ func (q *Queries) InsertUserWithPass(ctx context.Context, arg InsertUserWithPass
 	return created, err
 }
 
+const roomGetQueueTracks = `-- name: RoomGetQueueTracks :many
+SELECT
+    track_id,
+    g.name
+FROM
+    room_queue_tracks t
+    JOIN rooms r ON r.code = $1
+    JOIN room_guests g ON g.id = t.guest_id
+        AND t.room_id = r.id
+`
+
+type RoomGetQueueTracksRow struct {
+	TrackID string
+	Name    string
+}
+
+func (q *Queries) RoomGetQueueTracks(ctx context.Context, code string) ([]RoomGetQueueTracksRow, error) {
+	rows, err := q.db.QueryContext(ctx, roomGetQueueTracks, code)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RoomGetQueueTracksRow
+	for rows.Next() {
+		var i RoomGetQueueTracksRow
+		if err := rows.Scan(&i.TrackID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const roomGuestGetName = `-- name: RoomGuestGetName :one
+SELECT
+    name
+FROM
+    room_guests
+WHERE
+    room_id = $1
+    AND id = $2::uuid
+`
+
+type RoomGuestGetNameParams struct {
+	RoomID  uuid.UUID
+	GuestID uuid.UUID
+}
+
+func (q *Queries) RoomGuestGetName(ctx context.Context, arg RoomGuestGetNameParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, roomGuestGetName, arg.RoomID, arg.GuestID)
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
+const roomGuestInsert = `-- name: RoomGuestInsert :one
+INSERT INTO room_guests(room_id, name)
+SELECT
+    r.id,
+    $1
+FROM
+    rooms AS r
+WHERE
+    r.code = $2::text
+RETURNING
+    id,
+    name
+`
+
+type RoomGuestInsertParams struct {
+	Name     string
+	RoomCode string
+}
+
+type RoomGuestInsertRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) RoomGuestInsert(ctx context.Context, arg RoomGuestInsertParams) (RoomGuestInsertRow, error) {
+	row := q.db.QueryRowContext(ctx, roomGuestInsert, arg.Name, arg.RoomCode)
+	var i RoomGuestInsertRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const roomGuestInsertWithID = `-- name: RoomGuestInsertWithID :one
+INSERT INTO room_guests(id, room_id, name)
+SELECT
+    $2::uuid,
+    r.id,
+    $1
+FROM
+    rooms AS r
+WHERE
+    r.code = $3::text
+RETURNING
+    id,
+    name
+`
+
+type RoomGuestInsertWithIDParams struct {
+	Name     string
+	GuestID  uuid.UUID
+	RoomCode string
+}
+
+type RoomGuestInsertWithIDRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) RoomGuestInsertWithID(ctx context.Context, arg RoomGuestInsertWithIDParams) (RoomGuestInsertWithIDRow, error) {
+	row := q.db.QueryRowContext(ctx, roomGuestInsertWithID, arg.Name, arg.GuestID, arg.RoomCode)
+	var i RoomGuestInsertWithIDRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const roomSetQueueTrack = `-- name: RoomSetQueueTrack :exec
+INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
+SELECT
+    $1,
+    $2::uuid,
+    r.id
+FROM
+    rooms AS r
+WHERE
+    r.code = $3::text
+`
+
+type RoomSetQueueTrackParams struct {
+	TrackID  string
+	GuestID  uuid.UUID
+	RoomCode string
+}
+
+func (q *Queries) RoomSetQueueTrack(ctx context.Context, arg RoomSetQueueTrackParams) error {
+	_, err := q.db.ExecContext(ctx, roomSetQueueTrack, arg.TrackID, arg.GuestID, arg.RoomCode)
+	return err
+}
+
 const updateSpotifyTokensByRoomCode = `-- name: UpdateSpotifyTokensByRoomCode :exec
 UPDATE
     spotify_tokens st
