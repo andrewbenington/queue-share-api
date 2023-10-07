@@ -34,10 +34,16 @@ func ForRoom(r *http.Request) (statusCode int, client *spotify.Client, err error
 	}
 
 	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := db.Service().RoomStore.GetEncryptedRoomTokens(ctx, code)
+	if err == sql.ErrNoRows {
+		return http.StatusNotFound, nil, fmt.Errorf("Room credentials not found")
+	}
 
 	status, token, err := DecryptRoomToken(ctx, encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken)
 	if err != nil {
 		return status, nil, err
+	}
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
 	}
 
 	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.SpotifyScopes...))

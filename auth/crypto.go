@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"fmt"
 	"io"
 
 	"github.com/andrewbenington/queue-share-api/config"
@@ -53,6 +54,9 @@ func AESGCMDecrypt(encrypted []byte) (string, error) {
 	}
 
 	nonceSize := aesGCM.NonceSize()
+	if len(encrypted) < nonceSize {
+		return "", fmt.Errorf("invalid token")
+	}
 	nonce, ciphertext := encrypted[:nonceSize], encrypted[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {

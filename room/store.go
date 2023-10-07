@@ -49,7 +49,7 @@ func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (accessToken []byte, accessTokenExpiry time.Time, refreshToken []byte, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	row, err := gen.New(s.db).GetSpotifyTokensByRoomCode(ctx, code)
+	row, err := gen.New(s.db).GetSpotifyTokensByRoomCode(ctx, strings.ToUpper(code))
 	if err != nil {
 		return
 	}
