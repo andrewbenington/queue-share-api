@@ -173,7 +173,7 @@ func (s *Store) SetQueueTrackGuest(ctx context.Context, roomCode string, trackID
 }
 
 func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (tracks []TrackWithGuest, err error) {
-	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, roomCode)
+	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, strings.ToUpper(roomCode))
 	if err != nil {
 		return
 	}

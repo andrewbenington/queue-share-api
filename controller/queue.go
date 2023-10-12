@@ -35,21 +35,28 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
-	currrentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
+	currentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
 
-	status, errMessage := addGuestsToTracks(r.Context(), roomCode, currrentQueue)
+	err = spotify.UpdateUserPlayback(r.Context(), spClient, currentQueue)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
+		return
+	}
+
+	status, errMessage := addGuestsToTracks(r.Context(), roomCode, currentQueue)
 	if status != http.StatusOK {
 		w.WriteHeader(status)
 		_, _ = w.Write(MarshalErrorBody(errMessage))
 		return
 	}
 
-	responseBytes, err := json.MarshalIndent(currrentQueue, "", " ")
+	responseBytes, err := json.MarshalIndent(currentQueue, "", " ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
@@ -94,21 +101,28 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	currrentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
+	currentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
 		return
 	}
 
-	status, errMessage := addGuestsToTracks(r.Context(), code, currrentQueue)
+	err = spotify.UpdateUserPlayback(r.Context(), spClient, currentQueue)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write(MarshalErrorBody(err.Error()))
+		return
+	}
+
+	status, errMessage := addGuestsToTracks(r.Context(), code, currentQueue)
 	if status != http.StatusOK {
 		w.WriteHeader(status)
 		_, _ = w.Write(MarshalErrorBody(errMessage))
 		return
 	}
 
-	responseBytes, err := json.MarshalIndent(currrentQueue, "", " ")
+	responseBytes, err := json.MarshalIndent(currentQueue, "", " ")
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write(MarshalErrorBody(err.Error()))
