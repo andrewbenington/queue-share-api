@@ -8,26 +8,45 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/andrewbenington/go-spotify/auth"
-	"github.com/andrewbenington/go-spotify/db"
-	"github.com/andrewbenington/go-spotify/room"
+	"github.com/andrewbenington/queue-share-api/auth"
+	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
 	"golang.org/x/oauth2"
 )
 
-func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err error) {
+func ForRoom(r *http.Request) (statusCode int, client *spotify.Client, err error) {
 	ctx := r.Context()
-	code, password := room.ParametersFromRequest(r)
+	code, _, password := room.ParametersFromRequest(r)
 	if code == "" {
 		return http.StatusBadRequest, nil, fmt.Errorf("invalid room code")
 	}
-	status, token, err := DecryptRoomToken(ctx, code, password)
+	authenticated, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
+	if err == sql.ErrNoRows {
+		return http.StatusNotFound, nil, fmt.Errorf("No room with code '%s'", code)
+	}
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	if !authenticated {
+		return http.StatusForbidden, nil, fmt.Errorf("Invalid room password")
+	}
+
+	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := db.Service().RoomStore.GetEncryptedRoomTokens(ctx, code)
+	if err == sql.ErrNoRows {
+		return http.StatusNotFound, nil, fmt.Errorf("Room credentials not found")
+	}
+
+	status, token, err := DecryptRoomToken(ctx, encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken)
 	if err != nil {
 		return status, nil, err
 	}
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
 
-	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.Scopes...))
+	authenticator := spotifyauth.New(spotifyauth.WithScopes(auth.SpotifyScopes...))
 	httpClient := authenticator.Client(ctx, token)
 	spotifyClient := spotify.New(httpClient)
 
@@ -46,15 +65,7 @@ func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err e
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("get refreshed token: %w", err)
 		}
-		encryptedAccessToken, err := auth.EncryptToken(newToken.AccessToken, password)
-		if err != nil {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
-		}
-		encryptedRefreshToken, err := auth.EncryptToken(newToken.RefreshToken, password)
-		if err != nil {
-			return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
-		}
-		err = db.Service().RoomStore.UpdateEncryptedRoomTokens(ctx, code, encryptedAccessToken, newToken.Expiry, encryptedRefreshToken)
+		err = db.Service().RoomStore.UpdateSpotifyToken(ctx, code, newToken)
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("update room tokens: %w", err)
 		}
@@ -63,21 +74,14 @@ func FromRequest(r *http.Request) (statusCode int, client *spotify.Client, err e
 	return http.StatusOK, spotifyClient, nil
 }
 
-func DecryptRoomToken(ctx context.Context, code string, password string) (int, *oauth2.Token, error) {
-	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := db.Service().RoomStore.GetEncryptedRoomTokens(ctx, code)
-	if err == sql.ErrNoRows {
-		return http.StatusNotFound, nil, fmt.Errorf("No room with code '%s'", code)
-	}
+func DecryptRoomToken(ctx context.Context, encrytpedAccessToken []byte, accessTokenExpiry time.Time, encryptedRefreshToken []byte) (int, *oauth2.Token, error) {
+	decryptedAccessToken, err := auth.AESGCMDecrypt(encrytpedAccessToken)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("get encrypted room token: %w", err)
+		return http.StatusInternalServerError, nil, fmt.Errorf("decryption error")
 	}
-	decryptedAccessToken, err := auth.DecryptToken(encrytpedAccessToken, password)
+	decryptedRefreshToken, err := auth.AESGCMDecrypt(encryptedRefreshToken)
 	if err != nil {
-		return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
-	}
-	decryptedRefreshToken, err := auth.DecryptToken(encryptedRefreshToken, password)
-	if err != nil {
-		return http.StatusUnauthorized, nil, fmt.Errorf("invalid password")
+		return http.StatusInternalServerError, nil, fmt.Errorf("decryption error")
 	}
 	token := &oauth2.Token{
 		AccessToken:  decryptedAccessToken,

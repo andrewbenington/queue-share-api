@@ -12,16 +12,57 @@ import (
 )
 
 type Room struct {
-	ID                    uuid.UUID
-	Name                  string
-	Code                  string
-	Created               sql.NullTime
-	EncryptedAccessToken  string
-	AccessTokenExpiry     time.Time
-	EncryptedRefreshToken string
+	ID      uuid.UUID
+	Name    string
+	Code    string
+	Created time.Time
+	HostID  uuid.UUID
+}
+
+type RoomGuest struct {
+	ID     uuid.UUID
+	RoomID uuid.UUID
+	Name   string
+}
+
+type RoomPassword struct {
+	ID                uuid.UUID
+	RoomID            uuid.UUID
+	EncryptedPassword sql.NullString
+}
+
+type RoomQueueTrack struct {
+	ID      uuid.UUID
+	TrackID string
+	GuestID uuid.UUID
+	RoomID  uuid.UUID
 }
 
 type SchemaMigration struct {
 	Version int64
 	Dirty   bool
+}
+
+type SpotifyToken struct {
+	ID                    uuid.UUID
+	UserID                uuid.UUID
+	EncryptedAccessToken  []byte
+	AccessTokenExpiry     time.Time
+	EncryptedRefreshToken []byte
+}
+
+type User struct {
+	ID              uuid.UUID
+	Username        string
+	DisplayName     string
+	SpotifyAccount  sql.NullString
+	SpotifyName     sql.NullString
+	SpotifyImageUrl sql.NullString
+	Created         time.Time
+}
+
+type UserPassword struct {
+	ID                uuid.UUID
+	UserID            uuid.NullUUID
+	EncryptedPassword string
 }

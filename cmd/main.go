@@ -1,28 +1,31 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
-	"github.com/andrewbenington/go-spotify/app"
-	"github.com/andrewbenington/go-spotify/db"
-	"github.com/zmb3/spotify/v2"
-)
-
-var (
-	client  *spotify.Client
-	session string
+	"github.com/andrewbenington/queue-share-api/app"
+	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/version"
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
+	v := version.Get()
+	bytes, err := yaml.Marshal(v)
+	if err != nil {
+		log.Panicf("marshal version data: %s", err)
+	}
+	log.Println("version:\n" + string(bytes))
+
 	a := app.App{}
 	a.Initialize()
-	err := db.Service().Initialize()
+	err = db.Service().Initialize()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %s", err)
+		log.Fatal(err)
 	}
 
-	addr := "localhost:8080"
+	addr := ":8080"
 	if len(os.Args) > 1 {
 		addr = os.Args[1]
 	}

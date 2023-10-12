@@ -1,14 +1,26 @@
+GIT_COMMIT:=$(shell git rev-parse HEAD || echo '?')
+GIT_TREE:=$(shell git diff-index --quiet HEAD -- && echo clean || echo dirty)
+GIT_VERSION:=$(shell git describe --tags --dirty --match 'v*' 2> /dev/null || echo dev-$(shell date -u +"%Y%m%d%H%M%S"))
+DB_VERSION:=$(shell ls -1 db/migrations | tail -n 1 | cut -b 1-14)
+BUILD_DATE:=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+LD_FLAGS = -X github.com/andrewbenington/queue-share-api/version.Commit=${GIT_COMMIT} \
+	-X github.com/andrewbenington/queue-share-api/version.Date=${BUILD_DATE} \
+	-X github.com/andrewbenington/queue-share-api/version.Tag=${GIT_VERSION} \
+	-X github.com/andrewbenington/queue-share-api/version.Tree=${GIT_TREE} \
+	-X github.com/andrewbenington/queue-share-api/version.Database=${DB_VERSION} 
+
 .PHONY: start
 start:
 	@go run ./cmd/main.go
 
 .PHONY: build
 build:
-	go build -o bin/queue-share ./cmd/main.go
+	go build -ldflags '-s -w -extldflags "-static" ${LD_FLAGS}' -o bin/queue-share ./cmd/main.go
 
 .PHONY: build-linux
 build-linux:
-	GOOS=linux GOARCH=amd64 go build -o bin/queue-share ./cmd/main.go
+	GOOS=linux GOARCH=amd64 go build -ldflags '${LD_FLAGS}' -o bin/queue-share ./cmd/main.go
 
 .PHONY: migrate-up
 migrate-up:
@@ -20,11 +32,20 @@ migrate-down:
 
 .PHONY: migrate-force
 migrate-force:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force 1
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force ${VERSION}
+
+.PHONY: migrate-force-latest
+migrate-force-latest:
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force ${DB_VERSION}
+
 
 .PHONY: migrate-version
 migrate-version:
 	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' version
+
+.PHONY: migrate-prod
+migrate-prod:
+	@migrate -path db/migrations -database 'postgres://postgres:$(shell printf '%s' "$(POSTGRES_PASS)" | jq -sRr @uri)@${POSTGRES_HOST}:5432/queue-share' up 1
 
 .PHONY: schema
 schema:

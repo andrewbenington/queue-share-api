@@ -1,11 +1,15 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"time"
 
-	"github.com/andrewbenington/go-spotify/config"
-	"github.com/andrewbenington/go-spotify/room"
+	"github.com/andrewbenington/queue-share-api/config"
+	"github.com/andrewbenington/queue-share-api/room"
+	"github.com/andrewbenington/queue-share-api/user"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -16,6 +20,7 @@ var (
 type DBService struct {
 	DB        *sql.DB
 	RoomStore *room.Store
+	UserStore *user.Store
 }
 
 func Service() *DBService {
@@ -26,15 +31,16 @@ func Service() *DBService {
 }
 
 func (d *DBService) Initialize() error {
-	cfg := config.GetConfig()
-	dbConn, err := sql.Open("pgx", cfg.GetDBString())
+	dbConn, err := sql.Open("pgx", config.GetDBString())
 	if err != nil {
-		return fmt.Errorf("connect to database: %w\n", err)
+		return fmt.Errorf("open database: %w\n", err)
 	}
 	d.DB = dbConn
-	err = dbConn.Ping()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err = dbConn.PingContext(ctx)
 	if err != nil {
-		panic(err)
+		log.Fatalf("couldn't connect to db: %s", err)
 	}
 
 	d.initStores()
@@ -43,4 +49,5 @@ func (d *DBService) Initialize() error {
 
 func (d *DBService) initStores() {
 	d.RoomStore = room.NewStore(d.DB)
+	d.UserStore = user.NewStore(d.DB)
 }

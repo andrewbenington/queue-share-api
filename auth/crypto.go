@@ -5,69 +5,59 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
+
+	"github.com/andrewbenington/queue-share-api/config"
 )
 
-func passwordToKey(password string) []byte {
+func hashTo64(value string) []byte {
 	hasher := sha256.New()
-	hasher.Write([]byte(password))
+	hasher.Write([]byte(value))
 	return hasher.Sum(nil)
 }
 
-func EncryptToken(token string, password string) (string, error) {
-	key := passwordToKey(password)
+func AESGCMEncrypt(token string) ([]byte, error) {
+	keyBytes := hashTo64(config.GetEncryptionKey())
 	tokenBytes := []byte(token)
 
-	//Create a new Cipher Block from the key
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode
-	//https://golang.org/pkg/crypto/cipher/#NewGCM
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	//Create a nonce. Nonce should be from GCM
 	nonce := make([]byte, aesGCM.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	//Encrypt the data using aesGCM.Seal
-	//Since we don't want to save the nonce somewhere else in this case, we add it as a prefix
-	//to the encrypted data. The first nonce argument in Seal is the prefix.
 	ciphertext := aesGCM.Seal(nonce, nonce, tokenBytes, nil)
-	return fmt.Sprintf("%x", ciphertext), nil
+	return ciphertext, nil
 }
 
-func DecryptToken(encrypted string, password string) (string, error) {
-	key := passwordToKey(password)
-	enc, err := hex.DecodeString(encrypted)
-	if err != nil {
-		return "", err
-	}
+func AESGCMDecrypt(encrypted []byte) (string, error) {
+	key := hashTo64(config.GetEncryptionKey())
 
-	//Create a new Cipher Block from the key
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
 	}
 
-	//Create a new GCM - https://en.wikipedia.org/wiki/Galois/Counter_Mode
-	//https://golang.org/pkg/crypto/cipher/#NewGCM
 	aesGCM, err := cipher.NewGCM(block)
 	if err != nil {
 		return "", err
 	}
 
 	nonceSize := aesGCM.NonceSize()
-	nonce, ciphertext := enc[:nonceSize], enc[nonceSize:]
+	if len(encrypted) < nonceSize {
+		return "", fmt.Errorf("invalid token")
+	}
+	nonce, ciphertext := encrypted[:nonceSize], encrypted[nonceSize:]
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", err
