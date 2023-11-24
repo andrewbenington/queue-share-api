@@ -34,7 +34,7 @@ type RoomResponse struct {
 	Guest *Guest `json:"guest_data"`
 }
 
-type TrackWithGuest struct {
-	TrackID   string
-	GuestName string
+type QueuedTrack struct {
+	TrackID string
+	AddedBy string
 }

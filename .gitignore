@@ -1,5 +1,7 @@
-*.env
+*.env*
 
 bin/*
+
+*.tar
 
 .DS_STORE

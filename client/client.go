@@ -5,34 +5,18 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/db"
-	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
 	"golang.org/x/oauth2"
 )
 
-func ForRoom(r *http.Request) (statusCode int, client *spotify.Client, err error) {
-	ctx := r.Context()
-	code, _, password := room.ParametersFromRequest(r)
-	if code == "" {
-		return http.StatusBadRequest, nil, fmt.Errorf("invalid room code")
-	}
-	authenticated, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
-	if err == sql.ErrNoRows {
-		return http.StatusNotFound, nil, fmt.Errorf("No room with code '%s'", code)
-	}
-	if err != nil {
-		return http.StatusInternalServerError, nil, err
-	}
-	if !authenticated {
-		return http.StatusForbidden, nil, fmt.Errorf("Invalid room password")
-	}
-
+func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.Client, err error) {
 	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := db.Service().RoomStore.GetEncryptedRoomTokens(ctx, code)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, nil, fmt.Errorf("Room credentials not found")
@@ -43,6 +27,7 @@ func ForRoom(r *http.Request) (statusCode int, client *spotify.Client, err error
 		return status, nil, err
 	}
 	if err != nil {
+		log.Printf("Error decrypting room token: %s", err)
 		return http.StatusInternalServerError, nil, err
 	}
 

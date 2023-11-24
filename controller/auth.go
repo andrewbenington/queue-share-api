@@ -11,8 +11,8 @@ import (
 
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/config"
-	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/spotify"
 	"github.com/andrewbenington/queue-share-api/user"
 	"github.com/google/uuid"
@@ -29,42 +29,31 @@ type TokenResponse struct {
 func (c *Controller) GetToken(w http.ResponseWriter, r *http.Request) {
 	username, password, ok := r.BasicAuth()
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorPassword))
+		requests.RespondAuthError(w)
 		return
 	}
 
 	authenticated, err := db.Service().UserStore.Authenticate(r.Context(), username, password)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("authenticate: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondInternalError(w)
 		return
 	}
 	if !authenticated || err == sql.ErrNoRows {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotAuthenticated))
+		requests.RespondAuthError(w)
 		return
 	}
 
 	u, err := db.Service().UserStore.GetByUsername(r.Context(), username)
-	if err == sql.ErrNoRows {
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotFound))
-		return
-	}
 	if err != nil {
-		log.Printf("get user: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondWithDBError(w, err)
 		return
 	}
 
 	token, expiry, err := u.GetJWT()
 	if err != nil {
 		log.Printf("generate jwt: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondInternalError(w)
 		return
 	}
 
@@ -84,8 +73,7 @@ type GetSpotifyLoginURLResponse struct {
 func (c *Controller) GetSpotifyLoginURL(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotAuthenticated))
+		requests.RespondAuthError(w)
 		return
 	}
 	redirect := r.URL.Query().Get("redirect")
@@ -169,7 +157,7 @@ func (c *Controller) SpotifyAuthRedirect(w http.ResponseWriter, r *http.Request)
 
 	err = db.Service().UserStore.UpdateSpotifyToken(r.Context(), loginState.UserID, token)
 	if err != nil {
-		log.Printf("update user spotify token: %s\n", err)
+		log.Printf("update user spotify token: %s\n (loginState %+v)", err, loginState)
 		redirectQuery.Add("error", fmt.Sprintf("Error updating user Spotify token: %s", err))
 		return
 	}

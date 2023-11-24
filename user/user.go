@@ -1,7 +1,7 @@
 package user
 
 type User struct {
-	ID           string `json:"id"`
+	ID           string `json:"user_id"`
 	Username     string `json:"username"`
 	DisplayName  string `json:"display_name"`
 	SpotifyName  string `json:"spotify_name"`

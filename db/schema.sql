@@ -88,6 +88,20 @@ CREATE TABLE public.room_guests (
 ALTER TABLE public.room_guests OWNER TO postgres;
 
 --
+-- Name: room_members; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.room_members (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    room_id uuid NOT NULL,
+    is_moderator boolean DEFAULT false NOT NULL
+);
+
+
+ALTER TABLE public.room_members OWNER TO postgres;
+
+--
 -- Name: room_passwords; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -107,8 +121,10 @@ ALTER TABLE public.room_passwords OWNER TO postgres;
 CREATE TABLE public.room_queue_tracks (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     track_id text NOT NULL,
-    guest_id uuid NOT NULL,
-    room_id uuid NOT NULL
+    guest_id uuid,
+    room_id uuid NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid
 );
 
 
@@ -192,6 +208,14 @@ ALTER TABLE public.users OWNER TO postgres;
 
 ALTER TABLE ONLY public.room_guests
     ADD CONSTRAINT room_guests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: room_members room_members_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_members
+    ADD CONSTRAINT room_members_pkey PRIMARY KEY (id);
 
 
 --
@@ -282,6 +306,22 @@ ALTER TABLE ONLY public.room_guests
 
 
 --
+-- Name: room_members room_members_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_members
+    ADD CONSTRAINT room_members_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: room_members room_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_members
+    ADD CONSTRAINT room_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: room_passwords room_passwords_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -303,6 +343,14 @@ ALTER TABLE ONLY public.room_queue_tracks
 
 ALTER TABLE ONLY public.room_queue_tracks
     ADD CONSTRAINT room_queue_tracks_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
+
+
+--
+-- Name: room_queue_tracks room_queue_tracks_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_queue_tracks
+    ADD CONSTRAINT room_queue_tracks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

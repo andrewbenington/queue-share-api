@@ -46,6 +46,16 @@ func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 	}, nil
 }
 
+func (s *Store) GetHostID(ctx context.Context, code string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	id, err := gen.New(s.db).RoomGetHostID(ctx, strings.ToUpper(code))
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
+}
+
 func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (accessToken []byte, accessTokenExpiry time.Time, refreshToken []byte, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -109,6 +119,54 @@ func (s *Store) ValidatePassword(ctx context.Context, code string, password stri
 	})
 }
 
+func (s *Store) AddMember(ctx context.Context, roomCode string, userID string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("parse user UUID: %w", err)
+	}
+	err = gen.New(s.db).RoomAddMember(ctx, gen.RoomAddMemberParams{
+		RoomCode: roomCode,
+		UserID:   userUUID,
+	})
+	return err
+}
+
+func (s *Store) UserIsMember(ctx context.Context, roomID string, userID string) (bool, error) {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return false, fmt.Errorf("parse room UUID: %w", err)
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return false, fmt.Errorf("parse room UUID: %w", err)
+	}
+	return gen.New(s.db).RoomUserIsMember(ctx, gen.RoomUserIsMemberParams{UserID: userUUID, RoomID: roomUUID})
+}
+
+func (s *Store) GetAllMembers(ctx context.Context, roomID string) ([]user.User, error) {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("parse room UUID: %w", err)
+	}
+	rows, err := gen.New(s.db).RoomGetAllMembers(ctx, roomUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]user.User, 0, len(rows))
+	for _, row := range rows {
+		users = append(users, user.User{
+			ID:           row.UserID.String(),
+			Username:     row.Username,
+			DisplayName:  row.DisplayName,
+			SpotifyName:  row.SpotifyName.String,
+			SpotifyImage: row.SpotifyImageUrl.String,
+		})
+	}
+
+	return users, nil
+}
+
 func (s *Store) InsertGuest(ctx context.Context, roomCode string, name string) (*Guest, error) {
 	row, err := gen.New(s.db).RoomGuestInsert(ctx, gen.RoomGuestInsertParams{
 		RoomCode: roomCode,
@@ -159,31 +217,71 @@ func (s *Store) GetGuestName(ctx context.Context, roomID string, guestID string)
 	})
 }
 
+func (s *Store) GetAllRoomGuests(ctx context.Context, roomCode string) ([]Guest, error) {
+	rows, err := gen.New(s.db).RoomGetAllGuests(ctx, roomCode)
+	if err != nil {
+		return nil, err
+	}
+
+	guests := make([]Guest, 0, len(rows))
+	for _, row := range rows {
+		guests = append(guests, Guest{
+			ID:   row.ID.String(),
+			Name: row.Name,
+		})
+	}
+
+	return guests, nil
+}
+
 func (s *Store) SetQueueTrackGuest(ctx context.Context, roomCode string, trackID string, guestID string) error {
 	guestUUID, err := uuid.Parse(guestID)
 	if err != nil {
 		return fmt.Errorf("parse guest id: %s", err)
 	}
 
-	return gen.New(s.db).RoomSetQueueTrack(ctx, gen.RoomSetQueueTrackParams{
+	return gen.New(s.db).RoomSetGuestQueueTrack(ctx, gen.RoomSetGuestQueueTrackParams{
 		GuestID:  guestUUID,
 		RoomCode: roomCode,
 		TrackID:  trackID,
 	})
 }
 
-func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (tracks []TrackWithGuest, err error) {
+func (s *Store) SetQueueTrackUser(ctx context.Context, roomCode string, trackID string, userID string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("parse user id: %s", err)
+	}
+
+	return gen.New(s.db).RoomSetMemberQueueTrack(ctx, gen.RoomSetMemberQueueTrackParams{
+		UserID:   userUUID,
+		RoomCode: roomCode,
+		TrackID:  trackID,
+	})
+}
+
+func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (tracks []QueuedTrack, err error) {
 	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, strings.ToUpper(roomCode))
 	if err != nil {
 		return
 	}
 
 	for _, row := range rows {
-		tracks = append(tracks, TrackWithGuest{
-			TrackID:   row.TrackID,
-			GuestName: row.Name,
+		addedBy := ""
+		if row.GuestName.Valid {
+			addedBy = row.GuestName.String
+		} else if row.MemberName.Valid {
+			addedBy = row.MemberName.String
+		}
+		tracks = append(tracks, QueuedTrack{
+			TrackID: row.TrackID,
+			AddedBy: addedBy,
 		})
 	}
 
 	return
+}
+
+func (s *Store) DeleteByCode(ctx context.Context, roomCode string) error {
+	return gen.New(s.db).RoomDeleteByID(ctx, strings.ToUpper(roomCode))
 }

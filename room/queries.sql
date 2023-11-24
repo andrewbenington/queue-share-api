@@ -107,7 +107,16 @@ WHERE
     room_id = $1
     AND id = @guest_id::uuid;
 
--- name: RoomSetQueueTrack :exec
+-- name: RoomGetAllGuests :many
+SELECT
+    rg.name,
+    rg.id
+FROM
+    room_guests AS rg
+    JOIN rooms r ON r.code = $1
+        AND rg.room_id = r.id;
+
+-- name: RoomSetGuestQueueTrack :exec
 INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
 SELECT
     $1,
@@ -118,13 +127,69 @@ FROM
 WHERE
     r.code = @room_code::text;
 
+-- name: RoomSetMemberQueueTrack :exec
+INSERT INTO room_queue_tracks(track_id, user_id, room_id)
+SELECT
+    $1,
+    @user_id::uuid,
+    r.id
+FROM
+    rooms AS r
+WHERE
+    r.code = @room_code::text;
+
 -- name: RoomGetQueueTracks :many
 SELECT
     track_id,
-    g.name
+    g.name AS guest_name,
+    u.display_name AS member_name
 FROM
     room_queue_tracks t
     JOIN rooms r ON r.code = $1
-    JOIN room_guests g ON g.id = t.guest_id
-        AND t.room_id = r.id;
+    LEFT JOIN room_guests g ON g.id = t.guest_id
+    LEFT JOIN users u ON u.id = t.user_id;
+
+-- name: RoomGetHostID :one
+SELECT
+    r.host_id
+FROM
+    rooms r
+WHERE
+    r.code = $1;
+
+-- name: RoomDeleteByID :exec
+DELETE FROM rooms r
+WHERE r.code = $1;
+
+-- name: RoomAddMember :exec
+INSERT INTO room_members(user_id, room_id)
+SELECT
+    $1,
+    r.id
+FROM
+    rooms AS r
+WHERE
+    r.code = @room_code::text;
+
+-- name: RoomUserIsMember :one
+SELECT
+    is_moderator
+FROM
+    room_members
+WHERE
+    user_id = $1
+    AND room_id = $2;
+
+-- name: RoomGetAllMembers :many
+SELECT
+    u.id AS user_id,
+    u.username,
+    u.display_name,
+    u.spotify_name,
+    u.spotify_image_url,
+    m.is_moderator
+FROM
+    room_members AS m
+    JOIN users u ON m.user_id = u.id
+        AND m.room_id = $1;
 

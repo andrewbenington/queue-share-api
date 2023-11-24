@@ -10,6 +10,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/user"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -30,16 +31,14 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserBody
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorBadRequest))
+		requests.RespondBadRequest(w)
 		return
 	}
 
 	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
 	if err != nil {
 		log.Printf("create transaction: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondInternalError(w)
 		return
 	}
 
@@ -47,13 +46,11 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		pgErr, ok := err.(*pgconn.PgError)
 		if ok && pgErr.Code == "23505" {
-			w.WriteHeader(http.StatusConflict)
-			_, _ = w.Write(MarshalErrorBody(constants.ErrorUsernameInUse))
+			requests.RespondWithError(w, http.StatusConflict, constants.ErrorUsernameInUse)
 			return
 		}
 		log.Printf("create user: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondInternalError(w)
 		return
 	}
 
@@ -67,8 +64,7 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		_ = tx.Rollback()
 		log.Printf("generate jwt: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondInternalError(w)
 		return
 	}
 
@@ -81,8 +77,7 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 	err = tx.Commit()
 	if err != nil {
 		log.Printf("commit tx: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		requests.RespondInternalError(w)
 		return
 	}
 
@@ -93,21 +88,19 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) CurrentUser(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotAuthenticated))
+		requests.RespondAuthError(w)
 		return
 	}
 
 	u, err := db.Service().UserStore.GetByID(r.Context(), userID)
 
 	if err == sql.ErrNoRows {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorNotAuthenticated))
+		requests.RespondAuthError(w)
 		return
 	}
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+		log.Printf("Error getting current user: %s", err)
+		requests.RespondInternalError(w)
 		return
 	}
 
@@ -115,25 +108,24 @@ func (c *Controller) CurrentUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
+type GetUserRoomResponse struct {
+	Room *user.GetUserRoomResponse `json:"room"`
+}
+
 func (c *Controller) GetUserRoom(w http.ResponseWriter, r *http.Request) {
-	username, password, ok := r.BasicAuth()
+	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorPassword))
+		requests.RespondAuthError(w)
 		return
 	}
 
-	authorized, err := db.Service().UserStore.Authenticate(r.Context(), username, password)
-	if err != nil {
-		log.Printf("authorize user: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorInternal))
+	room, err := db.Service().UserStore.GetUserRoom(r.Context(), userID)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Error getting user room: %s", err)
+		requests.RespondInternalError(w)
 		return
 	}
 
-	if !authorized {
-		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write(MarshalErrorBody(constants.ErrorPassword))
-		return
-	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(GetUserRoomResponse{Room: room})
 }

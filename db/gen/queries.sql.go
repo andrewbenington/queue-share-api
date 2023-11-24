@@ -111,7 +111,7 @@ SELECT
 FROM
     rooms r
     JOIN users u ON r.host_id = u.id
-        AND upper(u.username) = upper($1::text)
+        AND u.id = $1
 `
 
 type GetUserRoomRow struct {
@@ -125,8 +125,8 @@ type GetUserRoomRow struct {
 	SpotifyImageUrl sql.NullString
 }
 
-func (q *Queries) GetUserRoom(ctx context.Context, username string) (GetUserRoomRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserRoom, username)
+func (q *Queries) GetUserRoom(ctx context.Context, id uuid.UUID) (GetUserRoomRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserRoom, id)
 	var i GetUserRoomRow
 	err := row.Scan(
 		&i.ID,
@@ -202,7 +202,7 @@ INSERT INTO users(username, display_name)
         new_user
     RETURNING (
         SELECT
-            created
+            id
         FROM
             new_user)
 `
@@ -213,27 +213,167 @@ type InsertUserWithPassParams struct {
 	UserPass    string
 }
 
-func (q *Queries) InsertUserWithPass(ctx context.Context, arg InsertUserWithPassParams) (time.Time, error) {
+func (q *Queries) InsertUserWithPass(ctx context.Context, arg InsertUserWithPassParams) (uuid.UUID, error) {
 	row := q.db.QueryRowContext(ctx, insertUserWithPass, arg.Username, arg.DisplayName, arg.UserPass)
-	var created time.Time
-	err := row.Scan(&created)
-	return created, err
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const roomAddMember = `-- name: RoomAddMember :exec
+INSERT INTO room_members(user_id, room_id)
+SELECT
+    $1,
+    r.id
+FROM
+    rooms AS r
+WHERE
+    r.code = $2::text
+`
+
+type RoomAddMemberParams struct {
+	UserID   uuid.UUID
+	RoomCode string
+}
+
+func (q *Queries) RoomAddMember(ctx context.Context, arg RoomAddMemberParams) error {
+	_, err := q.db.ExecContext(ctx, roomAddMember, arg.UserID, arg.RoomCode)
+	return err
+}
+
+const roomDeleteByID = `-- name: RoomDeleteByID :exec
+DELETE FROM rooms r
+WHERE r.code = $1
+`
+
+func (q *Queries) RoomDeleteByID(ctx context.Context, code string) error {
+	_, err := q.db.ExecContext(ctx, roomDeleteByID, code)
+	return err
+}
+
+const roomGetAllGuests = `-- name: RoomGetAllGuests :many
+SELECT
+    rg.name,
+    rg.id
+FROM
+    room_guests AS rg
+    JOIN rooms r ON r.code = $1
+        AND rg.room_id = r.id
+`
+
+type RoomGetAllGuestsRow struct {
+	Name string
+	ID   uuid.UUID
+}
+
+func (q *Queries) RoomGetAllGuests(ctx context.Context, code string) ([]RoomGetAllGuestsRow, error) {
+	rows, err := q.db.QueryContext(ctx, roomGetAllGuests, code)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RoomGetAllGuestsRow
+	for rows.Next() {
+		var i RoomGetAllGuestsRow
+		if err := rows.Scan(&i.Name, &i.ID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const roomGetAllMembers = `-- name: RoomGetAllMembers :many
+SELECT
+    u.id AS user_id,
+    u.username,
+    u.display_name,
+    u.spotify_name,
+    u.spotify_image_url,
+    m.is_moderator
+FROM
+    room_members AS m
+    JOIN users u ON m.user_id = u.id
+        AND m.room_id = $1
+`
+
+type RoomGetAllMembersRow struct {
+	UserID          uuid.UUID
+	Username        string
+	DisplayName     string
+	SpotifyName     sql.NullString
+	SpotifyImageUrl sql.NullString
+	IsModerator     bool
+}
+
+func (q *Queries) RoomGetAllMembers(ctx context.Context, roomID uuid.UUID) ([]RoomGetAllMembersRow, error) {
+	rows, err := q.db.QueryContext(ctx, roomGetAllMembers, roomID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []RoomGetAllMembersRow
+	for rows.Next() {
+		var i RoomGetAllMembersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyName,
+			&i.SpotifyImageUrl,
+			&i.IsModerator,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const roomGetHostID = `-- name: RoomGetHostID :one
+SELECT
+    r.host_id
+FROM
+    rooms r
+WHERE
+    r.code = $1
+`
+
+func (q *Queries) RoomGetHostID(ctx context.Context, code string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, roomGetHostID, code)
+	var host_id uuid.UUID
+	err := row.Scan(&host_id)
+	return host_id, err
 }
 
 const roomGetQueueTracks = `-- name: RoomGetQueueTracks :many
 SELECT
     track_id,
-    g.name
+    g.name AS guest_name,
+    u.display_name AS member_name
 FROM
     room_queue_tracks t
     JOIN rooms r ON r.code = $1
-    JOIN room_guests g ON g.id = t.guest_id
-        AND t.room_id = r.id
+    LEFT JOIN room_guests g ON g.id = t.guest_id
+    LEFT JOIN users u ON u.id = t.user_id
 `
 
 type RoomGetQueueTracksRow struct {
-	TrackID string
-	Name    string
+	TrackID    string
+	GuestName  sql.NullString
+	MemberName sql.NullString
 }
 
 func (q *Queries) RoomGetQueueTracks(ctx context.Context, code string) ([]RoomGetQueueTracksRow, error) {
@@ -245,7 +385,7 @@ func (q *Queries) RoomGetQueueTracks(ctx context.Context, code string) ([]RoomGe
 	var items []RoomGetQueueTracksRow
 	for rows.Next() {
 		var i RoomGetQueueTracksRow
-		if err := rows.Scan(&i.TrackID, &i.Name); err != nil {
+		if err := rows.Scan(&i.TrackID, &i.GuestName, &i.MemberName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -345,7 +485,7 @@ func (q *Queries) RoomGuestInsertWithID(ctx context.Context, arg RoomGuestInsert
 	return i, err
 }
 
-const roomSetQueueTrack = `-- name: RoomSetQueueTrack :exec
+const roomSetGuestQueueTrack = `-- name: RoomSetGuestQueueTrack :exec
 INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
 SELECT
     $1,
@@ -357,15 +497,60 @@ WHERE
     r.code = $3::text
 `
 
-type RoomSetQueueTrackParams struct {
+type RoomSetGuestQueueTrackParams struct {
 	TrackID  string
 	GuestID  uuid.UUID
 	RoomCode string
 }
 
-func (q *Queries) RoomSetQueueTrack(ctx context.Context, arg RoomSetQueueTrackParams) error {
-	_, err := q.db.ExecContext(ctx, roomSetQueueTrack, arg.TrackID, arg.GuestID, arg.RoomCode)
+func (q *Queries) RoomSetGuestQueueTrack(ctx context.Context, arg RoomSetGuestQueueTrackParams) error {
+	_, err := q.db.ExecContext(ctx, roomSetGuestQueueTrack, arg.TrackID, arg.GuestID, arg.RoomCode)
 	return err
+}
+
+const roomSetMemberQueueTrack = `-- name: RoomSetMemberQueueTrack :exec
+INSERT INTO room_queue_tracks(track_id, user_id, room_id)
+SELECT
+    $1,
+    $2::uuid,
+    r.id
+FROM
+    rooms AS r
+WHERE
+    r.code = $3::text
+`
+
+type RoomSetMemberQueueTrackParams struct {
+	TrackID  string
+	UserID   uuid.UUID
+	RoomCode string
+}
+
+func (q *Queries) RoomSetMemberQueueTrack(ctx context.Context, arg RoomSetMemberQueueTrackParams) error {
+	_, err := q.db.ExecContext(ctx, roomSetMemberQueueTrack, arg.TrackID, arg.UserID, arg.RoomCode)
+	return err
+}
+
+const roomUserIsMember = `-- name: RoomUserIsMember :one
+SELECT
+    is_moderator
+FROM
+    room_members
+WHERE
+    user_id = $1
+    AND room_id = $2
+`
+
+type RoomUserIsMemberParams struct {
+	UserID uuid.UUID
+	RoomID uuid.UUID
+}
+
+func (q *Queries) RoomUserIsMember(ctx context.Context, arg RoomUserIsMemberParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, roomUserIsMember, arg.UserID, arg.RoomID)
+	var is_moderator bool
+	err := row.Scan(&is_moderator)
+	return is_moderator, err
 }
 
 const updateSpotifyTokensByRoomCode = `-- name: UpdateSpotifyTokensByRoomCode :exec
@@ -440,7 +625,10 @@ const userGetByUsername = `-- name: UserGetByUsername :one
 SELECT
     id,
     username,
-    display_name
+    display_name,
+    spotify_account,
+    spotify_name,
+    spotify_image_url
 FROM
     users u
 WHERE
@@ -448,15 +636,25 @@ WHERE
 `
 
 type UserGetByUsernameRow struct {
-	ID          uuid.UUID
-	Username    string
-	DisplayName string
+	ID              uuid.UUID
+	Username        string
+	DisplayName     string
+	SpotifyAccount  sql.NullString
+	SpotifyName     sql.NullString
+	SpotifyImageUrl sql.NullString
 }
 
 func (q *Queries) UserGetByUsername(ctx context.Context, username string) (UserGetByUsernameRow, error) {
 	row := q.db.QueryRowContext(ctx, userGetByUsername, username)
 	var i UserGetByUsernameRow
-	err := row.Scan(&i.ID, &i.Username, &i.DisplayName)
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.DisplayName,
+		&i.SpotifyAccount,
+		&i.SpotifyName,
+		&i.SpotifyImageUrl,
+	)
 	return i, err
 }
 
