@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -32,7 +31,6 @@ func (c *Controller) SuggestedTracks(w http.ResponseWriter, r *http.Request) {
 
 	tracks, err := spotify.TopTracks(ctx, client)
 	if err != nil {
-		log.Println(err)
 		requests.RespondInternalError(w)
 		return
 	}

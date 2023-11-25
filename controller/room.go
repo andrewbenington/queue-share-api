@@ -174,8 +174,12 @@ func (*Controller) JoinRoomAsMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resp := room.RoomResponse{
+		Room: *reqCtx.Room,
+	}
+
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte{})
+	json.NewEncoder(w).Encode(resp)
 }
 
 func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
@@ -367,7 +371,6 @@ func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext,
 	as.GuestID = guestID
 
 	passwordValid, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
-	log.Println(passwordValid, err)
 	if err != nil && err != sql.ErrNoRows {
 		return as, err
 	}

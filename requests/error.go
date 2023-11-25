@@ -25,7 +25,7 @@ func RespondWithDBError(w http.ResponseWriter, err error) {
 
 func RespondWithRoomAuthError(w http.ResponseWriter, permissionLevel int) {
 	if permissionLevel == 0 {
-		RespondWithError(w, http.StatusNotFound, constants.ErrorPassword)
+		RespondWithError(w, http.StatusUnauthorized, constants.ErrorPassword)
 		return
 	}
 	RespondWithError(w, http.StatusForbidden, constants.ErrorNotAuthenticated)

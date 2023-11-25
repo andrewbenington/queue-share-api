@@ -72,12 +72,16 @@ const roomGetAllGuests = `-- name: RoomGetAllGuests :many
 SELECT
     rg.name,
     rg.id,
-    counts.queued_tracks
+    CASE WHEN counts.queued_tracks IS NOT NULL THEN
+        counts.queued_tracks
+    ELSE
+        0
+    END AS queued_tracks
 FROM
     room_guests AS rg
     JOIN rooms r ON r.code = $1
         AND rg.room_id = r.id
-    JOIN (
+    LEFT JOIN (
         SELECT
             guest_id,
             COUNT(*) AS queued_tracks
@@ -90,7 +94,7 @@ FROM
 type RoomGetAllGuestsRow struct {
 	Name         string
 	ID           uuid.UUID
-	QueuedTracks int64
+	QueuedTracks int32
 }
 
 func (q *Queries) RoomGetAllGuests(ctx context.Context, code string) ([]RoomGetAllGuestsRow, error) {
@@ -124,12 +128,16 @@ SELECT
     u.spotify_name,
     u.spotify_image_url,
     m.is_moderator,
-    counts.queued_tracks
+    CASE WHEN counts.queued_tracks IS NOT NULL THEN
+        counts.queued_tracks
+    ELSE
+        0
+    END AS queued_tracks
 FROM
     room_members AS m
     JOIN users u ON m.user_id = u.id
         AND m.room_id = $1
-    JOIN (
+    LEFT JOIN (
         SELECT
             user_id,
             COUNT(*) AS queued_tracks
@@ -146,7 +154,7 @@ type RoomGetAllMembersRow struct {
 	SpotifyName     sql.NullString
 	SpotifyImageUrl sql.NullString
 	IsModerator     bool
-	QueuedTracks    int64
+	QueuedTracks    int32
 }
 
 func (q *Queries) RoomGetAllMembers(ctx context.Context, roomID uuid.UUID) ([]RoomGetAllMembersRow, error) {
