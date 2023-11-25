@@ -40,7 +40,6 @@ func (c *Controller) Search(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write(SearchMissingError)
 	}
-
 	results, err := spotify.SearchSongs(r.Context(), client, term)
 	if err != nil {
 		requests.RespondInternalError(w)

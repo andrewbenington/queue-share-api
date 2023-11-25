@@ -2,71 +2,76 @@
 --
 -- PostgreSQL database dump
 --
-
 -- Dumped from database version 15.4 (Homebrew)
 -- Dumped by pg_dump version 15.4
-
 SET statement_timeout = 0;
+
 SET lock_timeout = 0;
+
 SET idle_in_transaction_session_timeout = 0;
+
 SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
+
+SET standard_conforming_strings = ON;
+
+SELECT
+    pg_catalog.set_config('search_path', '', FALSE);
+
+SET check_function_bodies = FALSE;
+
 SET xmloption = content;
+
 SET client_min_messages = warning;
-SET row_security = off;
+
+SET row_security = OFF;
 
 --
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
 --
-
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
 
-
 --
--- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION pgcrypto; Type: COMMENT; Schema: -; Owner:
 --
-
 COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
-
 
 --
 -- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
 --
-
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
-
 --
--- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner:
 --
-
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
-
 
 --
 -- Name: generate_unique_code(); Type: FUNCTION; Schema: public; Owner: postgres
 --
-
-CREATE FUNCTION public.generate_unique_code() RETURNS character varying
+CREATE FUNCTION public.generate_unique_code()
+    RETURNS character varying
     LANGUAGE plpgsql
     AS $$
 DECLARE
-    new_code VARCHAR(4);
+    new_code varchar(4);
 BEGIN
     LOOP
         -- Generate a random 6-letter string
         new_code := upper(substr(md5(random()::text), 1, 4));
-
         -- Check if the generated string already exists in column1 of table1
-        IF NOT EXISTS (SELECT 1 FROM rooms WHERE code = new_code) THEN
-            RETURN new_code; -- Return the unique string
-        END IF;
-    END LOOP;
+        IF NOT EXISTS (
+            SELECT
+                1
+            FROM
+                rooms
+            WHERE
+                code = new_code) THEN
+        RETURN new_code;
+        -- Return the unique string
+    END IF;
+END LOOP;
 END;
 $$;
-
 
 ALTER FUNCTION public.generate_unique_code() OWNER TO postgres;
 
@@ -77,48 +82,41 @@ SET default_table_access_method = heap;
 --
 -- Name: room_guests; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.room_guests (
+CREATE TABLE public.room_guests(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     room_id uuid NOT NULL,
     name text NOT NULL
 );
-
 
 ALTER TABLE public.room_guests OWNER TO postgres;
 
 --
 -- Name: room_members; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.room_members (
+CREATE TABLE public.room_members(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     room_id uuid NOT NULL,
-    is_moderator boolean DEFAULT false NOT NULL
+    is_moderator boolean DEFAULT FALSE NOT NULL
 );
-
 
 ALTER TABLE public.room_members OWNER TO postgres;
 
 --
 -- Name: room_passwords; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.room_passwords (
+CREATE TABLE public.room_passwords(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     room_id uuid NOT NULL,
     encrypted_password text
 );
-
 
 ALTER TABLE public.room_passwords OWNER TO postgres;
 
 --
 -- Name: room_queue_tracks; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.room_queue_tracks (
+CREATE TABLE public.room_queue_tracks(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     track_id text NOT NULL,
     guest_id uuid,
@@ -127,41 +125,35 @@ CREATE TABLE public.room_queue_tracks (
     user_id uuid
 );
 
-
 ALTER TABLE public.room_queue_tracks OWNER TO postgres;
 
 --
 -- Name: rooms; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.rooms (
+CREATE TABLE public.rooms(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name text NOT NULL,
     code text DEFAULT public.generate_unique_code() NOT NULL,
     created timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    host_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL
+    host_id uuid DEFAULT '00000000-0000-0000-0000-000000000000' ::uuid NOT NULL
 );
-
 
 ALTER TABLE public.rooms OWNER TO postgres;
 
 --
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.schema_migrations (
+CREATE TABLE public.schema_migrations(
     version bigint NOT NULL,
     dirty boolean NOT NULL
 );
-
 
 ALTER TABLE public.schema_migrations OWNER TO postgres;
 
 --
 -- Name: spotify_tokens; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.spotify_tokens (
+CREATE TABLE public.spotify_tokens(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     encrypted_access_token bytea NOT NULL,
@@ -169,27 +161,23 @@ CREATE TABLE public.spotify_tokens (
     encrypted_refresh_token bytea NOT NULL
 );
 
-
 ALTER TABLE public.spotify_tokens OWNER TO postgres;
 
 --
 -- Name: user_passwords; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.user_passwords (
+CREATE TABLE public.user_passwords(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid,
     encrypted_password text NOT NULL
 );
-
 
 ALTER TABLE public.user_passwords OWNER TO postgres;
 
 --
 -- Name: users; Type: TABLE; Schema: public; Owner: postgres
 --
-
-CREATE TABLE public.users (
+CREATE TABLE public.users(
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     username text NOT NULL,
     display_name text NOT NULL,
@@ -199,185 +187,139 @@ CREATE TABLE public.users (
     created timestamp with time zone DEFAULT now() NOT NULL
 );
 
-
 ALTER TABLE public.users OWNER TO postgres;
 
 --
 -- Name: room_guests room_guests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_guests
     ADD CONSTRAINT room_guests_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: room_members room_members_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_members
     ADD CONSTRAINT room_members_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: room_passwords room_passwords_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_passwords
     ADD CONSTRAINT room_passwords_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: room_queue_tracks room_queue_tracks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_queue_tracks
     ADD CONSTRAINT room_queue_tracks_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: rooms rooms_code_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.rooms
     ADD CONSTRAINT rooms_code_key UNIQUE (code);
-
 
 --
 -- Name: rooms rooms_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.rooms
     ADD CONSTRAINT rooms_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
-
 
 --
 -- Name: spotify_tokens spotify_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: spotify_tokens spotify_tokens_user_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_user_id_key UNIQUE (user_id);
-
 
 --
 -- Name: user_passwords user_passwords_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.user_passwords
     ADD CONSTRAINT user_passwords_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
 
 --
 -- Name: username_case_insensitive; Type: INDEX; Schema: public; Owner: postgres
 --
-
-CREATE UNIQUE INDEX username_case_insensitive ON public.users USING btree (upper(username));
-
+CREATE UNIQUE INDEX username_case_insensitive ON public.users USING btree(upper(username));
 
 --
 -- Name: room_guests room_guests_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_guests
     ADD CONSTRAINT room_guests_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
-
 
 --
 -- Name: room_members room_members_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_members
     ADD CONSTRAINT room_members_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
-
 
 --
 -- Name: room_members room_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_members
     ADD CONSTRAINT room_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
 
 --
 -- Name: room_passwords room_passwords_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_passwords
     ADD CONSTRAINT room_passwords_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
-
 
 --
 -- Name: room_queue_tracks room_queue_tracks_guest_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_queue_tracks
     ADD CONSTRAINT room_queue_tracks_guest_id_fkey FOREIGN KEY (guest_id) REFERENCES public.room_guests(id) ON DELETE CASCADE;
-
 
 --
 -- Name: room_queue_tracks room_queue_tracks_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_queue_tracks
     ADD CONSTRAINT room_queue_tracks_room_id_fkey FOREIGN KEY (room_id) REFERENCES public.rooms(id) ON DELETE CASCADE;
-
 
 --
 -- Name: room_queue_tracks room_queue_tracks_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.room_queue_tracks
     ADD CONSTRAINT room_queue_tracks_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
 
 --
 -- Name: rooms rooms_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.rooms
     ADD CONSTRAINT rooms_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
 
 --
 -- Name: spotify_tokens spotify_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
 
 --
 -- Name: user_passwords user_passwords_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
-
 ALTER TABLE ONLY public.user_passwords
     ADD CONSTRAINT user_passwords_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
-
 
 --
 -- PostgreSQL database dump complete
 --
-
