@@ -51,7 +51,6 @@ migrate-force:
 migrate-force-latest:
 	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force ${DB_VERSION}
 
-
 .PHONY: migrate-version
 migrate-version:
 	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' version
