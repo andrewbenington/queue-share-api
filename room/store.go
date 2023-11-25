@@ -143,7 +143,17 @@ func (s *Store) UserIsMember(ctx context.Context, roomID string, userID string) 
 	return gen.New(s.db).RoomUserIsMember(ctx, gen.RoomUserIsMemberParams{UserID: userUUID, RoomID: roomUUID})
 }
 
-func (s *Store) GetAllMembers(ctx context.Context, roomID string) ([]user.User, error) {
+type Member struct {
+	ID           string `json:"user_id"`
+	Username     string `json:"username"`
+	DisplayName  string `json:"display_name"`
+	SpotifyName  string `json:"spotify_name"`
+	SpotifyImage string `json:"spotify_image"`
+	IsModerator  bool   `json:"is_moderator"`
+	QueuedTracks int    `json:"queued_tracks"`
+}
+
+func (s *Store) GetAllMembers(ctx context.Context, roomID string) ([]Member, error) {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return nil, fmt.Errorf("parse room UUID: %w", err)
@@ -153,18 +163,37 @@ func (s *Store) GetAllMembers(ctx context.Context, roomID string) ([]user.User, 
 		return nil, err
 	}
 
-	users := make([]user.User, 0, len(rows))
+	users := make([]Member, 0, len(rows))
 	for _, row := range rows {
-		users = append(users, user.User{
+		users = append(users, Member{
 			ID:           row.UserID.String(),
 			Username:     row.Username,
 			DisplayName:  row.DisplayName,
 			SpotifyName:  row.SpotifyName.String,
 			SpotifyImage: row.SpotifyImageUrl.String,
+			IsModerator:  row.IsModerator,
+			QueuedTracks: int(row.QueuedTracks),
 		})
 	}
 
 	return users, nil
+}
+
+func (s *Store) SetModerator(ctx context.Context, roomID string, userID string, isModerator bool) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("parse user UUID: %w", err)
+	}
+	err = gen.New(s.db).RoomSetModerator(ctx, gen.RoomSetModeratorParams{
+		RoomID:      roomUUID,
+		UserID:      userUUID,
+		IsModerator: isModerator,
+	})
+	return err
 }
 
 func (s *Store) InsertGuest(ctx context.Context, roomCode string, name string) (*Guest, error) {
@@ -226,8 +255,9 @@ func (s *Store) GetAllRoomGuests(ctx context.Context, roomCode string) ([]Guest,
 	guests := make([]Guest, 0, len(rows))
 	for _, row := range rows {
 		guests = append(guests, Guest{
-			ID:   row.ID.String(),
-			Name: row.Name,
+			ID:           row.ID.String(),
+			Name:         row.Name,
+			QueuedTracks: int(row.QueuedTracks),
 		})
 	}
 

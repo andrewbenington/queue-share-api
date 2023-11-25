@@ -254,16 +254,26 @@ func (q *Queries) RoomDeleteByID(ctx context.Context, code string) error {
 const roomGetAllGuests = `-- name: RoomGetAllGuests :many
 SELECT
     rg.name,
-    rg.id
+    rg.id,
+    counts.queued_tracks
 FROM
     room_guests AS rg
     JOIN rooms r ON r.code = $1
         AND rg.room_id = r.id
+    JOIN (
+        SELECT
+            guest_id,
+            COUNT(*) AS queued_tracks
+        FROM
+            room_queue_tracks
+        GROUP BY
+            guest_id) counts ON rg.id = counts.guest_id
 `
 
 type RoomGetAllGuestsRow struct {
-	Name string
-	ID   uuid.UUID
+	Name         string
+	ID           uuid.UUID
+	QueuedTracks int64
 }
 
 func (q *Queries) RoomGetAllGuests(ctx context.Context, code string) ([]RoomGetAllGuestsRow, error) {
@@ -275,7 +285,7 @@ func (q *Queries) RoomGetAllGuests(ctx context.Context, code string) ([]RoomGetA
 	var items []RoomGetAllGuestsRow
 	for rows.Next() {
 		var i RoomGetAllGuestsRow
-		if err := rows.Scan(&i.Name, &i.ID); err != nil {
+		if err := rows.Scan(&i.Name, &i.ID, &i.QueuedTracks); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -296,11 +306,20 @@ SELECT
     u.display_name,
     u.spotify_name,
     u.spotify_image_url,
-    m.is_moderator
+    m.is_moderator,
+    counts.queued_tracks
 FROM
     room_members AS m
     JOIN users u ON m.user_id = u.id
         AND m.room_id = $1
+    JOIN (
+        SELECT
+            user_id,
+            COUNT(*) AS queued_tracks
+        FROM
+            room_queue_tracks
+        GROUP BY
+            user_id) counts ON u.id = counts.user_id
 `
 
 type RoomGetAllMembersRow struct {
@@ -310,6 +329,7 @@ type RoomGetAllMembersRow struct {
 	SpotifyName     sql.NullString
 	SpotifyImageUrl sql.NullString
 	IsModerator     bool
+	QueuedTracks    int64
 }
 
 func (q *Queries) RoomGetAllMembers(ctx context.Context, roomID uuid.UUID) ([]RoomGetAllMembersRow, error) {
@@ -328,6 +348,7 @@ func (q *Queries) RoomGetAllMembers(ctx context.Context, roomID uuid.UUID) ([]Ro
 			&i.SpotifyName,
 			&i.SpotifyImageUrl,
 			&i.IsModerator,
+			&i.QueuedTracks,
 		); err != nil {
 			return nil, err
 		}
@@ -528,6 +549,27 @@ type RoomSetMemberQueueTrackParams struct {
 
 func (q *Queries) RoomSetMemberQueueTrack(ctx context.Context, arg RoomSetMemberQueueTrackParams) error {
 	_, err := q.db.ExecContext(ctx, roomSetMemberQueueTrack, arg.TrackID, arg.UserID, arg.RoomCode)
+	return err
+}
+
+const roomSetModerator = `-- name: RoomSetModerator :exec
+UPDATE
+    room_members
+SET
+    is_moderator = $3
+WHERE
+    room_id = $1
+    AND user_id = $2
+`
+
+type RoomSetModeratorParams struct {
+	RoomID      uuid.UUID
+	UserID      uuid.UUID
+	IsModerator bool
+}
+
+func (q *Queries) RoomSetModerator(ctx context.Context, arg RoomSetModeratorParams) error {
+	_, err := q.db.ExecContext(ctx, roomSetModerator, arg.RoomID, arg.UserID, arg.IsModerator)
 	return err
 }
 

@@ -25,8 +25,9 @@ type InsertGuestRequest struct {
 }
 
 type Guest struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	QueuedTracks int    `json:"queued_tracks"`
 }
 
 type RoomResponse struct {

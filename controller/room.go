@@ -14,7 +14,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
-	"github.com/andrewbenington/queue-share-api/user"
 )
 
 type PermissionLevel int
@@ -223,8 +222,8 @@ func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
 }
 
 type GetRoomGuestsAndMembersResponse struct {
-	Guests  []room.Guest `json:"guests"`
-	Members []user.User  `json:"members"`
+	Guests  []room.Guest  `json:"guests"`
+	Members []room.Member `json:"members"`
 }
 
 func (*Controller) GetRoomGuestsAndMembers(w http.ResponseWriter, r *http.Request) {
@@ -232,6 +231,12 @@ func (*Controller) GetRoomGuestsAndMembers(w http.ResponseWriter, r *http.Reques
 	reqCtx, err := getRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
+		return
+	}
+
+	log.Printf("%+v\n", reqCtx)
+	if reqCtx.PermissionLevel < Guest {
+		requests.RespondAuthError(w)
 		return
 	}
 
@@ -290,6 +295,40 @@ func (*Controller) DeleteRoom(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 	w.Write([]byte{})
+}
+
+type SetModeratorRequest struct {
+	UserID      string `json:"user_id"`
+	IsModerator bool   `json:"is_moderator"`
+}
+
+func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	reqCtx, err := getRequestContext(ctx, r)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+		return
+	}
+
+	if reqCtx.PermissionLevel < Host {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	var body SetModeratorRequest
+	err = json.NewDecoder(r.Body).Decode(&body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err = db.Service().RoomStore.SetModerator(ctx, reqCtx.Room.ID, body.UserID, body.IsModerator)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext, err error) {

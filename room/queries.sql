@@ -110,11 +110,20 @@ WHERE
 -- name: RoomGetAllGuests :many
 SELECT
     rg.name,
-    rg.id
+    rg.id,
+    counts.queued_tracks
 FROM
     room_guests AS rg
     JOIN rooms r ON r.code = $1
-        AND rg.room_id = r.id;
+        AND rg.room_id = r.id
+    JOIN (
+        SELECT
+            guest_id,
+            COUNT(*) AS queued_tracks
+        FROM
+            room_queue_tracks
+        GROUP BY
+            guest_id) counts ON rg.id = counts.guest_id;
 
 -- name: RoomSetGuestQueueTrack :exec
 INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
@@ -187,9 +196,27 @@ SELECT
     u.display_name,
     u.spotify_name,
     u.spotify_image_url,
-    m.is_moderator
+    m.is_moderator,
+    counts.queued_tracks
 FROM
     room_members AS m
     JOIN users u ON m.user_id = u.id
-        AND m.room_id = $1;
+        AND m.room_id = $1
+    JOIN (
+        SELECT
+            user_id,
+            COUNT(*) AS queued_tracks
+        FROM
+            room_queue_tracks
+        GROUP BY
+            user_id) counts ON u.id = counts.user_id;
+
+-- name: RoomSetModerator :exec
+UPDATE
+    room_members
+SET
+    is_moderator = $3
+WHERE
+    room_id = $1
+    AND user_id = $2;
 

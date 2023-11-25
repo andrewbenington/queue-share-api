@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -96,6 +97,10 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = spotify.PushToUserQueue(r.Context(), spClient, songID)
+	if err != nil && strings.Contains(err.Error(), "No active device found") {
+		requests.RespondWithError(w, http.StatusBadRequest, "Host is not playing music")
+		return
+	}
 	if err != nil {
 		log.Printf("Error pushing to user queue: %s", err)
 		requests.RespondInternalError(w)
