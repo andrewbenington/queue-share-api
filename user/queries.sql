@@ -21,7 +21,7 @@ INSERT INTO users(username, display_name)
         new_user
     RETURNING (
         SELECT
-            created
+            id
         FROM
             new_user);
 
@@ -46,13 +46,16 @@ SELECT
 FROM
     rooms r
     JOIN users u ON r.host_id = u.id
-        AND upper(u.username) = upper(@username::text);
+        AND u.id = $1;
 
 -- name: UserGetByUsername :one
 SELECT
     id,
     username,
-    display_name
+    display_name,
+    spotify_account,
+    spotify_name,
+    spotify_image_url
 FROM
     users u
 WHERE

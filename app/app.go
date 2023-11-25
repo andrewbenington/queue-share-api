@@ -32,13 +32,28 @@ func (a *App) initRouter() {
 	// a.Router.HandleFunc("/room", a.Controller.GetAllRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room", a.Controller.CreateRoom).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}", a.Controller.GetRoom).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}", a.Controller.DeleteRoom).Methods("DELETE", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/queue", a.Controller.GetQueue).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/queue/{song}", a.Controller.PushToQueue).Methods("POST", "OPTIONS")
+
+	a.Router.HandleFunc("/room/{code}/play", a.Controller.Play).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/pause", a.Controller.Pause).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/next", a.Controller.Next).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/previous", a.Controller.Previous).Methods("POST", "OPTIONS")
+
+	a.Router.HandleFunc("/room/{code}/devices", a.Controller.Devices).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/playlists", a.Controller.UserPlaylists).Methods("GET", "OPTIONS")
+
 	a.Router.HandleFunc("/room/{code}/search", a.Controller.Search).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/guest", a.Controller.AddGuest).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/guests_and_members", a.Controller.GetRoomGuestsAndMembers).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/join", a.Controller.JoinRoomAsMember).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/permissions", a.Controller.GetRoomPermissions).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/moderator", a.Controller.SetModerator).Methods("PUT", "OPTIONS")
 
 	a.Router.HandleFunc("/user", a.Controller.CreateUser).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/user", a.Controller.CurrentUser).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/room", a.Controller.GetUserRoom).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")

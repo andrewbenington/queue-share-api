@@ -25,6 +25,13 @@ type RoomGuest struct {
 	Name   string
 }
 
+type RoomMember struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	RoomID      uuid.UUID
+	IsModerator bool
+}
+
 type RoomPassword struct {
 	ID                uuid.UUID
 	RoomID            uuid.UUID
@@ -32,10 +39,12 @@ type RoomPassword struct {
 }
 
 type RoomQueueTrack struct {
-	ID      uuid.UUID
-	TrackID string
-	GuestID uuid.UUID
-	RoomID  uuid.UUID
+	ID        uuid.UUID
+	TrackID   string
+	GuestID   uuid.NullUUID
+	RoomID    uuid.UUID
+	Timestamp time.Time
+	UserID    uuid.NullUUID
 }
 
 type SchemaMigration struct {

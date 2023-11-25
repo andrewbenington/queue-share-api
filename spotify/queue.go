@@ -3,6 +3,7 @@ package spotify
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/zmb3/spotify/v2"
 )
@@ -31,7 +32,7 @@ func UpdateUserPlayback(ctx context.Context, client *spotify.Client, playbackSta
 	if playback == nil || playbackStatus.CurrentlyPlaying.ID == "" {
 		return nil
 	}
-	startedPlaying := playback.Timestamp - int64(playback.Progress)
+	startedPlaying := time.Now().UnixMilli() - int64(playback.Progress)
 	playbackStatus.CurrentlyPlaying.StartedPlayingEpochMilis = &startedPlaying
 	playbackStatus.CurrentlyPlaying.Paused = !playback.Playing
 	return nil

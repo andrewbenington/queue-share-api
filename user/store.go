@@ -89,8 +89,13 @@ type GetUserRoomResponse struct {
 	Created time.Time `json:"created"`
 }
 
-func (s *Store) GetUserRoom(ctx context.Context, username string) (*GetUserRoomResponse, error) {
-	row, err := gen.New(s.db).GetUserRoom(ctx, username)
+func (s *Store) GetUserRoom(ctx context.Context, userID string) (*GetUserRoomResponse, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("parse user UUID: %w", err)
+	}
+
+	row, err := gen.New(s.db).GetUserRoom(ctx, userUUID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -112,9 +117,11 @@ func (s *Store) GetByUsername(ctx context.Context, username string) (*User, erro
 		return nil, err
 	}
 	return &User{
-		ID:          row.ID.String(),
-		Username:    row.Username,
-		DisplayName: row.DisplayName,
+		ID:           row.ID.String(),
+		Username:     row.Username,
+		DisplayName:  row.DisplayName,
+		SpotifyName:  row.SpotifyName.String,
+		SpotifyImage: row.SpotifyImageUrl.String,
 	}, nil
 }
 

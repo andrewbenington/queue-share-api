@@ -22,6 +22,19 @@ build:
 build-linux:
 	GOOS=linux GOARCH=amd64 go build -ldflags '${LD_FLAGS}' -o bin/queue-share ./cmd/main.go
 
+.PHONY: build-pi
+build-pi:
+	GOOS=linux GOARCH=arm64 go build -ldflags '${LD_FLAGS}' -o bin/queue-share ./cmd/main.go
+
+.PHONY: docker-build
+docker-build:
+	@docker build -t andrewb57/queue-share-api:latest .
+	@docker build -t andrewb57/queue-share-api:${GIT_VERSION} .
+
+.PHONY: docker-push
+docker-push:
+	@docker push andrewb57/queue-share-api:latest
+
 .PHONY: migrate-up
 migrate-up:
 	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' up 1
@@ -38,7 +51,6 @@ migrate-force:
 migrate-force-latest:
 	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force ${DB_VERSION}
 
-
 .PHONY: migrate-version
 migrate-version:
 	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' version
@@ -53,3 +65,18 @@ schema:
 	@pg_dump -d queue-share -s >> db/schema.sql
 	@sqlc generate
 
+.PHONY: docker-build-db
+docker-build-db:
+	@docker build -t andrewb57/queue-share-api:latest ./db
+
+.PHONY: docker-run-db
+docker-run-db:
+	@docker run --name qsd -e POSTGRES_PASSWORD=password -d -p 5431:5432 andrewb57/queue-share-api:latest
+
+.PHONY: docker-save
+docker-save:
+	@docker save -o api-image.tar andrewb57/queue-share-api:latest
+
+.PHONY: docker-save-db
+docker-save-db:
+	@docker save -o db-image.tar andrewb57/queue-share-api:latest
