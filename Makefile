@@ -34,6 +34,7 @@ docker-build:
 .PHONY: docker-push
 docker-push:
 	@docker push andrewb57/queue-share-api:latest
+	@docker push andrewb57/queue-share-api:${GIT_VERSION}
 
 .PHONY: migrate-up
 migrate-up:
