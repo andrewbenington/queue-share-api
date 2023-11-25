@@ -23,17 +23,12 @@ func RespondWithDBError(w http.ResponseWriter, err error) {
 	RespondInternalError(w)
 }
 
-func RespondWithRoomAuthError(w http.ResponseWriter, err error) {
-	if err == sql.ErrNoRows {
-		RespondWithError(w, http.StatusNotFound, constants.ErrorNotFound)
+func RespondWithRoomAuthError(w http.ResponseWriter, permissionLevel int) {
+	if permissionLevel == 0 {
+		RespondWithError(w, http.StatusNotFound, constants.ErrorPassword)
 		return
 	}
-	if err != nil {
-		log.Printf("error authenticating room: %s\n", err)
-		RespondWithError(w, http.StatusInternalServerError, constants.ErrorInternal)
-		return
-	}
-	RespondWithError(w, http.StatusForbidden, constants.ErrorPassword)
+	RespondWithError(w, http.StatusForbidden, constants.ErrorNotAuthenticated)
 }
 
 func RespondNotFound(w http.ResponseWriter) {

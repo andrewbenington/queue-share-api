@@ -27,7 +27,7 @@ func NewStore(db *sql.DB) *Store {
 func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	row, err := gen.New(s.db).FindRoomByCode(ctx, strings.ToUpper(code))
+	row, err := gen.New(s.db).RoomGetByCode(ctx, strings.ToUpper(code))
 	if err != nil {
 		return Room{}, err
 	}
@@ -73,9 +73,9 @@ func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room
 	if err != nil {
 		return Room{}, fmt.Errorf("parse user UUID: %w", err)
 	}
-	row, err := gen.New(s.db).InsertRoomWithPass(
+	row, err := gen.New(s.db).RoomInsertWithPassword(
 		ctx,
-		gen.InsertRoomWithPassParams{
+		gen.RoomInsertWithPasswordParams{
 			Name:     insertParams.Name,
 			HostID:   hostUUID,
 			RoomPass: insertParams.Password,
@@ -104,7 +104,7 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 	if err != nil {
 		return fmt.Errorf("encrypt refresh token: %w", err)
 	}
-	return gen.New(s.db).UpdateSpotifyTokensByRoomCode(ctx, gen.UpdateSpotifyTokensByRoomCodeParams{
+	return gen.New(s.db).RoomUpdateSpotifyTokens(ctx, gen.RoomUpdateSpotifyTokensParams{
 		Code:                  strings.ToUpper(code),
 		EncryptedAccessToken:  encryptedAccessToken,
 		AccessTokenExpiry:     oauthToken.Expiry,
@@ -113,7 +113,7 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 }
 
 func (s *Store) ValidatePassword(ctx context.Context, code string, password string) (bool, error) {
-	return gen.New(s.db).ValidateRoomPass(ctx, gen.ValidateRoomPassParams{
+	return gen.New(s.db).RoomValidatePassword(ctx, gen.RoomValidatePasswordParams{
 		Code:     strings.ToUpper(code),
 		RoomPass: password,
 	})

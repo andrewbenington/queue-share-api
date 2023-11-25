@@ -1,4 +1,4 @@
--- name: FindRoomByCode :one
+-- name: RoomGetByCode :one
 SELECT
     r.id,
     r.name,
@@ -14,14 +14,14 @@ FROM
     JOIN users AS u ON r.code = $1
         AND u.id = r.host_id;
 
--- name: GetRoomIDByCode :one
+-- name: RoomGetIDByCode :one
 SELECT
     id
 FROM
     rooms
 WHERE (code = $1);
 
--- name: InsertRoomWithPass :one
+-- name: RoomInsertWithPassword :one
 WITH new_room AS (
 INSERT INTO rooms(name, host_id)
         VALUES ($1, $2)
@@ -40,7 +40,7 @@ SELECT
 FROM
     new_room;
 
--- name: ValidateRoomPass :one
+-- name: RoomValidatePassword :one
 SELECT
     (encrypted_password = crypt(@room_pass::text, encrypted_password::text))
 FROM
@@ -58,7 +58,7 @@ FROM
     JOIN rooms AS r ON r.code = $1
         AND st.user_id = r.host_id;
 
--- name: UpdateSpotifyTokensByRoomCode :exec
+-- name: RoomUpdateSpotifyTokens :exec
 UPDATE
     spotify_tokens st
 SET

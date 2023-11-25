@@ -7,7 +7,7 @@ ON CONFLICT ON CONSTRAINT spotify_tokens_user_id_key
     WHERE
         spotify_tokens.user_id = $1;
 
--- name: InsertUserWithPass :one
+-- name: UserInsertWithPassword :one
 WITH new_user AS (
 INSERT INTO users(username, display_name)
         VALUES ($1, $2)
@@ -25,7 +25,7 @@ INSERT INTO users(username, display_name)
         FROM
             new_user);
 
--- name: ValidateUserPass :one
+-- name: UserValidatePassword :one
 SELECT
     (encrypted_password = crypt(@user_pass, encrypted_password))
 FROM
@@ -33,7 +33,7 @@ FROM
     JOIN users u ON u.id = up.user_id
         AND UPPER(u.username) = UPPER(@username::text);
 
--- name: GetUserRoom :one
+-- name: UserGetRoom :one
 SELECT
     r.id,
     r.name,
@@ -81,6 +81,16 @@ SET
     spotify_account = $2,
     spotify_name = $3,
     spotify_image_url = $4
+WHERE
+    id = $1;
+
+-- name: UserDeleteSpotifyInfo :exec
+UPDATE
+    users
+SET
+    spotify_account = NULL,
+    spotify_name = NULL,
+    spotify_image_url = NULL
 WHERE
     id = $1;
 

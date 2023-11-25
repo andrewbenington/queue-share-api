@@ -13,67 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const findRoomByCode = `-- name: FindRoomByCode :one
-SELECT
-    r.id,
-    r.name,
-    r.host_id,
-    u.username AS host_username,
-    u.display_name AS host_display,
-    u.spotify_name AS host_spotify_name,
-    u.spotify_image_url AS host_image,
-    r.code,
-    r.created
-FROM
-    rooms AS r
-    JOIN users AS u ON r.code = $1
-        AND u.id = r.host_id
-`
-
-type FindRoomByCodeRow struct {
-	ID              uuid.UUID
-	Name            string
-	HostID          uuid.UUID
-	HostUsername    string
-	HostDisplay     string
-	HostSpotifyName sql.NullString
-	HostImage       sql.NullString
-	Code            string
-	Created         time.Time
-}
-
-func (q *Queries) FindRoomByCode(ctx context.Context, code string) (FindRoomByCodeRow, error) {
-	row := q.db.QueryRowContext(ctx, findRoomByCode, code)
-	var i FindRoomByCodeRow
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.HostID,
-		&i.HostUsername,
-		&i.HostDisplay,
-		&i.HostSpotifyName,
-		&i.HostImage,
-		&i.Code,
-		&i.Created,
-	)
-	return i, err
-}
-
-const getRoomIDByCode = `-- name: GetRoomIDByCode :one
-SELECT
-    id
-FROM
-    rooms
-WHERE (code = $1)
-`
-
-func (q *Queries) GetRoomIDByCode(ctx context.Context, code string) (uuid.UUID, error) {
-	row := q.db.QueryRowContext(ctx, getRoomIDByCode, code)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const getSpotifyTokensByRoomCode = `-- name: GetSpotifyTokensByRoomCode :one
 SELECT
     st.encrypted_access_token,
@@ -96,128 +35,6 @@ func (q *Queries) GetSpotifyTokensByRoomCode(ctx context.Context, code string) (
 	var i GetSpotifyTokensByRoomCodeRow
 	err := row.Scan(&i.EncryptedAccessToken, &i.AccessTokenExpiry, &i.EncryptedRefreshToken)
 	return i, err
-}
-
-const getUserRoom = `-- name: GetUserRoom :one
-SELECT
-    r.id,
-    r.name,
-    r.code,
-    r.created,
-    u.id AS user_id,
-    u.username,
-    u.display_name,
-    u.spotify_image_url
-FROM
-    rooms r
-    JOIN users u ON r.host_id = u.id
-        AND u.id = $1
-`
-
-type GetUserRoomRow struct {
-	ID              uuid.UUID
-	Name            string
-	Code            string
-	Created         time.Time
-	UserID          uuid.UUID
-	Username        string
-	DisplayName     string
-	SpotifyImageUrl sql.NullString
-}
-
-func (q *Queries) GetUserRoom(ctx context.Context, id uuid.UUID) (GetUserRoomRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserRoom, id)
-	var i GetUserRoomRow
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.Code,
-		&i.Created,
-		&i.UserID,
-		&i.Username,
-		&i.DisplayName,
-		&i.SpotifyImageUrl,
-	)
-	return i, err
-}
-
-const insertRoomWithPass = `-- name: InsertRoomWithPass :one
-WITH new_room AS (
-INSERT INTO rooms(name, host_id)
-        VALUES ($1, $2)
-    RETURNING
-        id, name, host_id, code, created
-), new_pass AS (
-INSERT INTO room_passwords(room_id, encrypted_password)
-    SELECT
-        id,
-        crypt($3, gen_salt('bf'))
-    FROM
-        new_room
-)
-SELECT
-    id, name, host_id, code, created
-FROM
-    new_room
-`
-
-type InsertRoomWithPassParams struct {
-	Name     string
-	HostID   uuid.UUID
-	RoomPass string
-}
-
-type InsertRoomWithPassRow struct {
-	ID      uuid.UUID
-	Name    string
-	HostID  uuid.UUID
-	Code    string
-	Created time.Time
-}
-
-func (q *Queries) InsertRoomWithPass(ctx context.Context, arg InsertRoomWithPassParams) (InsertRoomWithPassRow, error) {
-	row := q.db.QueryRowContext(ctx, insertRoomWithPass, arg.Name, arg.HostID, arg.RoomPass)
-	var i InsertRoomWithPassRow
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.HostID,
-		&i.Code,
-		&i.Created,
-	)
-	return i, err
-}
-
-const insertUserWithPass = `-- name: InsertUserWithPass :one
-WITH new_user AS (
-INSERT INTO users(username, display_name)
-        VALUES ($1, $2)
-    RETURNING
-        id, username, display_name, created)
-    INSERT INTO user_passwords(user_id, encrypted_password)
-    SELECT
-        id,
-        crypt($3, gen_salt('bf'))
-    FROM
-        new_user
-    RETURNING (
-        SELECT
-            id
-        FROM
-            new_user)
-`
-
-type InsertUserWithPassParams struct {
-	Username    string
-	DisplayName string
-	UserPass    string
-}
-
-func (q *Queries) InsertUserWithPass(ctx context.Context, arg InsertUserWithPassParams) (uuid.UUID, error) {
-	row := q.db.QueryRowContext(ctx, insertUserWithPass, arg.Username, arg.DisplayName, arg.UserPass)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
 }
 
 const roomAddMember = `-- name: RoomAddMember :exec
@@ -363,6 +180,52 @@ func (q *Queries) RoomGetAllMembers(ctx context.Context, roomID uuid.UUID) ([]Ro
 	return items, nil
 }
 
+const roomGetByCode = `-- name: RoomGetByCode :one
+SELECT
+    r.id,
+    r.name,
+    r.host_id,
+    u.username AS host_username,
+    u.display_name AS host_display,
+    u.spotify_name AS host_spotify_name,
+    u.spotify_image_url AS host_image,
+    r.code,
+    r.created
+FROM
+    rooms AS r
+    JOIN users AS u ON r.code = $1
+        AND u.id = r.host_id
+`
+
+type RoomGetByCodeRow struct {
+	ID              uuid.UUID
+	Name            string
+	HostID          uuid.UUID
+	HostUsername    string
+	HostDisplay     string
+	HostSpotifyName sql.NullString
+	HostImage       sql.NullString
+	Code            string
+	Created         time.Time
+}
+
+func (q *Queries) RoomGetByCode(ctx context.Context, code string) (RoomGetByCodeRow, error) {
+	row := q.db.QueryRowContext(ctx, roomGetByCode, code)
+	var i RoomGetByCodeRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.HostID,
+		&i.HostUsername,
+		&i.HostDisplay,
+		&i.HostSpotifyName,
+		&i.HostImage,
+		&i.Code,
+		&i.Created,
+	)
+	return i, err
+}
+
 const roomGetHostID = `-- name: RoomGetHostID :one
 SELECT
     r.host_id
@@ -377,6 +240,21 @@ func (q *Queries) RoomGetHostID(ctx context.Context, code string) (uuid.UUID, er
 	var host_id uuid.UUID
 	err := row.Scan(&host_id)
 	return host_id, err
+}
+
+const roomGetIDByCode = `-- name: RoomGetIDByCode :one
+SELECT
+    id
+FROM
+    rooms
+WHERE (code = $1)
+`
+
+func (q *Queries) RoomGetIDByCode(ctx context.Context, code string) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, roomGetIDByCode, code)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const roomGetQueueTracks = `-- name: RoomGetQueueTracks :many
@@ -506,6 +384,53 @@ func (q *Queries) RoomGuestInsertWithID(ctx context.Context, arg RoomGuestInsert
 	return i, err
 }
 
+const roomInsertWithPassword = `-- name: RoomInsertWithPassword :one
+WITH new_room AS (
+INSERT INTO rooms(name, host_id)
+        VALUES ($1, $2)
+    RETURNING
+        id, name, host_id, code, created
+), new_pass AS (
+INSERT INTO room_passwords(room_id, encrypted_password)
+    SELECT
+        id,
+        crypt($3, gen_salt('bf'))
+    FROM
+        new_room
+)
+SELECT
+    id, name, host_id, code, created
+FROM
+    new_room
+`
+
+type RoomInsertWithPasswordParams struct {
+	Name     string
+	HostID   uuid.UUID
+	RoomPass string
+}
+
+type RoomInsertWithPasswordRow struct {
+	ID      uuid.UUID
+	Name    string
+	HostID  uuid.UUID
+	Code    string
+	Created time.Time
+}
+
+func (q *Queries) RoomInsertWithPassword(ctx context.Context, arg RoomInsertWithPasswordParams) (RoomInsertWithPasswordRow, error) {
+	row := q.db.QueryRowContext(ctx, roomInsertWithPassword, arg.Name, arg.HostID, arg.RoomPass)
+	var i RoomInsertWithPasswordRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.HostID,
+		&i.Code,
+		&i.Created,
+	)
+	return i, err
+}
+
 const roomSetGuestQueueTrack = `-- name: RoomSetGuestQueueTrack :exec
 INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
 SELECT
@@ -573,6 +498,37 @@ func (q *Queries) RoomSetModerator(ctx context.Context, arg RoomSetModeratorPara
 	return err
 }
 
+const roomUpdateSpotifyTokens = `-- name: RoomUpdateSpotifyTokens :exec
+UPDATE
+    spotify_tokens st
+SET
+    encrypted_access_token = $2,
+    access_token_expiry = $3,
+    encrypted_refresh_token = $4
+FROM
+    rooms AS r
+WHERE
+    st.user_id = r.host_id
+    AND r.code = $1
+`
+
+type RoomUpdateSpotifyTokensParams struct {
+	Code                  string
+	EncryptedAccessToken  []byte
+	AccessTokenExpiry     time.Time
+	EncryptedRefreshToken []byte
+}
+
+func (q *Queries) RoomUpdateSpotifyTokens(ctx context.Context, arg RoomUpdateSpotifyTokensParams) error {
+	_, err := q.db.ExecContext(ctx, roomUpdateSpotifyTokens,
+		arg.Code,
+		arg.EncryptedAccessToken,
+		arg.AccessTokenExpiry,
+		arg.EncryptedRefreshToken,
+	)
+	return err
+}
+
 const roomUserIsMember = `-- name: RoomUserIsMember :one
 SELECT
     is_moderator
@@ -595,34 +551,40 @@ func (q *Queries) RoomUserIsMember(ctx context.Context, arg RoomUserIsMemberPara
 	return is_moderator, err
 }
 
-const updateSpotifyTokensByRoomCode = `-- name: UpdateSpotifyTokensByRoomCode :exec
-UPDATE
-    spotify_tokens st
-SET
-    encrypted_access_token = $2,
-    access_token_expiry = $3,
-    encrypted_refresh_token = $4
+const roomValidatePassword = `-- name: RoomValidatePassword :one
+SELECT
+    (encrypted_password = crypt($2::text, encrypted_password::text))
 FROM
-    rooms AS r
-WHERE
-    st.user_id = r.host_id
-    AND r.code = $1
+    room_passwords AS rp
+    JOIN rooms r ON r.id = rp.room_id
+        AND r.code = $1
 `
 
-type UpdateSpotifyTokensByRoomCodeParams struct {
-	Code                  string
-	EncryptedAccessToken  []byte
-	AccessTokenExpiry     time.Time
-	EncryptedRefreshToken []byte
+type RoomValidatePasswordParams struct {
+	Code     string
+	RoomPass string
 }
 
-func (q *Queries) UpdateSpotifyTokensByRoomCode(ctx context.Context, arg UpdateSpotifyTokensByRoomCodeParams) error {
-	_, err := q.db.ExecContext(ctx, updateSpotifyTokensByRoomCode,
-		arg.Code,
-		arg.EncryptedAccessToken,
-		arg.AccessTokenExpiry,
-		arg.EncryptedRefreshToken,
-	)
+func (q *Queries) RoomValidatePassword(ctx context.Context, arg RoomValidatePasswordParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, roomValidatePassword, arg.Code, arg.RoomPass)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const userDeleteSpotifyInfo = `-- name: UserDeleteSpotifyInfo :exec
+UPDATE
+    users
+SET
+    spotify_account = NULL,
+    spotify_name = NULL,
+    spotify_image_url = NULL
+WHERE
+    id = $1
+`
+
+func (q *Queries) UserDeleteSpotifyInfo(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, userDeleteSpotifyInfo, id)
 	return err
 }
 
@@ -700,6 +662,81 @@ func (q *Queries) UserGetByUsername(ctx context.Context, username string) (UserG
 	return i, err
 }
 
+const userGetRoom = `-- name: UserGetRoom :one
+SELECT
+    r.id,
+    r.name,
+    r.code,
+    r.created,
+    u.id AS user_id,
+    u.username,
+    u.display_name,
+    u.spotify_image_url
+FROM
+    rooms r
+    JOIN users u ON r.host_id = u.id
+        AND u.id = $1
+`
+
+type UserGetRoomRow struct {
+	ID              uuid.UUID
+	Name            string
+	Code            string
+	Created         time.Time
+	UserID          uuid.UUID
+	Username        string
+	DisplayName     string
+	SpotifyImageUrl sql.NullString
+}
+
+func (q *Queries) UserGetRoom(ctx context.Context, id uuid.UUID) (UserGetRoomRow, error) {
+	row := q.db.QueryRowContext(ctx, userGetRoom, id)
+	var i UserGetRoomRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Code,
+		&i.Created,
+		&i.UserID,
+		&i.Username,
+		&i.DisplayName,
+		&i.SpotifyImageUrl,
+	)
+	return i, err
+}
+
+const userInsertWithPassword = `-- name: UserInsertWithPassword :one
+WITH new_user AS (
+INSERT INTO users(username, display_name)
+        VALUES ($1, $2)
+    RETURNING
+        id, username, display_name, created)
+    INSERT INTO user_passwords(user_id, encrypted_password)
+    SELECT
+        id,
+        crypt($3, gen_salt('bf'))
+    FROM
+        new_user
+    RETURNING (
+        SELECT
+            id
+        FROM
+            new_user)
+`
+
+type UserInsertWithPasswordParams struct {
+	Username    string
+	DisplayName string
+	UserPass    string
+}
+
+func (q *Queries) UserInsertWithPassword(ctx context.Context, arg UserInsertWithPasswordParams) (uuid.UUID, error) {
+	row := q.db.QueryRowContext(ctx, userInsertWithPassword, arg.Username, arg.DisplayName, arg.UserPass)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const userUpdateSpotifyInfo = `-- name: UserUpdateSpotifyInfo :exec
 UPDATE
     users
@@ -755,28 +792,7 @@ func (q *Queries) UserUpdateSpotifyTokens(ctx context.Context, arg UserUpdateSpo
 	return err
 }
 
-const validateRoomPass = `-- name: ValidateRoomPass :one
-SELECT
-    (encrypted_password = crypt($2::text, encrypted_password::text))
-FROM
-    room_passwords AS rp
-    JOIN rooms r ON r.id = rp.room_id
-        AND r.code = $1
-`
-
-type ValidateRoomPassParams struct {
-	Code     string
-	RoomPass string
-}
-
-func (q *Queries) ValidateRoomPass(ctx context.Context, arg ValidateRoomPassParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, validateRoomPass, arg.Code, arg.RoomPass)
-	var column_1 bool
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const validateUserPass = `-- name: ValidateUserPass :one
+const userValidatePassword = `-- name: UserValidatePassword :one
 SELECT
     (encrypted_password = crypt($1, encrypted_password))
 FROM
@@ -785,13 +801,13 @@ FROM
         AND UPPER(u.username) = UPPER($2::text)
 `
 
-type ValidateUserPassParams struct {
+type UserValidatePasswordParams struct {
 	UserPass string
 	Username string
 }
 
-func (q *Queries) ValidateUserPass(ctx context.Context, arg ValidateUserPassParams) (bool, error) {
-	row := q.db.QueryRowContext(ctx, validateUserPass, arg.UserPass, arg.Username)
+func (q *Queries) UserValidatePassword(ctx context.Context, arg UserValidatePasswordParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, userValidatePassword, arg.UserPass, arg.Username)
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err

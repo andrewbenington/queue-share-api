@@ -26,6 +26,7 @@ func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.
 	if err != nil {
 		return status, nil, err
 	}
+	log.Printf(token.AccessToken)
 	if err != nil {
 		log.Printf("Error decrypting room token: %s", err)
 		return http.StatusInternalServerError, nil, err

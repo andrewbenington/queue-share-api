@@ -39,7 +39,7 @@ func (c *Controller) Pause(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	c.GetQueue(w, r)
 }
 
@@ -85,7 +85,7 @@ func (c *Controller) Play(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	c.GetQueue(w, r)
 }
 
@@ -116,7 +116,7 @@ func (c *Controller) Next(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	c.GetQueue(w, r)
 }
 
@@ -147,7 +147,7 @@ func (c *Controller) Previous(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 	c.GetQueue(w, r)
 }
 

@@ -26,8 +26,8 @@ type RequestContext struct {
 }
 
 const (
-	NotAuthorized PermissionLevel = iota
-	Forbidden
+	IncorrectPassword PermissionLevel = iota
+	NotAuthorized
 	Guest
 	Member
 	Moderator
@@ -84,7 +84,7 @@ func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqCtx.PermissionLevel < Guest {
-		requests.RespondAuthError(w)
+		requests.RespondWithError(w, http.StatusUnauthorized, "Password incorrect")
 		return
 	}
 
@@ -188,7 +188,7 @@ func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqCtx.PermissionLevel < Guest {
-		requests.RespondAuthError(w)
+		requests.RespondWithRoomAuthError(w, int(reqCtx.PermissionLevel))
 		return
 	}
 
@@ -234,9 +234,8 @@ func (*Controller) GetRoomGuestsAndMembers(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	log.Printf("%+v\n", reqCtx)
 	if reqCtx.PermissionLevel < Guest {
-		requests.RespondAuthError(w)
+		requests.RespondWithRoomAuthError(w, int(reqCtx.PermissionLevel))
 		return
 	}
 
@@ -368,11 +367,12 @@ func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext,
 	as.GuestID = guestID
 
 	passwordValid, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
+	log.Println(passwordValid, err)
 	if err != nil && err != sql.ErrNoRows {
 		return as, err
 	}
 	if !passwordValid {
-		as.PermissionLevel = NotAuthorized
+		as.PermissionLevel = IncorrectPassword
 		return as, nil
 	}
 	as.PermissionLevel = Guest

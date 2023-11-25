@@ -58,7 +58,7 @@ migrate-version:
 
 .PHONY: migrate-prod
 migrate-prod:
-	@migrate -path db/migrations -database 'postgres://postgres:$(shell printf '%s' "$(POSTGRES_PASS)" | jq -sRr @uri)@${POSTGRES_HOST}:5432/queue-share' up 1
+	@migrate -path db/migrations -database 'postgres://queue_share:$(shell printf '%s' "$(POSTGRES_PASS)" | jq -sRr @uri)@${POSTGRES_HOST}:5432/queue_share?sslmode=disable' up 1
 
 .PHONY: schema
 schema:

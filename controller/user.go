@@ -129,3 +129,17 @@ func (c *Controller) GetUserRoom(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(GetUserRoomResponse{Room: room})
 }
+
+func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserContextKey).(string)
+	if !ok {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	err := db.Service().UserStore.UnlinkSpotify(r.Context(), userID)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

@@ -24,7 +24,7 @@ func NewStore(db *sql.DB) *Store {
 }
 
 func (s *Store) InsertUser(ctx context.Context, tx *sql.Tx, username string, displayName string, password string) (newUserID string, err error) {
-	userUUID, err := gen.New(tx).InsertUserWithPass(ctx, gen.InsertUserWithPassParams{
+	userUUID, err := gen.New(tx).UserInsertWithPassword(ctx, gen.UserInsertWithPasswordParams{
 		Username:    username,
 		DisplayName: displayName,
 		UserPass:    password,
@@ -76,7 +76,7 @@ func (s *Store) UpdateSpotifyInfo(ctx context.Context, userID string, info *spot
 }
 
 func (s *Store) Authenticate(ctx context.Context, username string, password string) (bool, error) {
-	return gen.New(s.db).ValidateUserPass(ctx, gen.ValidateUserPassParams{
+	return gen.New(s.db).UserValidatePassword(ctx, gen.UserValidatePasswordParams{
 		Username: username,
 		UserPass: password,
 	})
@@ -95,7 +95,7 @@ func (s *Store) GetUserRoom(ctx context.Context, userID string) (*GetUserRoomRes
 		return nil, fmt.Errorf("parse user UUID: %w", err)
 	}
 
-	row, err := gen.New(s.db).GetUserRoom(ctx, userUUID)
+	row, err := gen.New(s.db).UserGetRoom(ctx, userUUID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -143,4 +143,12 @@ func (s *Store) GetByID(ctx context.Context, userID string) (*User, error) {
 		SpotifyName:  row.SpotifyName.String,
 		SpotifyImage: row.SpotifyImageUrl.String,
 	}, nil
+}
+
+func (s *Store) UnlinkSpotify(ctx context.Context, userID string) error {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("parse user uuid: %s", err)
+	}
+	return gen.New(s.db).UserDeleteSpotifyInfo(ctx, userUUID)
 }
