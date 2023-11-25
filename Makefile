@@ -28,11 +28,12 @@ build-pi:
 
 .PHONY: docker-build
 docker-build:
-	@docker build -t queue-share-api:latest .
+	@docker build -t andrewb57/queue-share-api:latest .
+	@docker build -t andrewb57/queue-share-api:${GIT_VERSION} .
 
 .PHONY: docker-push
 docker-push:
-	@docker push queue-share-api:latest
+	@docker push andrewb57/queue-share-api:latest
 
 .PHONY: migrate-up
 migrate-up:
@@ -67,16 +68,16 @@ schema:
 
 .PHONY: docker-build-db
 docker-build-db:
-	@docker build -t queue-share-db:latest ./db
+	@docker build -t andrewb57/queue-share-api:latest ./db
 
 .PHONY: docker-run-db
 docker-run-db:
-	@docker run --name qsd -e POSTGRES_PASSWORD=password -d -p 5431:5432 queue-share-db:latest
+	@docker run --name qsd -e POSTGRES_PASSWORD=password -d -p 5431:5432 andrewb57/queue-share-api:latest
 
 .PHONY: docker-save
 docker-save:
-	@docker save -o api-image.tar queue-share-api:latest
+	@docker save -o api-image.tar andrewb57/queue-share-api:latest
 
 .PHONY: docker-save-db
 docker-save-db:
-	@docker save -o db-image.tar queue-share-db:latest
+	@docker save -o db-image.tar andrewb57/queue-share-api:latest
