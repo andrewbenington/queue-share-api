@@ -38,26 +38,30 @@ docker-push:
 
 .PHONY: migrate-up
 migrate-up:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' up 1
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue_share?sslmode=disable' up 1
 
 .PHONY: migrate-down
 migrate-down:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' down 1
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue_share?sslmode=disable' down 1
 
 .PHONY: migrate-force
 migrate-force:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force ${VERSION}
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue_share?sslmode=disable' force ${VERSION}
 
 .PHONY: migrate-force-latest
 migrate-force-latest:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' force ${DB_VERSION}
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue_share?sslmode=disable' force ${DB_VERSION}
 
 .PHONY: migrate-version
 migrate-version:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue-share?sslmode=disable' version
+	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue_share?sslmode=disable' version
 
-.PHONY: migrate-prod
-migrate-prod:
+.PHONY: migrate-down-prod
+migrate-down-prod:
+	@migrate -path db/migrations -database 'postgres://queue_share:$(shell printf '%s' "$(POSTGRES_PASS)" | jq -sRr @uri)@${POSTGRES_HOST}:5432/queue_share?sslmode=disable' down 1
+
+.PHONY: migrate-up-prod
+migrate-up-prod:
 	@migrate -path db/migrations -database 'postgres://queue_share:$(shell printf '%s' "$(POSTGRES_PASS)" | jq -sRr @uri)@${POSTGRES_HOST}:5432/queue_share?sslmode=disable' up 1
 
 .PHONY: schema

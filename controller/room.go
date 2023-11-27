@@ -10,7 +10,6 @@ import (
 	"os"
 
 	"github.com/andrewbenington/queue-share-api/auth"
-	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
@@ -148,149 +147,20 @@ func (c *Controller) GetRoomPermissions(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(response)
 }
 
-func (*Controller) JoinRoomAsMember(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	reqCtx, err := getRequestContext(ctx, r)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	if reqCtx.PermissionLevel >= Member {
-		w.WriteHeader(http.StatusNotModified)
-		_, _ = w.Write([]byte{})
-		return
-	}
-
-	if reqCtx.UserID == "" || reqCtx.PermissionLevel < Guest {
-		requests.RespondAuthError(w)
-		return
-	}
-
-	err = db.Service().RoomStore.AddMember(ctx, reqCtx.Room.Code, reqCtx.UserID)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	resp := room.RoomResponse{
-		Room: *reqCtx.Room,
-	}
-
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
-}
-
-func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	reqCtx, err := getRequestContext(ctx, r)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	if reqCtx.PermissionLevel < Guest {
-		requests.RespondWithRoomAuthError(w, int(reqCtx.PermissionLevel))
-		return
-	}
-
-	var req room.InsertGuestRequest
-	err = json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		requests.RespondBadRequest(w)
-		return
-	}
-
-	var guest *room.Guest
-	if reqCtx.GuestID != "" {
-		guest, err = db.Service().RoomStore.InsertGuestWithID(ctx, reqCtx.Room.Code, req.Name, reqCtx.GuestID)
-	} else {
-		guest, err = db.Service().RoomStore.InsertGuest(ctx, reqCtx.Room.Code, req.Name)
-	}
-
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	body, err := json.Marshal(guest)
-	if err != nil {
-		log.Printf("error marshalling room guest: %s\n", err)
-		requests.RespondInternalError(w)
-		return
-	}
-	w.WriteHeader(http.StatusCreated)
-	w.Write(body)
-}
-
-type GetRoomGuestsAndMembersResponse struct {
-	Guests  []room.Guest  `json:"guests"`
-	Members []room.Member `json:"members"`
-}
-
-func (*Controller) GetRoomGuestsAndMembers(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	reqCtx, err := getRequestContext(ctx, r)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	if reqCtx.PermissionLevel < Guest {
-		requests.RespondWithRoomAuthError(w, int(reqCtx.PermissionLevel))
-		return
-	}
-
-	guests, err := db.Service().RoomStore.GetAllRoomGuests(ctx, reqCtx.Room.Code)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	members, err := db.Service().RoomStore.GetAllMembers(ctx, reqCtx.Room.ID)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	body, err := json.Marshal(GetRoomGuestsAndMembersResponse{
-		Guests:  guests,
-		Members: members,
-	})
-	if err != nil {
-		log.Printf("error marshalling room guest: %s\n", err)
-		requests.RespondWithError(w, http.StatusInternalServerError, constants.ErrorInternal)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-	w.Write(body)
-}
-
 func (*Controller) DeleteRoom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-
-	code, _, _ := room.ParametersFromRequest(r)
-	if code == "" {
-		requests.RespondBadRequest(w)
-		return
-	}
-
-	hostID, err := db.Service().RoomStore.GetHostID(ctx, code)
+	reqCtx, err := getRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
 	}
 
-	userID, ok := r.Context().Value(auth.UserContextKey).(string)
-
-	if !ok || hostID != userID {
-		requests.RespondAuthError(w)
+	if reqCtx.PermissionLevel < Host {
+		requests.RespondWithRoomAuthError(w, int(reqCtx.PermissionLevel))
 		return
 	}
 
-	err = db.Service().RoomStore.DeleteByCode(ctx, code)
+	err = db.Service().RoomStore.DeleteByCode(ctx, reqCtx.Room.Code)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -300,12 +170,11 @@ func (*Controller) DeleteRoom(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte{})
 }
 
-type SetModeratorRequest struct {
-	UserID      string `json:"user_id"`
-	IsModerator bool   `json:"is_moderator"`
+type UpdatePasswordRequest struct {
+	NewPassword string `json:"new_password"`
 }
 
-func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
+func (*Controller) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	reqCtx, err := getRequestContext(ctx, r)
 	if err != nil {
@@ -318,14 +187,14 @@ func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var body SetModeratorRequest
+	var body UpdatePasswordRequest
 	err = json.NewDecoder(r.Body).Decode(&body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	err = db.Service().RoomStore.SetModerator(ctx, reqCtx.Room.ID, body.UserID, body.IsModerator)
+	err = db.Service().RoomStore.UpdatePassword(ctx, reqCtx.Room.ID, body.NewPassword)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return

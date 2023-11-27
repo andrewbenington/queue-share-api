@@ -2,7 +2,9 @@ package controller
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/requests"
@@ -31,6 +33,11 @@ func (c *Controller) SuggestedTracks(w http.ResponseWriter, r *http.Request) {
 
 	tracks, err := spotify.TopTracks(ctx, client)
 	if err != nil {
+		log.Println(err)
+		if strings.Contains(err.Error(), "403") {
+			requests.RespondWithError(w, http.StatusForbidden, "Outdated token")
+			return
+		}
 		requests.RespondInternalError(w)
 		return
 	}

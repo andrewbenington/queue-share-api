@@ -119,14 +119,31 @@ func (s *Store) ValidatePassword(ctx context.Context, code string, password stri
 	})
 }
 
-func (s *Store) AddMember(ctx context.Context, roomCode string, userID string) error {
+func (s *Store) AddMember(ctx context.Context, roomID string, userID string) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return fmt.Errorf("parse user UUID: %w", err)
 	}
 	err = gen.New(s.db).RoomAddMember(ctx, gen.RoomAddMemberParams{
-		RoomCode: roomCode,
-		UserID:   userUUID,
+		RoomID: roomUUID,
+		UserID: userUUID,
+	})
+	return err
+}
+
+func (s *Store) AddMemberByUsername(ctx context.Context, roomID string, username string, isModerator bool) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
+	_, err = gen.New(s.db).RoomAddMemberByUsername(ctx, gen.RoomAddMemberByUsernameParams{
+		RoomID:      roomUUID,
+		Username:    username,
+		IsModerator: isModerator,
 	})
 	return err
 }
@@ -196,6 +213,21 @@ func (s *Store) SetModerator(ctx context.Context, roomID string, userID string, 
 	return err
 }
 
+func (s *Store) RemoveMember(ctx context.Context, roomID string, userID string) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return fmt.Errorf("parse user UUID: %w", err)
+	}
+	return gen.New(s.db).RoomRemoveMember(ctx, gen.RoomRemoveMemberParams{
+		RoomID: roomUUID,
+		UserID: userUUID,
+	})
+}
+
 func (s *Store) InsertGuest(ctx context.Context, roomCode string, name string) (*Guest, error) {
 	row, err := gen.New(s.db).RoomGuestInsert(ctx, gen.RoomGuestInsertParams{
 		RoomCode: roomCode,
@@ -237,7 +269,7 @@ func (s *Store) GetGuestName(ctx context.Context, roomID string, guestID string)
 	}
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
-		return "", fmt.Errorf("parse guest UUID: %w", err)
+		return "", fmt.Errorf("parse room UUID: %w", err)
 	}
 
 	return gen.New(s.db).RoomGuestGetName(ctx, gen.RoomGuestGetNameParams{
@@ -246,8 +278,12 @@ func (s *Store) GetGuestName(ctx context.Context, roomID string, guestID string)
 	})
 }
 
-func (s *Store) GetAllRoomGuests(ctx context.Context, roomCode string) ([]Guest, error) {
-	rows, err := gen.New(s.db).RoomGetAllGuests(ctx, roomCode)
+func (s *Store) GetAllRoomGuests(ctx context.Context, roomID string) ([]Guest, error) {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("parse room UUID: %w", err)
+	}
+	rows, err := gen.New(s.db).RoomGetAllGuests(ctx, roomUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -314,4 +350,89 @@ func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (track
 
 func (s *Store) DeleteByCode(ctx context.Context, roomCode string) error {
 	return gen.New(s.db).RoomDeleteByID(ctx, strings.ToUpper(roomCode))
+}
+
+func (s *Store) UpdatePassword(ctx context.Context, roomID string, newPassword string) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
+
+	return gen.New(s.db).RoomUpdatePassword(ctx, gen.RoomUpdatePasswordParams{
+		RoomID:   roomUUID,
+		RoomPass: newPassword,
+	})
+}
+
+func (s *Store) GetUserHostedRooms(ctx context.Context, userID string, isOpen bool) ([]Room, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("parse user UUID: %w", err)
+	}
+
+	rows, err := gen.New(s.db).UserGetHostedRooms(ctx, gen.UserGetHostedRoomsParams{ID: userUUID, IsOpen: isOpen})
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	rooms := make([]Room, len(rows))
+	for i, row := range rows {
+		rooms[i] = Room{
+			ID:   row.ID.String(),
+			Code: row.Code,
+			Name: row.Name,
+			Host: user.User{
+				ID:           row.HostID.String(),
+				Username:     row.HostUsername,
+				DisplayName:  row.HostDisplayName,
+				SpotifyImage: row.HostSpotifyImageUrl.String,
+			},
+			Created: row.Created,
+		}
+	}
+	return rooms, nil
+}
+
+func (s *Store) GetUserJoinedRooms(ctx context.Context, userID string, isOpen bool) ([]Room, error) {
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, fmt.Errorf("parse user UUID: %w", err)
+	}
+
+	rows, err := gen.New(s.db).UserGetJoinedRooms(ctx, gen.UserGetJoinedRoomsParams{UserID: userUUID, IsOpen: isOpen})
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+
+	rooms := make([]Room, len(rows))
+	for i, row := range rows {
+		rooms[i] = Room{
+			ID:   row.ID.String(),
+			Code: row.Code,
+			Name: row.Name,
+			Host: user.User{
+				ID:           row.HostID.String(),
+				Username:     row.HostUsername,
+				DisplayName:  row.HostDisplayName,
+				SpotifyImage: row.HostSpotifyImageUrl.String,
+			},
+			Created: row.Created,
+		}
+	}
+	return rooms, nil
+}
+
+func (s *Store) SetIsOpen(ctx context.Context, roomID string, isOpen bool) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
+	return gen.New(s.db).RoomSetIsOpen(ctx, gen.RoomSetIsOpenParams{
+		ID:     roomUUID,
+		IsOpen: isOpen,
+	})
 }

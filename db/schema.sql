@@ -124,7 +124,8 @@ CREATE TABLE public.room_queue_tracks (
     guest_id uuid,
     room_id uuid NOT NULL,
     "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
-    user_id uuid
+    user_id uuid,
+    played boolean DEFAULT false NOT NULL
 );
 
 
@@ -139,7 +140,10 @@ CREATE TABLE public.rooms (
     name text NOT NULL,
     code text DEFAULT public.generate_unique_code() NOT NULL,
     created timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    host_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL
+    host_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL,
+    password_protected boolean DEFAULT true NOT NULL,
+    updated timestamp with time zone DEFAULT now(),
+    is_open boolean DEFAULT true NOT NULL
 );
 
 
@@ -158,6 +162,39 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO postgres;
 
 --
+-- Name: spotify_permissions_versions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.spotify_permissions_versions (
+    id bigint NOT NULL,
+    description text NOT NULL
+);
+
+
+ALTER TABLE public.spotify_permissions_versions OWNER TO postgres;
+
+--
+-- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.spotify_permissions_versions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.spotify_permissions_versions_id_seq OWNER TO postgres;
+
+--
+-- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.spotify_permissions_versions_id_seq OWNED BY public.spotify_permissions_versions.id;
+
+
+--
 -- Name: spotify_tokens; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -166,7 +203,8 @@ CREATE TABLE public.spotify_tokens (
     user_id uuid NOT NULL,
     encrypted_access_token bytea NOT NULL,
     access_token_expiry timestamp with time zone NOT NULL,
-    encrypted_refresh_token bytea NOT NULL
+    encrypted_refresh_token bytea NOT NULL,
+    permissions_version bigint DEFAULT 1 NOT NULL
 );
 
 
@@ -201,6 +239,13 @@ CREATE TABLE public.users (
 
 
 ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: spotify_permissions_versions id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spotify_permissions_versions ALTER COLUMN id SET DEFAULT nextval('public.spotify_permissions_versions_id_seq'::regclass);
+
 
 --
 -- Name: room_guests room_guests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
@@ -256,6 +301,14 @@ ALTER TABLE ONLY public.rooms
 
 ALTER TABLE ONLY public.schema_migrations
     ADD CONSTRAINT schema_migrations_pkey PRIMARY KEY (version);
+
+
+--
+-- Name: spotify_permissions_versions spotify_permissions_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spotify_permissions_versions
+    ADD CONSTRAINT spotify_permissions_versions_pkey PRIMARY KEY (id);
 
 
 --
@@ -359,6 +412,14 @@ ALTER TABLE ONLY public.room_queue_tracks
 
 ALTER TABLE ONLY public.rooms
     ADD CONSTRAINT rooms_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spotify_tokens spotify_tokens_permissions_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.spotify_tokens
+    ADD CONSTRAINT spotify_tokens_permissions_version_fkey FOREIGN KEY (permissions_version) REFERENCES public.spotify_permissions_versions(id);
 
 
 --

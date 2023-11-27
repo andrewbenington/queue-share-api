@@ -28,7 +28,7 @@ func RespondWithRoomAuthError(w http.ResponseWriter, permissionLevel int) {
 		RespondWithError(w, http.StatusUnauthorized, constants.ErrorPassword)
 		return
 	}
-	RespondWithError(w, http.StatusForbidden, constants.ErrorNotAuthenticated)
+	RespondWithError(w, http.StatusForbidden, constants.ErrorForbidden)
 }
 
 func RespondNotFound(w http.ResponseWriter) {

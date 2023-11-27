@@ -86,6 +86,9 @@ func (c *Controller) Play(w http.ResponseWriter, r *http.Request) {
 	}
 
 	time.Sleep(500 * time.Millisecond)
+	if deviceID != "" {
+		time.Sleep(1000 * time.Millisecond)
+	}
 	c.GetQueue(w, r)
 }
 

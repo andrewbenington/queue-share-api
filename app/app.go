@@ -49,17 +49,23 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/room/{code}/guest", a.Controller.AddGuest).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/guests-and-members", a.Controller.GetRoomGuestsAndMembers).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/join", a.Controller.JoinRoomAsMember).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/member", a.Controller.AddMember).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/member", a.Controller.DeleteMember).Methods("DELETE")
 	a.Router.HandleFunc("/room/{code}/permissions", a.Controller.GetRoomPermissions).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/moderator", a.Controller.SetModerator).Methods("PUT", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/password", a.Controller.UpdatePassword).Methods("PUT", "OPTIONS")
 
 	a.Router.HandleFunc("/user", a.Controller.CreateUser).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/user", a.Controller.CurrentUser).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/user/room", a.Controller.GetUserRoom).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/rooms/hosted", a.Controller.GetUserHostedRooms).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/rooms/joined", a.Controller.GetUserJoinedRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/user/spotify", a.Controller.UnlinkSpotify).Methods("DELETE", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-redirect", a.Controller.SpotifyAuthRedirect).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/version", a.Controller.GetVersion).Methods("GET", "OPTIONS")
 }
 
 func (a *App) Run(addr string) {

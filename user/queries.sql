@@ -33,20 +33,21 @@ FROM
     JOIN users u ON u.id = up.user_id
         AND UPPER(u.username) = UPPER(@username::text);
 
--- name: UserGetRoom :one
+-- name: UserGetHostedRooms :many
 SELECT
     r.id,
     r.name,
     r.code,
     r.created,
-    u.id AS user_id,
-    u.username,
-    u.display_name,
-    u.spotify_image_url
+    u.id AS host_id,
+    u.username AS host_username,
+    u.display_name AS host_display_name,
+    u.spotify_image_url AS host_spotify_image_url
 FROM
     rooms r
     JOIN users u ON r.host_id = u.id
-        AND u.id = $1;
+        AND u.id = $1
+        AND r.is_open = $2;
 
 -- name: UserGetByUsername :one
 SELECT
@@ -93,4 +94,21 @@ SET
     spotify_image_url = NULL
 WHERE
     id = $1;
+
+-- name: UserGetJoinedRooms :many
+SELECT
+    r.id,
+    r.name,
+    r.code,
+    r.created,
+    u.id AS host_id,
+    u.username AS host_username,
+    u.display_name AS host_display_name,
+    u.spotify_image_url AS host_spotify_image_url
+FROM
+    rooms r
+    JOIN room_members rm ON rm.user_id = $1
+        AND r.id = rm.room_id
+        AND r.is_open = $2
+    JOIN users u ON r.host_id = u.id;
 

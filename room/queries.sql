@@ -40,6 +40,14 @@ SELECT
 FROM
     new_room;
 
+-- name: RoomUpdatePassword :exec
+UPDATE
+    room_passwords
+SET
+    encrypted_password = crypt(@room_pass, gen_salt('bf'))
+WHERE
+    room_id = $1;
+
 -- name: RoomValidatePassword :one
 SELECT
     (encrypted_password = crypt(@room_pass::text, encrypted_password::text))
@@ -118,8 +126,6 @@ SELECT
     END AS queued_tracks
 FROM
     room_guests AS rg
-    JOIN rooms r ON r.code = $1
-        AND rg.room_id = r.id
     LEFT JOIN (
         SELECT
             guest_id,
@@ -127,7 +133,9 @@ FROM
         FROM
             room_queue_tracks
         GROUP BY
-            guest_id) counts ON rg.id = counts.guest_id;
+            guest_id) counts ON rg.id = counts.guest_id
+WHERE
+    rg.room_id = $1;
 
 -- name: RoomSetGuestQueueTrack :exec
 INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
@@ -176,13 +184,25 @@ WHERE r.code = $1;
 
 -- name: RoomAddMember :exec
 INSERT INTO room_members(user_id, room_id)
+    VALUES ($1, $2);
+
+-- name: RoomAddMemberByUsername :one
+INSERT INTO room_members(user_id, room_id, is_moderator)
 SELECT
+    u.id,
     $1,
-    r.id
+    $3
 FROM
-    rooms AS r
+    users u
 WHERE
-    r.code = @room_code::text;
+    u.username = $2
+RETURNING
+    id;
+
+-- name: RoomRemoveMember :exec
+DELETE FROM room_members rm
+WHERE rm.room_id = $1
+    AND rm.user_id = $2;
 
 -- name: RoomUserIsMember :one
 SELECT
@@ -227,4 +247,12 @@ SET
 WHERE
     room_id = $1
     AND user_id = $2;
+
+-- name: RoomSetIsOpen :exec
+UPDATE
+    rooms
+SET
+    is_open = $2
+WHERE
+    id = $1;
 

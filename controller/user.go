@@ -11,6 +11,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
+	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/andrewbenington/queue-share-api/user"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -108,18 +109,18 @@ func (c *Controller) CurrentUser(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(u)
 }
 
-type GetUserRoomResponse struct {
-	Room *user.GetUserRoomResponse `json:"room"`
+type GetRoomsResponse struct {
+	Rooms []room.Room `json:"rooms"`
 }
 
-func (c *Controller) GetUserRoom(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) GetUserHostedRooms(w http.ResponseWriter, r *http.Request) {
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
 		return
 	}
 
-	room, err := db.Service().UserStore.GetUserRoom(r.Context(), userID)
+	rooms, err := db.Service().RoomStore.GetUserHostedRooms(r.Context(), userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -127,7 +128,25 @@ func (c *Controller) GetUserRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(GetUserRoomResponse{Room: room})
+	json.NewEncoder(w).Encode(GetRoomsResponse{Rooms: rooms})
+}
+
+func (c *Controller) GetUserJoinedRooms(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserContextKey).(string)
+	if !ok {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	rooms, err := db.Service().RoomStore.GetUserJoinedRooms(r.Context(), userID, true)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("Error getting user room: %s", err)
+		requests.RespondInternalError(w)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(GetRoomsResponse{Rooms: rooms})
 }
 
 func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {

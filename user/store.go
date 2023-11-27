@@ -82,31 +82,11 @@ func (s *Store) Authenticate(ctx context.Context, username string, password stri
 	})
 }
 
-type GetUserRoomResponse struct {
+type HostedRoom struct {
 	ID      string    `json:"id"`
 	Code    string    `json:"code"`
 	Name    string    `json:"name"`
 	Created time.Time `json:"created"`
-}
-
-func (s *Store) GetUserRoom(ctx context.Context, userID string) (*GetUserRoomResponse, error) {
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, fmt.Errorf("parse user UUID: %w", err)
-	}
-
-	row, err := gen.New(s.db).UserGetRoom(ctx, userUUID)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
-		return nil, err
-	}
-	return &GetUserRoomResponse{
-		ID:      row.ID.String(),
-		Name:    row.Name,
-		Code:    row.Code,
-		Created: row.Created,
-	}, nil
 }
 
 func (s *Store) GetByUsername(ctx context.Context, username string) (*User, error) {
