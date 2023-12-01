@@ -290,22 +290,25 @@ const roomGetQueueTracks = `-- name: RoomGetQueueTracks :many
 SELECT
     track_id,
     g.name AS guest_name,
-    u.display_name AS member_name
+    u.display_name AS member_name,
+    timestamp
 FROM
     room_queue_tracks t
-    JOIN rooms r ON r.code = $1
     LEFT JOIN room_guests g ON g.id = t.guest_id
     LEFT JOIN users u ON u.id = t.user_id
+WHERE
+    t.room_id = $1
 `
 
 type RoomGetQueueTracksRow struct {
 	TrackID    string
 	GuestName  sql.NullString
 	MemberName sql.NullString
+	Timestamp  time.Time
 }
 
-func (q *Queries) RoomGetQueueTracks(ctx context.Context, code string) ([]RoomGetQueueTracksRow, error) {
-	rows, err := q.db.QueryContext(ctx, roomGetQueueTracks, code)
+func (q *Queries) RoomGetQueueTracks(ctx context.Context, roomID uuid.UUID) ([]RoomGetQueueTracksRow, error) {
+	rows, err := q.db.QueryContext(ctx, roomGetQueueTracks, roomID)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +316,12 @@ func (q *Queries) RoomGetQueueTracks(ctx context.Context, code string) ([]RoomGe
 	var items []RoomGetQueueTracksRow
 	for rows.Next() {
 		var i RoomGetQueueTracksRow
-		if err := rows.Scan(&i.TrackID, &i.GuestName, &i.MemberName); err != nil {
+		if err := rows.Scan(
+			&i.TrackID,
+			&i.GuestName,
+			&i.MemberName,
+			&i.Timestamp,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -458,6 +466,26 @@ func (q *Queries) RoomInsertWithPassword(ctx context.Context, arg RoomInsertWith
 		&i.Created,
 	)
 	return i, err
+}
+
+const roomMarkTracksAsPlayed = `-- name: RoomMarkTracksAsPlayed :exec
+UPDATE
+    room_queue_tracks
+SET
+    played = TRUE
+WHERE
+    room_id = $1
+    AND timestamp <= $2
+`
+
+type RoomMarkTracksAsPlayedParams struct {
+	RoomID    uuid.UUID
+	Timestamp time.Time
+}
+
+func (q *Queries) RoomMarkTracksAsPlayed(ctx context.Context, arg RoomMarkTracksAsPlayedParams) error {
+	_, err := q.db.ExecContext(ctx, roomMarkTracksAsPlayed, arg.RoomID, arg.Timestamp)
+	return err
 }
 
 const roomRemoveMember = `-- name: RoomRemoveMember :exec

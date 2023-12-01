@@ -248,5 +248,6 @@ func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext,
 		return as, nil
 	}
 	as.PermissionLevel = Guest
+	
 	return as, nil
 }

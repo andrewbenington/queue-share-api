@@ -326,8 +326,12 @@ func (s *Store) SetQueueTrackUser(ctx context.Context, roomCode string, trackID 
 	})
 }
 
-func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (tracks []QueuedTrack, err error) {
-	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, strings.ToUpper(roomCode))
+func (s *Store) GetQueueTrackGuests(ctx context.Context, roomID string) (tracks []QueuedTrack, err error) {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return nil, fmt.Errorf("parse room UUID: %w", err)
+	}
+	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, roomUUID)
 	if err != nil {
 		return
 	}
@@ -340,8 +344,9 @@ func (s *Store) GetQueueTrackGuests(ctx context.Context, roomCode string) (track
 			addedBy = row.MemberName.String
 		}
 		tracks = append(tracks, QueuedTrack{
-			TrackID: row.TrackID,
-			AddedBy: addedBy,
+			TrackID:   row.TrackID,
+			AddedBy:   addedBy,
+			Timestamp: row.Timestamp,
 		})
 	}
 
@@ -434,5 +439,17 @@ func (s *Store) SetIsOpen(ctx context.Context, roomID string, isOpen bool) error
 	return gen.New(s.db).RoomSetIsOpen(ctx, gen.RoomSetIsOpenParams{
 		ID:     roomUUID,
 		IsOpen: isOpen,
+	})
+}
+
+func (s *Store) MarkTracksAsPlayedSince(ctx context.Context, roomID string, since time.Time) error {
+	roomUUID, err := uuid.Parse(roomID)
+	if err != nil {
+		return fmt.Errorf("parse room UUID: %w", err)
+	}
+
+	return gen.New(s.db).RoomMarkTracksAsPlayed(ctx, gen.RoomMarkTracksAsPlayedParams{
+		RoomID:    roomUUID,
+		Timestamp: since,
 	})
 }

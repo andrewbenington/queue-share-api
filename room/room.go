@@ -36,6 +36,7 @@ type RoomResponse struct {
 }
 
 type QueuedTrack struct {
-	TrackID string
-	AddedBy string
+	TrackID   string
+	AddedBy   string
+	Timestamp time.Time
 }

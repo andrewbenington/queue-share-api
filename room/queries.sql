@@ -163,12 +163,16 @@ WHERE
 SELECT
     track_id,
     g.name AS guest_name,
-    u.display_name AS member_name
+    u.display_name AS member_name,
+    timestamp
 FROM
     room_queue_tracks t
-    JOIN rooms r ON r.code = $1
     LEFT JOIN room_guests g ON g.id = t.guest_id
-    LEFT JOIN users u ON u.id = t.user_id;
+    LEFT JOIN users u ON u.id = t.user_id
+WHERE
+    t.room_id = $1
+ORDER BY
+    timestamp DESC;
 
 -- name: RoomGetHostID :one
 SELECT
@@ -255,4 +259,13 @@ SET
     is_open = $2
 WHERE
     id = $1;
+
+-- name: RoomMarkTracksAsPlayed :exec
+UPDATE
+    room_queue_tracks
+SET
+    played = TRUE
+WHERE
+    room_id = $1
+    AND timestamp <= $2;
 

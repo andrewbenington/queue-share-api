@@ -56,7 +56,7 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, errMessage := addGuestsAndMembersToTracks(r.Context(), reqCtx.Room.Code, currentQueue)
+	status, errMessage := addGuestsAndMembersToTracks(r.Context(), reqCtx.Room.ID, currentQueue)
 	if status != http.StatusOK {
 		requests.RespondWithError(w, status, errMessage)
 		return
@@ -135,7 +135,7 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, errMessage := addGuestsAndMembersToTracks(r.Context(), reqCtx.Room.Code, currentQueue)
+	status, errMessage := addGuestsAndMembersToTracks(r.Context(), reqCtx.Room.ID, currentQueue)
 	if status != http.StatusOK {
 		requests.RespondWithError(w, status, errMessage)
 		return
@@ -149,8 +149,8 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseBytes)
 }
 
-func addGuestsAndMembersToTracks(ctx context.Context, roomCode string, q *spotify.CurrentQueue) (statusCode int, errMessage string) {
-	guestTracks, err := db.Service().RoomStore.GetQueueTrackGuests(ctx, roomCode)
+func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.CurrentQueue) (statusCode int, errMessage string) {
+	guestTracks, err := db.Service().RoomStore.GetQueueTrackGuests(ctx, roomID)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, constants.ErrorNotFound
 	}
@@ -169,8 +169,12 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomCode string, q *spotif
 
 	for _, gt := range guestTracks {
 		queueTrack, ok := tracks[gt.TrackID]
-		if ok {
+		if ok && gt.Timestamp.After(queueTrack.AddedAt) {
 			queueTrack.AddedBy = gt.AddedBy
+			queueTrack.AddedAt = gt.Timestamp
+			if queueTrack.ID == q.CurrentlyPlaying.ID {
+				db.Service().RoomStore.MarkTracksAsPlayedSince(ctx, roomID, gt.Timestamp)
+			}
 		}
 	}
 

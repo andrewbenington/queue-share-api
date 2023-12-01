@@ -14,6 +14,7 @@ type TrackInfo struct {
 	Artists                  []string       `json:"artists"`
 	Image                    *spotify.Image `json:"image"`
 	AddedBy                  string         `json:"added_by,omitempty"`
+	AddedAt                  time.Time      `json:"-"`
 	Paused                   bool           `json:"paused"`
 	DurationMS               int            `json:"duration_ms,omitempty"`
 	StartedPlayingEpochMilis *int64         `json:"started_playing_epoch_ms,omitempty"`

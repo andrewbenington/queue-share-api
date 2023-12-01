@@ -248,6 +248,14 @@ ALTER TABLE ONLY public.spotify_permissions_versions ALTER COLUMN id SET DEFAULT
 
 
 --
+-- Name: room_members no_duplicate_room_members; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_members
+    ADD CONSTRAINT no_duplicate_room_members UNIQUE (user_id, room_id);
+
+
+--
 -- Name: room_guests room_guests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -261,6 +269,14 @@ ALTER TABLE ONLY public.room_guests
 
 ALTER TABLE ONLY public.room_members
     ADD CONSTRAINT room_members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: room_members room_members_user_id_room_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.room_members
+    ADD CONSTRAINT room_members_user_id_room_id_key UNIQUE (user_id, room_id);
 
 
 --
