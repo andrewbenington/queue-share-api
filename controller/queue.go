@@ -150,7 +150,7 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 }
 
 func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.CurrentQueue) (statusCode int, errMessage string) {
-	guestTracks, err := db.Service().RoomStore.GetQueueTrackGuests(ctx, roomID)
+	guestTracks, err := db.Service().RoomStore.GetQueueTrackAddedBy(ctx, roomID)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, constants.ErrorNotFound
 	}
@@ -169,7 +169,7 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.
 
 	for _, gt := range guestTracks {
 		queueTrack, ok := tracks[gt.TrackID]
-		if ok && gt.Timestamp.After(queueTrack.AddedAt) {
+		if ok && !gt.Played && gt.Timestamp.After(queueTrack.AddedAt) {
 			queueTrack.AddedBy = gt.AddedBy
 			queueTrack.AddedAt = gt.Timestamp
 			if queueTrack.ID == q.CurrentlyPlaying.ID {

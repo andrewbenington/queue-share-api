@@ -40,10 +40,16 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/room/{code}/pause", a.Controller.Pause).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/next", a.Controller.Next).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/previous", a.Controller.Previous).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/volume", a.Controller.SetVolume).Methods("PUT", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/player", a.Controller.GetPlayback).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/room/{code}/devices", a.Controller.Devices).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/playlists", a.Controller.UserPlaylists).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/suggested", a.Controller.SuggestedTracks).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/room/{code}/playlist", a.Controller.GetPlaylist).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/album", a.Controller.GetAlbum).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/artist", a.Controller.GetArtist).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/room/{code}/search", a.Controller.Search).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/guest", a.Controller.AddGuest).Methods("POST", "OPTIONS")

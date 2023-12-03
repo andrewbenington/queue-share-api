@@ -291,13 +291,16 @@ SELECT
     track_id,
     g.name AS guest_name,
     u.display_name AS member_name,
-    timestamp
+    timestamp,
+    played
 FROM
     room_queue_tracks t
     LEFT JOIN room_guests g ON g.id = t.guest_id
     LEFT JOIN users u ON u.id = t.user_id
 WHERE
     t.room_id = $1
+ORDER BY
+    timestamp DESC
 `
 
 type RoomGetQueueTracksRow struct {
@@ -305,6 +308,7 @@ type RoomGetQueueTracksRow struct {
 	GuestName  sql.NullString
 	MemberName sql.NullString
 	Timestamp  time.Time
+	Played     bool
 }
 
 func (q *Queries) RoomGetQueueTracks(ctx context.Context, roomID uuid.UUID) ([]RoomGetQueueTracksRow, error) {
@@ -321,6 +325,7 @@ func (q *Queries) RoomGetQueueTracks(ctx context.Context, roomID uuid.UUID) ([]R
 			&i.GuestName,
 			&i.MemberName,
 			&i.Timestamp,
+			&i.Played,
 		); err != nil {
 			return nil, err
 		}

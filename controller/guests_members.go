@@ -74,7 +74,7 @@ func (*Controller) AddMember(w http.ResponseWriter, r *http.Request) {
 
 	err = db.Service().RoomStore.AddMemberByUsername(ctx, reqCtx.Room.ID, body.Username, body.IsModerator)
 	if err != nil {
-		if err, ok := err.(*pgconn.PgError); ok && err.Code == "23505" {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
 			requests.RespondWithError(w, http.StatusConflict, "User already added")
 		} else {
 			requests.RespondWithDBError(w, err)

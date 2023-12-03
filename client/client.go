@@ -35,6 +35,8 @@ func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.
 	httpClient := authenticator.Client(ctx, token)
 	spotifyClient := spotify.New(httpClient)
 
+	// log.Println(token.AccessToken)
+
 	// refresh token if stale
 	if token.Expiry.Before(time.Now()) {
 		_, err := spotifyClient.CurrentUser(ctx)

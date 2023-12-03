@@ -164,7 +164,8 @@ SELECT
     track_id,
     g.name AS guest_name,
     u.display_name AS member_name,
-    timestamp
+    timestamp,
+    played
 FROM
     room_queue_tracks t
     LEFT JOIN room_guests g ON g.id = t.guest_id

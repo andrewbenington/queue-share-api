@@ -326,7 +326,7 @@ func (s *Store) SetQueueTrackUser(ctx context.Context, roomCode string, trackID 
 	})
 }
 
-func (s *Store) GetQueueTrackGuests(ctx context.Context, roomID string) (tracks []QueuedTrack, err error) {
+func (s *Store) GetQueueTrackAddedBy(ctx context.Context, roomID string) (tracks []QueuedTrack, err error) {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return nil, fmt.Errorf("parse room UUID: %w", err)
@@ -347,6 +347,7 @@ func (s *Store) GetQueueTrackGuests(ctx context.Context, roomID string) (tracks 
 			TrackID:   row.TrackID,
 			AddedBy:   addedBy,
 			Timestamp: row.Timestamp,
+			Played:    row.Played,
 		})
 	}
 

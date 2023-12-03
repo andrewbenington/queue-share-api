@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
+	"strconv"
 
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/requests"
@@ -39,12 +39,7 @@ func (c *Controller) Pause(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(500 * time.Millisecond)
-	c.GetQueue(w, r)
-}
-
-type PlayBody struct {
-	ContextURI string `json:"context_uri"`
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (c *Controller) Play(w http.ResponseWriter, r *http.Request) {
@@ -85,11 +80,7 @@ func (c *Controller) Play(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(500 * time.Millisecond)
-	if deviceID != "" {
-		time.Sleep(1000 * time.Millisecond)
-	}
-	c.GetQueue(w, r)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (c *Controller) Next(w http.ResponseWriter, r *http.Request) {
@@ -119,8 +110,7 @@ func (c *Controller) Next(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(500 * time.Millisecond)
-	c.GetQueue(w, r)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (c *Controller) Previous(w http.ResponseWriter, r *http.Request) {
@@ -150,8 +140,7 @@ func (c *Controller) Previous(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(500 * time.Millisecond)
-	c.GetQueue(w, r)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (c *Controller) Devices(w http.ResponseWriter, r *http.Request) {
@@ -183,4 +172,71 @@ func (c *Controller) Devices(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(devices)
+}
+
+func (c *Controller) SetVolume(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	reqCtx, err := getRequestContext(ctx, r)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+		return
+	}
+
+	if reqCtx.PermissionLevel < Moderator {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	status, client, err := client.ForRoom(ctx, reqCtx.Room.Code)
+	if err != nil {
+		requests.RespondWithError(w, status, err.Error())
+		return
+	}
+
+	percentParam := (r.URL.Query().Get("percent"))
+	percent, err := strconv.Atoi(percentParam)
+	if err != nil {
+		requests.RespondBadRequest(w)
+		return
+	}
+
+	err = client.Volume(ctx, percent)
+	if err != nil {
+		log.Printf("error setting volume: %s", err)
+		requests.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (c *Controller) GetPlayback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	reqCtx, err := getRequestContext(ctx, r)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+		return
+	}
+
+	if reqCtx.PermissionLevel < Guest {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	status, client, err := client.ForRoom(ctx, reqCtx.Room.Code)
+	if err != nil {
+		requests.RespondWithError(w, status, err.Error())
+		return
+	}
+
+	state, err := client.PlayerState(ctx)
+	if err != nil {
+		log.Printf("error getting player state: %s", err)
+		requests.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	json.NewEncoder(w).Encode(state)
 }

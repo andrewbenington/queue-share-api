@@ -39,4 +39,5 @@ type QueuedTrack struct {
 	TrackID   string
 	AddedBy   string
 	Timestamp time.Time
+	Played    bool
 }
