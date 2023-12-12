@@ -12,11 +12,14 @@ import (
 )
 
 type Room struct {
-	ID      uuid.UUID
-	Name    string
-	Code    string
-	Created time.Time
-	HostID  uuid.UUID
+	ID                uuid.UUID
+	Name              string
+	Code              string
+	Created           time.Time
+	HostID            uuid.UUID
+	PasswordProtected bool
+	Updated           sql.NullTime
+	IsOpen            bool
 }
 
 type RoomGuest struct {
@@ -45,11 +48,17 @@ type RoomQueueTrack struct {
 	RoomID    uuid.UUID
 	Timestamp time.Time
 	UserID    uuid.NullUUID
+	Played    bool
 }
 
 type SchemaMigration struct {
 	Version int64
 	Dirty   bool
+}
+
+type SpotifyPermissionsVersion struct {
+	ID          int64
+	Description string
 }
 
 type SpotifyToken struct {
@@ -58,6 +67,7 @@ type SpotifyToken struct {
 	EncryptedAccessToken  []byte
 	AccessTokenExpiry     time.Time
 	EncryptedRefreshToken []byte
+	PermissionsVersion    int64
 }
 
 type User struct {

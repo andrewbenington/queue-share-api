@@ -6,22 +6,22 @@ import (
 )
 
 type GitVersion struct {
-	Tag    string           `yaml:"tag"`
-	Commit string           `yaml:"commit"`
-	Tree   WorkingTreeState `yaml:"working_tree"`
+	Tag    string           `yaml:"tag" json:"tag"`
+	Commit string           `yaml:"commit" json:"commit"`
+	Tree   WorkingTreeState `yaml:"working_tree" json:"working_tree"`
 }
 
 type GoMetadata struct {
-	Version string `yaml:"version"`
-	Arch    string `yaml:"arch"`
-	OS      string `yaml:"os"`
+	Version string `yaml:"version" json:"version"`
+	Arch    string `yaml:"arch" json:"arch"`
+	OS      string `yaml:"os" json:"os"`
 }
 
 type Version struct {
-	Git      GitVersion `yaml:"git"`
-	Database string
-	Go       GoMetadata `yaml:"go"`
-	Date     string     `yaml:"build_date"`
+	Git      GitVersion `yaml:"git" json:"git"`
+	Database string     `yaml:"database" json:"database"`
+	Go       GoMetadata `yaml:"go" json:"go"`
+	Date     string     `yaml:"build_date" json:"build_date"`
 }
 
 type WorkingTreeState string

@@ -7,4 +7,5 @@ const (
 	ErrorNotAuthenticated = "Not Authenticated"
 	ErrorUsernameInUse    = "Username in use"
 	ErrorNotFound         = "Not found"
+	ErrorForbidden        = "Forbidden"
 )

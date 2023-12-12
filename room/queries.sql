@@ -1,4 +1,4 @@
--- name: FindRoomByCode :one
+-- name: RoomGetByCode :one
 SELECT
     r.id,
     r.name,
@@ -14,14 +14,14 @@ FROM
     JOIN users AS u ON r.code = $1
         AND u.id = r.host_id;
 
--- name: GetRoomIDByCode :one
+-- name: RoomGetIDByCode :one
 SELECT
     id
 FROM
     rooms
 WHERE (code = $1);
 
--- name: InsertRoomWithPass :one
+-- name: RoomInsertWithPassword :one
 WITH new_room AS (
 INSERT INTO rooms(name, host_id)
         VALUES ($1, $2)
@@ -40,7 +40,15 @@ SELECT
 FROM
     new_room;
 
--- name: ValidateRoomPass :one
+-- name: RoomUpdatePassword :exec
+UPDATE
+    room_passwords
+SET
+    encrypted_password = crypt(@room_pass, gen_salt('bf'))
+WHERE
+    room_id = $1;
+
+-- name: RoomValidatePassword :one
 SELECT
     (encrypted_password = crypt(@room_pass::text, encrypted_password::text))
 FROM
@@ -58,7 +66,7 @@ FROM
     JOIN rooms AS r ON r.code = $1
         AND st.user_id = r.host_id;
 
--- name: UpdateSpotifyTokensByRoomCode :exec
+-- name: RoomUpdateSpotifyTokens :exec
 UPDATE
     spotify_tokens st
 SET
@@ -111,19 +119,23 @@ WHERE
 SELECT
     rg.name,
     rg.id,
-    counts.queued_tracks
+    CASE WHEN counts.queued_tracks IS NOT NULL THEN
+        counts.queued_tracks
+    ELSE
+        0
+    END AS queued_tracks
 FROM
     room_guests AS rg
-    JOIN rooms r ON r.code = $1
-        AND rg.room_id = r.id
-    JOIN (
+    LEFT JOIN (
         SELECT
             guest_id,
             COUNT(*) AS queued_tracks
         FROM
             room_queue_tracks
         GROUP BY
-            guest_id) counts ON rg.id = counts.guest_id;
+            guest_id) counts ON rg.id = counts.guest_id
+WHERE
+    rg.room_id = $1;
 
 -- name: RoomSetGuestQueueTrack :exec
 INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
@@ -172,13 +184,25 @@ WHERE r.code = $1;
 
 -- name: RoomAddMember :exec
 INSERT INTO room_members(user_id, room_id)
+    VALUES ($1, $2);
+
+-- name: RoomAddMemberByUsername :one
+INSERT INTO room_members(user_id, room_id, is_moderator)
 SELECT
+    u.id,
     $1,
-    r.id
+    $3
 FROM
-    rooms AS r
+    users u
 WHERE
-    r.code = @room_code::text;
+    u.username = $2
+RETURNING
+    id;
+
+-- name: RoomRemoveMember :exec
+DELETE FROM room_members rm
+WHERE rm.room_id = $1
+    AND rm.user_id = $2;
 
 -- name: RoomUserIsMember :one
 SELECT
@@ -197,12 +221,16 @@ SELECT
     u.spotify_name,
     u.spotify_image_url,
     m.is_moderator,
-    counts.queued_tracks
+    CASE WHEN counts.queued_tracks IS NOT NULL THEN
+        counts.queued_tracks
+    ELSE
+        0
+    END AS queued_tracks
 FROM
     room_members AS m
     JOIN users u ON m.user_id = u.id
         AND m.room_id = $1
-    JOIN (
+    LEFT JOIN (
         SELECT
             user_id,
             COUNT(*) AS queued_tracks
@@ -219,4 +247,12 @@ SET
 WHERE
     room_id = $1
     AND user_id = $2;
+
+-- name: RoomSetIsOpen :exec
+UPDATE
+    rooms
+SET
+    is_open = $2
+WHERE
+    id = $1;
 

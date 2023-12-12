@@ -33,7 +33,7 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqCtx.PermissionLevel < Guest {
-		requests.RespondAuthError(w)
+		requests.RespondWithRoomAuthError(w, int(reqCtx.PermissionLevel))
 		return
 	}
 

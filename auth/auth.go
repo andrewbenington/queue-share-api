@@ -18,6 +18,7 @@ var (
 		spotifyauth.ScopeUserReadPrivate,
 		spotifyauth.ScopeUserReadPlaybackState,
 		spotifyauth.ScopeUserModifyPlaybackState,
+		spotifyauth.ScopeUserTopRead,
 	}
 	SpotifyStates     = map[string]SpotifyLoginState{}
 	SpotifyStatesLock = sync.Mutex{}
