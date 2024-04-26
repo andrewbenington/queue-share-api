@@ -24,3 +24,32 @@ func SearchSongs(ctx context.Context, spClient *spotify.Client, text string) ([]
 	}
 	return resultsTrunced, nil
 }
+
+func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]spotify.FullTrack, error) {
+
+	tracks := getTracksFromCache(ids)
+	idsToGet := []spotify.ID{}
+	fmt.Printf("%d/%d tracks already cached", len(tracks), len(ids))
+
+	for _, id := range ids {
+		if _, ok := tracks[id]; !ok {
+			idsToGet = append(idsToGet, spotify.ID(id))
+		}
+	}
+	if len(idsToGet) > 0 {
+		fmt.Printf("Getting tracks: %v\n", idsToGet)
+		trackResults, err := spClient.GetTracks(ctx, idsToGet)
+		fmt.Println("Got tracks")
+		if err != nil {
+			return nil, err
+		}
+
+		cacheTracks(trackResults)
+
+		for _, track := range trackResults {
+			tracks[track.ID.String()] = *track
+		}
+	}
+
+	return tracks, nil
+}

@@ -3,8 +3,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 15.5 (Homebrew)
--- Dumped by pg_dump version 15.5 (Homebrew)
+-- Dumped from database version 16.0 (Debian 16.0-1.pgdg120+1)
+-- Dumped by pg_dump version 16.2 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -88,7 +88,7 @@ CREATE TABLE public.room_guests (
 ALTER TABLE public.room_guests OWNER TO postgres;
 
 --
--- Name: room_members; Type: TABLE; Schema: public; Owner: postgres
+-- Name: room_members; Type: TABLE; Schema: public; Owner: queue_share
 --
 
 CREATE TABLE public.room_members (
@@ -99,7 +99,7 @@ CREATE TABLE public.room_members (
 );
 
 
-ALTER TABLE public.room_members OWNER TO postgres;
+ALTER TABLE public.room_members OWNER TO queue_share;
 
 --
 -- Name: room_passwords; Type: TABLE; Schema: public; Owner: postgres
@@ -162,7 +162,35 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO postgres;
 
 --
--- Name: spotify_permissions_versions; Type: TABLE; Schema: public; Owner: postgres
+-- Name: spotify_history; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_history (
+    user_id uuid NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    platform character varying NOT NULL,
+    ms_played integer NOT NULL,
+    conn_country character varying NOT NULL,
+    ip_addr character varying(15),
+    user_agent character varying,
+    track_name character varying NOT NULL,
+    artist_name character varying NOT NULL,
+    album_name character varying NOT NULL,
+    spotify_track_uri character varying NOT NULL,
+    reason_start character varying,
+    reason_end character varying,
+    shuffle boolean NOT NULL,
+    skipped boolean,
+    offline boolean NOT NULL,
+    offline_timestamp timestamp without time zone,
+    incognito_mode boolean NOT NULL
+);
+
+
+ALTER TABLE public.spotify_history OWNER TO queue_share;
+
+--
+-- Name: spotify_permissions_versions; Type: TABLE; Schema: public; Owner: queue_share
 --
 
 CREATE TABLE public.spotify_permissions_versions (
@@ -171,10 +199,10 @@ CREATE TABLE public.spotify_permissions_versions (
 );
 
 
-ALTER TABLE public.spotify_permissions_versions OWNER TO postgres;
+ALTER TABLE public.spotify_permissions_versions OWNER TO queue_share;
 
 --
--- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: queue_share
 --
 
 CREATE SEQUENCE public.spotify_permissions_versions_id_seq
@@ -185,10 +213,10 @@ CREATE SEQUENCE public.spotify_permissions_versions_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.spotify_permissions_versions_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.spotify_permissions_versions_id_seq OWNER TO queue_share;
 
 --
--- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: queue_share
 --
 
 ALTER SEQUENCE public.spotify_permissions_versions_id_seq OWNED BY public.spotify_permissions_versions.id;
@@ -241,14 +269,14 @@ CREATE TABLE public.users (
 ALTER TABLE public.users OWNER TO postgres;
 
 --
--- Name: spotify_permissions_versions id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: spotify_permissions_versions id; Type: DEFAULT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.spotify_permissions_versions ALTER COLUMN id SET DEFAULT nextval('public.spotify_permissions_versions_id_seq'::regclass);
 
 
 --
--- Name: room_members no_duplicate_room_members; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members no_duplicate_room_members; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
@@ -264,19 +292,11 @@ ALTER TABLE ONLY public.room_guests
 
 
 --
--- Name: room_members room_members_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members room_members_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
     ADD CONSTRAINT room_members_pkey PRIMARY KEY (id);
-
-
---
--- Name: room_members room_members_user_id_room_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.room_members
-    ADD CONSTRAINT room_members_user_id_room_id_key UNIQUE (user_id, room_id);
 
 
 --
@@ -320,7 +340,15 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: spotify_permissions_versions spotify_permissions_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: spotify_history spotify_history_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_history
+    ADD CONSTRAINT spotify_history_pkey PRIMARY KEY (user_id, "timestamp");
+
+
+--
+-- Name: spotify_permissions_versions spotify_permissions_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.spotify_permissions_versions
@@ -375,7 +403,7 @@ ALTER TABLE ONLY public.room_guests
 
 
 --
--- Name: room_members room_members_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members room_members_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
@@ -383,7 +411,7 @@ ALTER TABLE ONLY public.room_members
 
 
 --
--- Name: room_members room_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members room_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
@@ -428,6 +456,14 @@ ALTER TABLE ONLY public.room_queue_tracks
 
 ALTER TABLE ONLY public.rooms
     ADD CONSTRAINT rooms_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: spotify_history spotify_history_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_history
+    ADD CONSTRAINT spotify_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

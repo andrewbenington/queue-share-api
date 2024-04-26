@@ -3,6 +3,7 @@ package controller
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -10,9 +11,11 @@ import (
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/db/gen"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/andrewbenington/queue-share-api/user"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -161,4 +164,26 @@ func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {
 		requests.RespondWithDBError(w, err)
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (c *Controller) UserHasSpotifyHistory(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserContextKey).(string)
+	if !ok {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
+		return
+	}
+
+	result, err := gen.New((db.Service().DB)).UserHasSpotifyHistory(r.Context(), userUUID)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+
+	response := map[string]bool{"user_has_history": result}
+	json.NewEncoder(w).Encode(response)
 }

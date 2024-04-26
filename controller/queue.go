@@ -26,7 +26,7 @@ var (
 func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -73,7 +73,7 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return

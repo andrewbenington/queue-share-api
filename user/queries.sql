@@ -25,6 +25,14 @@ INSERT INTO users(username, display_name)
         FROM
             new_user);
 
+-- name: UserUpdatePassword :exec
+UPDATE
+    users
+SET
+    encrypted_password = crypt(@user_pass, gen_salt('bf'))
+WHERE
+    id = @user_id;
+
 -- name: UserValidatePassword :one
 SELECT
     (encrypted_password = crypt(@user_pass, encrypted_password))
@@ -112,3 +120,16 @@ FROM
         AND r.is_open = $2
     JOIN users u ON r.host_id = u.id;
 
+
+-- name: UserGetSpotifyTokens :one
+SELECT
+    st.encrypted_access_token,
+    st.access_token_expiry,
+    st.encrypted_refresh_token
+FROM
+    spotify_tokens AS st
+    WHERE st.user_id = $1;
+
+-- name: UserHasSpotifyHistory :one
+SELECT
+    EXISTS (SELECT * FROM SPOTIFY_HISTORY WHERE USER_ID = @user_id);

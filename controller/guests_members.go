@@ -15,7 +15,7 @@ import (
 func (*Controller) JoinRoomAsMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -54,7 +54,7 @@ type AddMemberRequest struct {
 func (*Controller) AddMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -99,7 +99,7 @@ type SetModeratorRequest struct {
 
 func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -136,7 +136,7 @@ func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
 func (*Controller) DeleteMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -168,7 +168,7 @@ func (*Controller) DeleteMember(w http.ResponseWriter, r *http.Request) {
 func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -215,7 +215,7 @@ type GetRoomGuestsAndMembersResponse struct {
 
 func (*Controller) GetRoomGuestsAndMembers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return

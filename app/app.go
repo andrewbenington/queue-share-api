@@ -66,6 +66,14 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/user/rooms/hosted", a.Controller.GetUserHostedRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/user/rooms/joined", a.Controller.GetUserJoinedRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/user/spotify", a.Controller.UnlinkSpotify).Methods("DELETE", "OPTIONS")
+	a.Router.HandleFunc("/user/has-spotify-history", a.Controller.UserHasSpotifyHistory).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/stats/upload", a.Controller.UploadHistory).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/stats/history", a.Controller.GetAllHistory).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/songs-by-month", a.Controller.GetTopSongsByMonth).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/tracks-by-year", a.Controller.GetTopTracksByYear).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/albums-by-year", a.Controller.GetTopAlbumsByYear).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/artists-by-year", a.Controller.GetTopArtistsByYear).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")
