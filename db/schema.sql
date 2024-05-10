@@ -4,7 +4,7 @@
 --
 
 -- Dumped from database version 15.5 (Homebrew)
--- Dumped by pg_dump version 15.5 (Homebrew)
+-- Dumped by pg_dump version 16.2 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -88,7 +88,7 @@ CREATE TABLE public.room_guests (
 ALTER TABLE public.room_guests OWNER TO postgres;
 
 --
--- Name: room_members; Type: TABLE; Schema: public; Owner: postgres
+-- Name: room_members; Type: TABLE; Schema: public; Owner: queue_share
 --
 
 CREATE TABLE public.room_members (
@@ -99,7 +99,7 @@ CREATE TABLE public.room_members (
 );
 
 
-ALTER TABLE public.room_members OWNER TO postgres;
+ALTER TABLE public.room_members OWNER TO queue_share;
 
 --
 -- Name: room_passwords; Type: TABLE; Schema: public; Owner: postgres
@@ -162,7 +162,78 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO postgres;
 
 --
--- Name: spotify_permissions_versions; Type: TABLE; Schema: public; Owner: postgres
+-- Name: spotify_album_cache; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_album_cache (
+    id text NOT NULL,
+    uri text NOT NULL,
+    name text NOT NULL,
+    artist_id text NOT NULL,
+    artist_uri text NOT NULL,
+    artist_name text NOT NULL,
+    album_group text,
+    album_type text,
+    image_url text,
+    release_date date,
+    release_date_precision text,
+    genres jsonb,
+    popularity integer
+);
+
+
+ALTER TABLE public.spotify_album_cache OWNER TO queue_share;
+
+--
+-- Name: spotify_artist_cache; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_artist_cache (
+    id text NOT NULL,
+    uri text NOT NULL,
+    name text NOT NULL,
+    image_url text,
+    genres jsonb,
+    popularity integer,
+    follower_count integer
+);
+
+
+ALTER TABLE public.spotify_artist_cache OWNER TO queue_share;
+
+--
+-- Name: spotify_history; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_history (
+    user_id uuid NOT NULL,
+    "timestamp" timestamp without time zone NOT NULL,
+    platform character varying NOT NULL,
+    ms_played integer NOT NULL,
+    conn_country character varying NOT NULL,
+    ip_addr character varying(15),
+    user_agent character varying,
+    track_name character varying NOT NULL,
+    artist_name character varying NOT NULL,
+    album_name character varying NOT NULL,
+    spotify_track_uri character varying NOT NULL,
+    reason_start character varying,
+    reason_end character varying,
+    shuffle boolean NOT NULL,
+    skipped boolean,
+    offline boolean NOT NULL,
+    offline_timestamp timestamp without time zone,
+    incognito_mode boolean NOT NULL,
+    spotify_artist_uri text,
+    spotify_album_uri text,
+    from_history boolean DEFAULT false NOT NULL
+);
+
+
+ALTER TABLE public.spotify_history OWNER TO queue_share;
+
+--
+-- Name: spotify_permissions_versions; Type: TABLE; Schema: public; Owner: queue_share
 --
 
 CREATE TABLE public.spotify_permissions_versions (
@@ -171,10 +242,10 @@ CREATE TABLE public.spotify_permissions_versions (
 );
 
 
-ALTER TABLE public.spotify_permissions_versions OWNER TO postgres;
+ALTER TABLE public.spotify_permissions_versions OWNER TO queue_share;
 
 --
--- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+-- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: queue_share
 --
 
 CREATE SEQUENCE public.spotify_permissions_versions_id_seq
@@ -185,10 +256,10 @@ CREATE SEQUENCE public.spotify_permissions_versions_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.spotify_permissions_versions_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.spotify_permissions_versions_id_seq OWNER TO queue_share;
 
 --
--- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+-- Name: spotify_permissions_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: queue_share
 --
 
 ALTER SEQUENCE public.spotify_permissions_versions_id_seq OWNED BY public.spotify_permissions_versions.id;
@@ -209,6 +280,62 @@ CREATE TABLE public.spotify_tokens (
 
 
 ALTER TABLE public.spotify_tokens OWNER TO postgres;
+
+--
+-- Name: spotify_track_cache; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_track_cache (
+    id text NOT NULL,
+    uri text NOT NULL,
+    name text NOT NULL,
+    album_id text NOT NULL,
+    album_uri text NOT NULL,
+    album_name text NOT NULL,
+    artist_id text NOT NULL,
+    artist_uri text NOT NULL,
+    artist_name text NOT NULL,
+    image_url text,
+    other_artists jsonb,
+    duration_ms integer NOT NULL,
+    popularity integer DEFAULT 0 NOT NULL,
+    explicit boolean DEFAULT false NOT NULL,
+    preview_url text NOT NULL,
+    disc_number integer NOT NULL,
+    track_number integer NOT NULL,
+    type text NOT NULL,
+    external_ids jsonb,
+    isrc text
+);
+
+
+ALTER TABLE public.spotify_track_cache OWNER TO queue_share;
+
+--
+-- Name: user_friend_requests; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.user_friend_requests (
+    user_id uuid NOT NULL,
+    friend_id uuid NOT NULL,
+    request_timestamp timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_friend_requests OWNER TO queue_share;
+
+--
+-- Name: user_friends; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.user_friends (
+    user_id uuid NOT NULL,
+    friend_id uuid NOT NULL,
+    added_timestamp timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_friends OWNER TO queue_share;
 
 --
 -- Name: user_passwords; Type: TABLE; Schema: public; Owner: postgres
@@ -241,14 +368,14 @@ CREATE TABLE public.users (
 ALTER TABLE public.users OWNER TO postgres;
 
 --
--- Name: spotify_permissions_versions id; Type: DEFAULT; Schema: public; Owner: postgres
+-- Name: spotify_permissions_versions id; Type: DEFAULT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.spotify_permissions_versions ALTER COLUMN id SET DEFAULT nextval('public.spotify_permissions_versions_id_seq'::regclass);
 
 
 --
--- Name: room_members no_duplicate_room_members; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members no_duplicate_room_members; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
@@ -264,19 +391,11 @@ ALTER TABLE ONLY public.room_guests
 
 
 --
--- Name: room_members room_members_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members room_members_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
     ADD CONSTRAINT room_members_pkey PRIMARY KEY (id);
-
-
---
--- Name: room_members room_members_user_id_room_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.room_members
-    ADD CONSTRAINT room_members_user_id_room_id_key UNIQUE (user_id, room_id);
 
 
 --
@@ -320,7 +439,31 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: spotify_permissions_versions spotify_permissions_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: spotify_album_cache spotify_album_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_album_cache
+    ADD CONSTRAINT spotify_album_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: spotify_artist_cache spotify_artist_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_artist_cache
+    ADD CONSTRAINT spotify_artist_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: spotify_history spotify_history_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_history
+    ADD CONSTRAINT spotify_history_pkey PRIMARY KEY (user_id, "timestamp");
+
+
+--
+-- Name: spotify_permissions_versions spotify_permissions_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.spotify_permissions_versions
@@ -341,6 +484,30 @@ ALTER TABLE ONLY public.spotify_tokens
 
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_user_id_key UNIQUE (user_id);
+
+
+--
+-- Name: spotify_track_cache spotify_track_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_track_cache
+    ADD CONSTRAINT spotify_track_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_friend_requests user_friend_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friend_requests
+    ADD CONSTRAINT user_friend_requests_pkey PRIMARY KEY (user_id, friend_id);
+
+
+--
+-- Name: user_friends user_friends_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friends
+    ADD CONSTRAINT user_friends_pkey PRIMARY KEY (user_id, friend_id);
 
 
 --
@@ -375,7 +542,7 @@ ALTER TABLE ONLY public.room_guests
 
 
 --
--- Name: room_members room_members_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members room_members_room_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
@@ -383,7 +550,7 @@ ALTER TABLE ONLY public.room_members
 
 
 --
--- Name: room_members room_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: room_members room_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
 --
 
 ALTER TABLE ONLY public.room_members
@@ -431,6 +598,14 @@ ALTER TABLE ONLY public.rooms
 
 
 --
+-- Name: spotify_history spotify_history_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_history
+    ADD CONSTRAINT spotify_history_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: spotify_tokens spotify_tokens_permissions_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -444,6 +619,38 @@ ALTER TABLE ONLY public.spotify_tokens
 
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friend_requests user_friend_requests_friend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friend_requests
+    ADD CONSTRAINT user_friend_requests_friend_id_fkey FOREIGN KEY (friend_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friend_requests user_friend_requests_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friend_requests
+    ADD CONSTRAINT user_friend_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friends user_friends_friend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friends
+    ADD CONSTRAINT user_friends_friend_id_fkey FOREIGN KEY (friend_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friends user_friends_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friends
+    ADD CONSTRAINT user_friends_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

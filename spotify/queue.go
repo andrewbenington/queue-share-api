@@ -9,15 +9,15 @@ import (
 )
 
 type TrackInfo struct {
-	ID                       string         `json:"id"`
-	Name                     string         `json:"name"`
-	Artists                  []string       `json:"artists"`
-	Image                    *spotify.Image `json:"image"`
-	AddedBy                  string         `json:"added_by,omitempty"`
-	AddedAt                  time.Time      `json:"-"`
-	Paused                   bool           `json:"paused"`
-	DurationMS               int            `json:"duration_ms,omitempty"`
-	StartedPlayingEpochMilis *int64         `json:"started_playing_epoch_ms,omitempty"`
+	ID                       string                 `json:"id"`
+	Name                     string                 `json:"name"`
+	Artists                  []spotify.SimpleArtist `json:"artists"`
+	Image                    *spotify.Image         `json:"image"`
+	AddedBy                  string                 `json:"added_by,omitempty"`
+	AddedAt                  time.Time              `json:"-"`
+	Paused                   bool                   `json:"paused"`
+	DurationMS               int                    `json:"duration_ms,omitempty"`
+	StartedPlayingEpochMilis *int64                 `json:"started_playing_epoch_ms,omitempty"`
 }
 
 type CurrentQueue struct {
@@ -48,7 +48,7 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 		CurrentlyPlaying: TrackInfo{
 			ID:         queue.CurrentlyPlaying.ID.String(),
 			Name:       queue.CurrentlyPlaying.Name,
-			Artists:    GetArtists(queue.CurrentlyPlaying),
+			Artists:    queue.CurrentlyPlaying.Artists,
 			Image:      Get64Image(queue.CurrentlyPlaying.Album),
 			DurationMS: queue.CurrentlyPlaying.Duration,
 		},
@@ -57,7 +57,7 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 		qe := TrackInfo{
 			ID:         entry.ID.String(),
 			Name:       entry.Name,
-			Artists:    GetArtists(entry),
+			Artists:    entry.Artists,
 			Image:      Get64Image(entry.Album),
 			DurationMS: entry.Duration,
 		}
@@ -84,7 +84,7 @@ func Get64Image(t spotify.SimpleAlbum) *spotify.Image {
 	return nil
 }
 
-func GetArtists(t spotify.FullTrack) []string {
+func GetArtistsForTrack(t spotify.FullTrack) []string {
 	artists := []string{}
 	for _, a := range t.Artists {
 		artists = append(artists, a.Name)

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/auth"
-	"github.com/andrewbenington/queue-share-api/db/gen"
+	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/user"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
@@ -24,10 +24,10 @@ func NewStore(db *sql.DB) *Store {
 	}
 }
 
-func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
+func GetByCode(ctx context.Context, dbtx db.DBTX, code string) (Room, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	row, err := gen.New(s.db).RoomGetByCode(ctx, strings.ToUpper(code))
+	row, err := db.New(dbtx).RoomGetByCode(ctx, strings.ToUpper(code))
 	if err != nil {
 		return Room{}, err
 	}
@@ -46,36 +46,36 @@ func (s *Store) GetByCode(ctx context.Context, code string) (Room, error) {
 	}, nil
 }
 
-func (s *Store) GetHostID(ctx context.Context, code string) (string, error) {
+func GetHostID(ctx context.Context, dbtx db.DBTX, code string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	id, err := gen.New(s.db).RoomGetHostID(ctx, strings.ToUpper(code))
+	id, err := db.New(dbtx).RoomGetHostID(ctx, strings.ToUpper(code))
 	if err != nil {
 		return "", err
 	}
 	return id.String(), nil
 }
 
-func (s *Store) GetEncryptedRoomTokens(ctx context.Context, code string) (accessToken []byte, accessTokenExpiry time.Time, refreshToken []byte, err error) {
+func GetEncryptedRoomTokens(ctx context.Context, dbtx db.DBTX, code string) (accessToken []byte, accessTokenExpiry time.Time, refreshToken []byte, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	row, err := gen.New(s.db).GetSpotifyTokensByRoomCode(ctx, strings.ToUpper(code))
+	row, err := db.New(dbtx).GetSpotifyTokensByRoomCode(ctx, strings.ToUpper(code))
 	if err != nil {
 		return
 	}
 	return row.EncryptedAccessToken, row.AccessTokenExpiry, row.EncryptedRefreshToken, nil
 }
 
-func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room, error) {
+func Insert(ctx context.Context, dbtx db.DBTX, insertParams InsertRoomParams) (Room, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	hostUUID, err := uuid.Parse(insertParams.HostID)
 	if err != nil {
 		return Room{}, fmt.Errorf("parse user UUID: %w", err)
 	}
-	row, err := gen.New(s.db).RoomInsertWithPassword(
+	row, err := db.New(dbtx).RoomInsertWithPassword(
 		ctx,
-		gen.RoomInsertWithPasswordParams{
+		db.RoomInsertWithPasswordParams{
 			Name:     insertParams.Name,
 			HostID:   hostUUID,
 			RoomPass: insertParams.Password,
@@ -92,7 +92,7 @@ func (s *Store) Insert(ctx context.Context, insertParams InsertRoomParams) (Room
 	}, nil
 }
 
-func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken *oauth2.Token) error {
+func UpdateSpotifyToken(ctx context.Context, dbtx db.DBTX, code string, oauthToken *oauth2.Token) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -104,7 +104,7 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 	if err != nil {
 		return fmt.Errorf("encrypt refresh token: %w", err)
 	}
-	return gen.New(s.db).RoomUpdateSpotifyTokens(ctx, gen.RoomUpdateSpotifyTokensParams{
+	return db.New(dbtx).RoomUpdateSpotifyTokens(ctx, db.RoomUpdateSpotifyTokensParams{
 		Code:                  strings.ToUpper(code),
 		EncryptedAccessToken:  encryptedAccessToken,
 		AccessTokenExpiry:     oauthToken.Expiry,
@@ -112,14 +112,14 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, code string, oauthToken 
 	})
 }
 
-func (s *Store) ValidatePassword(ctx context.Context, code string, password string) (bool, error) {
-	return gen.New(s.db).RoomValidatePassword(ctx, gen.RoomValidatePasswordParams{
+func ValidatePassword(ctx context.Context, dbtx db.DBTX, code string, password string) (bool, error) {
+	return db.New(dbtx).RoomValidatePassword(ctx, db.RoomValidatePasswordParams{
 		Code:     strings.ToUpper(code),
 		RoomPass: password,
 	})
 }
 
-func (s *Store) AddMember(ctx context.Context, roomID string, userID string) error {
+func AddMember(ctx context.Context, dbtx db.DBTX, roomID string, userID string) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
@@ -128,19 +128,19 @@ func (s *Store) AddMember(ctx context.Context, roomID string, userID string) err
 	if err != nil {
 		return fmt.Errorf("parse user UUID: %w", err)
 	}
-	err = gen.New(s.db).RoomAddMember(ctx, gen.RoomAddMemberParams{
+	err = db.New(dbtx).RoomAddMember(ctx, db.RoomAddMemberParams{
 		RoomID: roomUUID,
 		UserID: userUUID,
 	})
 	return err
 }
 
-func (s *Store) AddMemberByUsername(ctx context.Context, roomID string, username string, isModerator bool) error {
+func AddMemberByUsername(ctx context.Context, dbtx db.DBTX, roomID string, username string, isModerator bool) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
 	}
-	_, err = gen.New(s.db).RoomAddMemberByUsername(ctx, gen.RoomAddMemberByUsernameParams{
+	_, err = db.New(dbtx).RoomAddMemberByUsername(ctx, db.RoomAddMemberByUsernameParams{
 		RoomID:      roomUUID,
 		Username:    username,
 		IsModerator: isModerator,
@@ -148,7 +148,7 @@ func (s *Store) AddMemberByUsername(ctx context.Context, roomID string, username
 	return err
 }
 
-func (s *Store) UserIsMember(ctx context.Context, roomID string, userID string) (bool, error) {
+func UserIsMember(ctx context.Context, dbtx db.DBTX, roomID string, userID string) (bool, error) {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return false, fmt.Errorf("parse room UUID: %w", err)
@@ -157,7 +157,7 @@ func (s *Store) UserIsMember(ctx context.Context, roomID string, userID string) 
 	if err != nil {
 		return false, fmt.Errorf("parse room UUID: %w", err)
 	}
-	return gen.New(s.db).RoomUserIsMember(ctx, gen.RoomUserIsMemberParams{UserID: userUUID, RoomID: roomUUID})
+	return db.New(dbtx).RoomUserIsMember(ctx, db.RoomUserIsMemberParams{UserID: userUUID, RoomID: roomUUID})
 }
 
 type Member struct {
@@ -170,12 +170,12 @@ type Member struct {
 	QueuedTracks int    `json:"queued_tracks"`
 }
 
-func (s *Store) GetAllMembers(ctx context.Context, roomID string) ([]Member, error) {
+func GetAllMembers(ctx context.Context, dbtx db.DBTX, roomID string) ([]Member, error) {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return nil, fmt.Errorf("parse room UUID: %w", err)
 	}
-	rows, err := gen.New(s.db).RoomGetAllMembers(ctx, roomUUID)
+	rows, err := db.New(dbtx).RoomGetAllMembers(ctx, roomUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (s *Store) GetAllMembers(ctx context.Context, roomID string) ([]Member, err
 	return users, nil
 }
 
-func (s *Store) SetModerator(ctx context.Context, roomID string, userID string, isModerator bool) error {
+func SetModerator(ctx context.Context, dbtx db.DBTX, roomID string, userID string, isModerator bool) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
@@ -205,7 +205,7 @@ func (s *Store) SetModerator(ctx context.Context, roomID string, userID string, 
 	if err != nil {
 		return fmt.Errorf("parse user UUID: %w", err)
 	}
-	err = gen.New(s.db).RoomSetModerator(ctx, gen.RoomSetModeratorParams{
+	err = db.New(dbtx).RoomSetModerator(ctx, db.RoomSetModeratorParams{
 		RoomID:      roomUUID,
 		UserID:      userUUID,
 		IsModerator: isModerator,
@@ -213,7 +213,7 @@ func (s *Store) SetModerator(ctx context.Context, roomID string, userID string, 
 	return err
 }
 
-func (s *Store) RemoveMember(ctx context.Context, roomID string, userID string) error {
+func RemoveMember(ctx context.Context, dbtx db.DBTX, roomID string, userID string) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
@@ -222,14 +222,14 @@ func (s *Store) RemoveMember(ctx context.Context, roomID string, userID string) 
 	if err != nil {
 		return fmt.Errorf("parse user UUID: %w", err)
 	}
-	return gen.New(s.db).RoomRemoveMember(ctx, gen.RoomRemoveMemberParams{
+	return db.New(dbtx).RoomRemoveMember(ctx, db.RoomRemoveMemberParams{
 		RoomID: roomUUID,
 		UserID: userUUID,
 	})
 }
 
-func (s *Store) InsertGuest(ctx context.Context, roomCode string, name string) (*Guest, error) {
-	row, err := gen.New(s.db).RoomGuestInsert(ctx, gen.RoomGuestInsertParams{
+func InsertGuest(ctx context.Context, dbtx db.DBTX, roomCode string, name string) (*Guest, error) {
+	row, err := db.New(dbtx).RoomGuestInsert(ctx, db.RoomGuestInsertParams{
 		RoomCode: roomCode,
 		Name:     name,
 	})
@@ -242,13 +242,13 @@ func (s *Store) InsertGuest(ctx context.Context, roomCode string, name string) (
 	}, nil
 }
 
-func (s *Store) InsertGuestWithID(ctx context.Context, roomCode string, name string, guestID string) (*Guest, error) {
+func InsertGuestWithID(ctx context.Context, dbtx db.DBTX, roomCode string, name string, guestID string) (*Guest, error) {
 	guestUUID, err := uuid.Parse(guestID)
 	if err != nil {
 		return nil, fmt.Errorf("parse guest UUID: %w", err)
 	}
 
-	row, err := gen.New(s.db).RoomGuestInsertWithID(ctx, gen.RoomGuestInsertWithIDParams{
+	row, err := db.New(dbtx).RoomGuestInsertWithID(ctx, db.RoomGuestInsertWithIDParams{
 		GuestID:  guestUUID,
 		RoomCode: roomCode,
 		Name:     name,
@@ -262,7 +262,7 @@ func (s *Store) InsertGuestWithID(ctx context.Context, roomCode string, name str
 	}, nil
 }
 
-func (s *Store) GetGuestName(ctx context.Context, roomID string, guestID string) (string, error) {
+func GetGuestName(ctx context.Context, dbtx db.DBTX, roomID string, guestID string) (string, error) {
 	guestUUID, err := uuid.Parse(guestID)
 	if err != nil {
 		return "", fmt.Errorf("parse guest UUID: %w", err)
@@ -272,18 +272,18 @@ func (s *Store) GetGuestName(ctx context.Context, roomID string, guestID string)
 		return "", fmt.Errorf("parse room UUID: %w", err)
 	}
 
-	return gen.New(s.db).RoomGuestGetName(ctx, gen.RoomGuestGetNameParams{
+	return db.New(dbtx).RoomGuestGetName(ctx, db.RoomGuestGetNameParams{
 		GuestID: guestUUID,
 		RoomID:  roomUUID,
 	})
 }
 
-func (s *Store) GetAllRoomGuests(ctx context.Context, roomID string) ([]Guest, error) {
+func GetAllRoomGuests(ctx context.Context, dbtx db.DBTX, roomID string) ([]Guest, error) {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return nil, fmt.Errorf("parse room UUID: %w", err)
 	}
-	rows, err := gen.New(s.db).RoomGetAllGuests(ctx, roomUUID)
+	rows, err := db.New(dbtx).RoomGetAllGuests(ctx, roomUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -300,38 +300,38 @@ func (s *Store) GetAllRoomGuests(ctx context.Context, roomID string) ([]Guest, e
 	return guests, nil
 }
 
-func (s *Store) SetQueueTrackGuest(ctx context.Context, roomCode string, trackID string, guestID string) error {
+func SetQueueTrackGuest(ctx context.Context, dbtx db.DBTX, roomCode string, trackID string, guestID string) error {
 	guestUUID, err := uuid.Parse(guestID)
 	if err != nil {
 		return fmt.Errorf("parse guest id: %s", err)
 	}
 
-	return gen.New(s.db).RoomSetGuestQueueTrack(ctx, gen.RoomSetGuestQueueTrackParams{
+	return db.New(dbtx).RoomSetGuestQueueTrack(ctx, db.RoomSetGuestQueueTrackParams{
 		GuestID:  guestUUID,
 		RoomCode: roomCode,
 		TrackID:  trackID,
 	})
 }
 
-func (s *Store) SetQueueTrackUser(ctx context.Context, roomCode string, trackID string, userID string) error {
+func SetQueueTrackUser(ctx context.Context, dbtx db.DBTX, roomCode string, trackID string, userID string) error {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return fmt.Errorf("parse user id: %s", err)
 	}
 
-	return gen.New(s.db).RoomSetMemberQueueTrack(ctx, gen.RoomSetMemberQueueTrackParams{
+	return db.New(dbtx).RoomSetMemberQueueTrack(ctx, db.RoomSetMemberQueueTrackParams{
 		UserID:   userUUID,
 		RoomCode: roomCode,
 		TrackID:  trackID,
 	})
 }
 
-func (s *Store) GetQueueTrackAddedBy(ctx context.Context, roomID string) (tracks []QueuedTrack, err error) {
+func GetQueueTrackAddedBy(ctx context.Context, dbtx db.DBTX, roomID string) (tracks []QueuedTrack, err error) {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return nil, fmt.Errorf("parse room UUID: %w", err)
 	}
-	rows, err := gen.New(s.db).RoomGetQueueTracks(ctx, roomUUID)
+	rows, err := db.New(dbtx).RoomGetQueueTracks(ctx, roomUUID)
 	if err != nil {
 		return
 	}
@@ -354,29 +354,29 @@ func (s *Store) GetQueueTrackAddedBy(ctx context.Context, roomID string) (tracks
 	return
 }
 
-func (s *Store) DeleteByCode(ctx context.Context, roomCode string) error {
-	return gen.New(s.db).RoomDeleteByID(ctx, strings.ToUpper(roomCode))
+func DeleteByCode(ctx context.Context, dbtx db.DBTX, roomCode string) error {
+	return db.New(dbtx).RoomDeleteByID(ctx, strings.ToUpper(roomCode))
 }
 
-func (s *Store) UpdatePassword(ctx context.Context, roomID string, newPassword string) error {
+func UpdatePassword(ctx context.Context, dbtx db.DBTX, roomID string, newPassword string) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
 	}
 
-	return gen.New(s.db).RoomUpdatePassword(ctx, gen.RoomUpdatePasswordParams{
+	return db.New(dbtx).RoomUpdatePassword(ctx, db.RoomUpdatePasswordParams{
 		RoomID:   roomUUID,
 		RoomPass: newPassword,
 	})
 }
 
-func (s *Store) GetUserHostedRooms(ctx context.Context, userID string, isOpen bool) ([]Room, error) {
+func GetUserHostedRooms(ctx context.Context, dbtx db.DBTX, userID string, isOpen bool) ([]Room, error) {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, fmt.Errorf("parse user UUID: %w", err)
 	}
 
-	rows, err := gen.New(s.db).UserGetHostedRooms(ctx, gen.UserGetHostedRoomsParams{ID: userUUID, IsOpen: isOpen})
+	rows, err := db.New(dbtx).UserGetHostedRooms(ctx, db.UserGetHostedRoomsParams{ID: userUUID, IsOpen: isOpen})
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -401,13 +401,13 @@ func (s *Store) GetUserHostedRooms(ctx context.Context, userID string, isOpen bo
 	return rooms, nil
 }
 
-func (s *Store) GetUserJoinedRooms(ctx context.Context, userID string, isOpen bool) ([]Room, error) {
+func GetUserJoinedRooms(ctx context.Context, dbtx db.DBTX, userID string, isOpen bool) ([]Room, error) {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, fmt.Errorf("parse user UUID: %w", err)
 	}
 
-	rows, err := gen.New(s.db).UserGetJoinedRooms(ctx, gen.UserGetJoinedRoomsParams{UserID: userUUID, IsOpen: isOpen})
+	rows, err := db.New(dbtx).UserGetJoinedRooms(ctx, db.UserGetJoinedRoomsParams{UserID: userUUID, IsOpen: isOpen})
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -432,24 +432,24 @@ func (s *Store) GetUserJoinedRooms(ctx context.Context, userID string, isOpen bo
 	return rooms, nil
 }
 
-func (s *Store) SetIsOpen(ctx context.Context, roomID string, isOpen bool) error {
+func SetIsOpen(ctx context.Context, dbtx db.DBTX, roomID string, isOpen bool) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
 	}
-	return gen.New(s.db).RoomSetIsOpen(ctx, gen.RoomSetIsOpenParams{
+	return db.New(dbtx).RoomSetIsOpen(ctx, db.RoomSetIsOpenParams{
 		ID:     roomUUID,
 		IsOpen: isOpen,
 	})
 }
 
-func (s *Store) MarkTracksAsPlayedSince(ctx context.Context, roomID string, since time.Time) error {
+func MarkTracksAsPlayedSince(ctx context.Context, dbtx db.DBTX, roomID string, since time.Time) error {
 	roomUUID, err := uuid.Parse(roomID)
 	if err != nil {
 		return fmt.Errorf("parse room UUID: %w", err)
 	}
 
-	return gen.New(s.db).RoomMarkTracksAsPlayed(ctx, gen.RoomMarkTracksAsPlayedParams{
+	return db.New(dbtx).RoomMarkTracksAsPlayed(ctx, db.RoomMarkTracksAsPlayedParams{
 		RoomID:    roomUUID,
 		Timestamp: since,
 	})

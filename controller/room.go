@@ -13,6 +13,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
+	"github.com/andrewbenington/queue-share-api/user"
 )
 
 type PermissionLevel int
@@ -34,6 +35,7 @@ const (
 )
 
 func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
@@ -49,14 +51,20 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 
 	req.HostID = userID
 
-	newRoom, err := db.Service().RoomStore.Insert(r.Context(), req)
+	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+
+	newRoom, err := room.Insert(ctx, transaction, req)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error inserting room: %s", err)
 		requests.RespondInternalError(w)
 		return
 	}
 
-	user, err := db.Service().UserStore.GetByID(r.Context(), userID)
+	user, err := user.GetByID(ctx, db.Service().DB, userID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "get room host after create: %s", err)
 	} else {
@@ -76,7 +84,7 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -92,7 +100,7 @@ func (c *Controller) GetRoom(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if reqCtx.GuestID != "" {
-		guestName, err := db.Service().RoomStore.GetGuestName(ctx, reqCtx.Room.ID, reqCtx.GuestID)
+		guestName, err := room.GetGuestName(ctx, db.Service().DB, reqCtx.Room.ID, reqCtx.GuestID)
 		if err != nil {
 			log.Printf("error finding guest name: %s\n", err)
 		} else {
@@ -121,7 +129,7 @@ type GetRoomAuthLevelResponse struct {
 func (c *Controller) GetRoomPermissions(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -149,7 +157,7 @@ func (c *Controller) GetRoomPermissions(w http.ResponseWriter, r *http.Request) 
 
 func (*Controller) DeleteRoom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -160,7 +168,7 @@ func (*Controller) DeleteRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.Service().RoomStore.DeleteByCode(ctx, reqCtx.Room.Code)
+	err = room.DeleteByCode(ctx, db.Service().DB, reqCtx.Room.Code)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -176,7 +184,7 @@ type UpdatePasswordRequest struct {
 
 func (*Controller) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -194,7 +202,7 @@ func (*Controller) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = db.Service().RoomStore.UpdatePassword(ctx, reqCtx.Room.ID, body.NewPassword)
+	err = room.UpdatePassword(ctx, db.Service().DB, reqCtx.Room.ID, body.NewPassword)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -203,9 +211,9 @@ func (*Controller) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext, err error) {
+func getRoomRequestContext(ctx context.Context, r *http.Request) (as RequestContext, err error) {
 	code, guestID, password := room.ParametersFromRequest(r)
-	rm, err := db.Service().RoomStore.GetByCode(ctx, code)
+	rm, err := room.GetByCode(ctx, db.Service().DB, code)
 	if err != nil {
 		return
 	}
@@ -220,7 +228,7 @@ func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext,
 			return
 		}
 
-		isModerator, err := db.Service().RoomStore.UserIsMember(ctx, rm.ID, userID)
+		isModerator, err := room.UserIsMember(ctx, db.Service().DB, rm.ID, userID)
 
 		if err == nil {
 			if isModerator {
@@ -239,7 +247,7 @@ func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext,
 	// Request has been made by a guest; authenticate with room password
 	as.GuestID = guestID
 
-	passwordValid, err := db.Service().RoomStore.ValidatePassword(ctx, code, password)
+	passwordValid, err := room.ValidatePassword(ctx, db.Service().DB, code, password)
 	if err != nil && err != sql.ErrNoRows {
 		return as, err
 	}
@@ -248,6 +256,6 @@ func getRequestContext(ctx context.Context, r *http.Request) (as RequestContext,
 		return as, nil
 	}
 	as.PermissionLevel = Guest
-	
+
 	return as, nil
 }

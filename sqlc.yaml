@@ -1,11 +1,29 @@
-version: '2'
+version: "2"
 sql:
-  - schema: 'db/schema.sql'
+  - schema: "db/schema.sql"
     queries:
-      - 'room/queries.sql'
-      - 'user/queries.sql'
-    engine: 'postgresql'
+      - "**/queries.sql"
+    engine: "postgresql"
     gen:
       go:
-        package: 'gen'
-        out: 'db/gen'
+        emit_pointers_for_null_types: true
+        emit_result_struct_pointers: true
+        emit_json_tags: true
+        package: "db"
+        out: "db"
+        overrides:
+          - column: spotify_track_cache.other_artists
+            go_type:
+              type: TrackArtist
+          - column: spotify_artist_cache.genres
+            go_type:
+              type: "[]string"
+          - column: spotify_album_cache.genres
+            go_type:
+              type: "[]string"
+          - column: spotify_track_cache.external_ids
+            go_type:
+              import: "github.com/zmb3/spotify/v2"
+              type: TrackExternalIDs
+
+    strict_order_by: false
