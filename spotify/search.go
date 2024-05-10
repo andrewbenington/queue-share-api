@@ -44,7 +44,7 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 	}
 	fmt.Printf("Cache miss: %s\n", track.Name)
 
-	cacheFullTracks(ctx, []*spotify.FullTrack{track})
+	CacheFullTracks(ctx, []*spotify.FullTrack{track})
 
 	trackData := TrackDataFromFullTrack(*track)
 
@@ -78,7 +78,7 @@ func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			return nil, err
 		}
 
-		cacheFullTracks(ctx, results)
+		CacheFullTracks(ctx, results)
 
 		for _, track := range results {
 			tracks[track.ID.String()] = TrackDataFromFullTrack(*track)

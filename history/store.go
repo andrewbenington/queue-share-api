@@ -64,6 +64,7 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 
 	for _, entry := range entries {
 		if entry.TrackName == "" {
+			fmt.Println("skipping track with no name")
 			continue
 		}
 

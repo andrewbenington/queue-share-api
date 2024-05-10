@@ -57,7 +57,7 @@ func getHistoryForUser(ctx context.Context, userID uuid.UUID) {
 			fmt.Println(err)
 			return
 		} else {
-			log.Println("%d history entries found for %s", len(returnedRows), userID)
+			log.Printf("%d history entries found for %s", len(returnedRows), userID)
 		}
 
 		if len(returnedRows) == 0 {
@@ -106,7 +106,7 @@ func processHistory(ctx context.Context, spClient *z_spotify.Client, items []z_s
 
 		trackData, err := spotify.GetTrack(ctx, spClient, item.Track.ID.String())
 		if err != nil {
-			fmt.Println(err)
+			log.Printf("error getting track: %s", err)
 			continue
 		}
 

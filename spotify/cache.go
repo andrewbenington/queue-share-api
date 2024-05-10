@@ -73,7 +73,7 @@ func init() {
 	}
 }
 
-func cacheFullTracks(ctx context.Context, tracks []*spotify.FullTrack) {
+func CacheFullTracks(ctx context.Context, tracks []*spotify.FullTrack) {
 	params := InsertParamsFromFullTracks(tracks)
 	err := db.New(db.Service().DB).TrackCacheInsertBulkNullable(ctx, params)
 	if err != nil {
