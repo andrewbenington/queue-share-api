@@ -52,7 +52,6 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 }
 
 func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.TrackData, error) {
-	fmt.Println(ids)
 	tracks, err := getTracksFromCache(ctx, ids)
 	if err != nil {
 		log.Printf("error getting tracks from cache: %s", err)
@@ -159,15 +158,12 @@ func GetAlbum(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 }
 
 func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]spotify.FullAlbum, error) {
-
-	log.Println(ids[0])
 	albums := getAlbumsFromCache(ids)
 	idsToGet := []spotify.ID{}
 	fmt.Printf("%d/%d albums already cached\n", len(albums), len(ids))
 
 	for _, id := range ids {
 		if _, ok := albums[id]; !ok {
-			log.Println(id)
 			idsToGet = append(idsToGet, spotify.ID(id))
 		}
 	}
