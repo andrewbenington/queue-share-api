@@ -2,11 +2,14 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/google/uuid"
 )
 
 var (
@@ -15,7 +18,7 @@ var (
 	}, "", " ")
 )
 
-func (c *Controller) Search(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) SearchFromRoom(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	reqCtx, err := getRoomRequestContext(ctx, r)
@@ -41,6 +44,47 @@ func (c *Controller) Search(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(SearchMissingError)
 	}
 	results, err := spotify.SearchSongs(r.Context(), client, term)
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+
+	responseBytes, err := json.MarshalIndent(results, "", " ")
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+	_, _ = w.Write(responseBytes)
+}
+
+func (c *Controller) SearchByUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
+	if !authenticatedAsUser {
+		requests.RespondAuthError(w)
+		return
+	}
+	fmt.Println(userID)
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
+		return
+	}
+
+	code, spClient, err := client.ForUser(ctx, userUUID)
+	if err != nil {
+		requests.RespondWithError(w, code, err.Error())
+		return
+	}
+
+	term := r.URL.Query().Get("q")
+	if term == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(SearchMissingError)
+	}
+	results, err := spotify.SearchSongs(r.Context(), spClient, term)
 	if err != nil {
 		requests.RespondInternalError(w)
 		return

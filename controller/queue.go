@@ -13,6 +13,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
+	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/andrewbenington/queue-share-api/spotify"
 	"github.com/gorilla/mux"
 )
@@ -107,14 +108,20 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+
 	if reqCtx.UserID != "" {
-		err = db.Service().RoomStore.SetQueueTrackUser(ctx, reqCtx.Room.Code, songID, reqCtx.UserID)
+		err = room.SetQueueTrackUser(ctx, transaction, reqCtx.Room.Code, songID, reqCtx.UserID)
 		if err != nil {
 			requests.RespondWithDBError(w, err)
 			return
 		}
 	} else if reqCtx.GuestID != "" {
-		err = db.Service().RoomStore.SetQueueTrackGuest(ctx, reqCtx.Room.Code, songID, reqCtx.GuestID)
+		err = room.SetQueueTrackGuest(ctx, transaction, reqCtx.Room.Code, songID, reqCtx.GuestID)
 		if err != nil {
 			requests.RespondWithDBError(w, err)
 			return
@@ -146,11 +153,18 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		requests.RespondInternalError(w)
 		return
 	}
+
+	err = transaction.Commit()
+	if err != nil {
+		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
+		return
+	}
+
 	_, _ = w.Write(responseBytes)
 }
 
 func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.CurrentQueue) (statusCode int, errMessage string) {
-	guestTracks, err := db.Service().RoomStore.GetQueueTrackAddedBy(ctx, roomID)
+	guestTracks, err := room.GetQueueTrackAddedBy(ctx, db.Service().DB, roomID)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, constants.ErrorNotFound
 	}
@@ -173,7 +187,7 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.
 			queueTrack.AddedBy = gt.AddedBy
 			queueTrack.AddedAt = gt.Timestamp
 			if queueTrack.ID == q.CurrentlyPlaying.ID {
-				db.Service().RoomStore.MarkTracksAsPlayedSince(ctx, roomID, gt.Timestamp)
+				room.MarkTracksAsPlayedSince(ctx, db.Service().DB, roomID, gt.Timestamp)
 			}
 		}
 	}

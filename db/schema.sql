@@ -3,7 +3,7 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.0 (Debian 16.0-1.pgdg120+1)
+-- Dumped from database version 15.5 (Homebrew)
 -- Dumped by pg_dump version 16.2 (Homebrew)
 
 SET statement_timeout = 0;
@@ -162,6 +162,46 @@ CREATE TABLE public.schema_migrations (
 ALTER TABLE public.schema_migrations OWNER TO postgres;
 
 --
+-- Name: spotify_album_cache; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_album_cache (
+    id text NOT NULL,
+    uri text NOT NULL,
+    name text NOT NULL,
+    artist_id text NOT NULL,
+    artist_uri text NOT NULL,
+    artist_name text NOT NULL,
+    album_group text,
+    album_type text,
+    image_url text,
+    release_date date,
+    release_date_precision text,
+    genres jsonb,
+    popularity integer
+);
+
+
+ALTER TABLE public.spotify_album_cache OWNER TO queue_share;
+
+--
+-- Name: spotify_artist_cache; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_artist_cache (
+    id text NOT NULL,
+    uri text NOT NULL,
+    name text NOT NULL,
+    image_url text,
+    genres jsonb,
+    popularity integer,
+    follower_count integer
+);
+
+
+ALTER TABLE public.spotify_artist_cache OWNER TO queue_share;
+
+--
 -- Name: spotify_history; Type: TABLE; Schema: public; Owner: queue_share
 --
 
@@ -183,7 +223,10 @@ CREATE TABLE public.spotify_history (
     skipped boolean,
     offline boolean NOT NULL,
     offline_timestamp timestamp without time zone,
-    incognito_mode boolean NOT NULL
+    incognito_mode boolean NOT NULL,
+    spotify_artist_uri text,
+    spotify_album_uri text,
+    from_history boolean DEFAULT false NOT NULL
 );
 
 
@@ -237,6 +280,62 @@ CREATE TABLE public.spotify_tokens (
 
 
 ALTER TABLE public.spotify_tokens OWNER TO postgres;
+
+--
+-- Name: spotify_track_cache; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.spotify_track_cache (
+    id text NOT NULL,
+    uri text NOT NULL,
+    name text NOT NULL,
+    album_id text NOT NULL,
+    album_uri text NOT NULL,
+    album_name text NOT NULL,
+    artist_id text NOT NULL,
+    artist_uri text NOT NULL,
+    artist_name text NOT NULL,
+    image_url text,
+    other_artists jsonb,
+    duration_ms integer NOT NULL,
+    popularity integer DEFAULT 0 NOT NULL,
+    explicit boolean DEFAULT false NOT NULL,
+    preview_url text NOT NULL,
+    disc_number integer NOT NULL,
+    track_number integer NOT NULL,
+    type text NOT NULL,
+    external_ids jsonb,
+    isrc text
+);
+
+
+ALTER TABLE public.spotify_track_cache OWNER TO queue_share;
+
+--
+-- Name: user_friend_requests; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.user_friend_requests (
+    user_id uuid NOT NULL,
+    friend_id uuid NOT NULL,
+    request_timestamp timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_friend_requests OWNER TO queue_share;
+
+--
+-- Name: user_friends; Type: TABLE; Schema: public; Owner: queue_share
+--
+
+CREATE TABLE public.user_friends (
+    user_id uuid NOT NULL,
+    friend_id uuid NOT NULL,
+    added_timestamp timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.user_friends OWNER TO queue_share;
 
 --
 -- Name: user_passwords; Type: TABLE; Schema: public; Owner: postgres
@@ -340,6 +439,22 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: spotify_album_cache spotify_album_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_album_cache
+    ADD CONSTRAINT spotify_album_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: spotify_artist_cache spotify_artist_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_artist_cache
+    ADD CONSTRAINT spotify_artist_cache_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: spotify_history spotify_history_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
 --
 
@@ -369,6 +484,30 @@ ALTER TABLE ONLY public.spotify_tokens
 
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_user_id_key UNIQUE (user_id);
+
+
+--
+-- Name: spotify_track_cache spotify_track_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.spotify_track_cache
+    ADD CONSTRAINT spotify_track_cache_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user_friend_requests user_friend_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friend_requests
+    ADD CONSTRAINT user_friend_requests_pkey PRIMARY KEY (user_id, friend_id);
+
+
+--
+-- Name: user_friends user_friends_pkey; Type: CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friends
+    ADD CONSTRAINT user_friends_pkey PRIMARY KEY (user_id, friend_id);
 
 
 --
@@ -480,6 +619,38 @@ ALTER TABLE ONLY public.spotify_tokens
 
 ALTER TABLE ONLY public.spotify_tokens
     ADD CONSTRAINT spotify_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friend_requests user_friend_requests_friend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friend_requests
+    ADD CONSTRAINT user_friend_requests_friend_id_fkey FOREIGN KEY (friend_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friend_requests user_friend_requests_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friend_requests
+    ADD CONSTRAINT user_friend_requests_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friends user_friends_friend_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friends
+    ADD CONSTRAINT user_friends_friend_id_fkey FOREIGN KEY (friend_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: user_friends user_friends_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: queue_share
+--
+
+ALTER TABLE ONLY public.user_friends
+    ADD CONSTRAINT user_friends_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --

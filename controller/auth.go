@@ -33,7 +33,7 @@ func (c *Controller) GetToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authenticated, err := db.Service().UserStore.Authenticate(r.Context(), username, password)
+	authenticated, err := user.Authenticate(r.Context(), db.Service().DB, username, password)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("authenticate: %s", err)
 		requests.RespondInternalError(w)
@@ -44,7 +44,7 @@ func (c *Controller) GetToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := db.Service().UserStore.GetByUsername(r.Context(), username)
+	u, err := user.GetByUsername(r.Context(), db.Service().DB, username)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -111,6 +111,12 @@ func (c *Controller) SpotifyAuthRedirect(w http.ResponseWriter, r *http.Request)
 	}
 	auth.SpotifyStatesLock.Unlock()
 
+	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+
 	if !ok {
 		log.Printf("unknown spotify state")
 		w.WriteHeader(http.StatusBadRequest)
@@ -155,7 +161,7 @@ func (c *Controller) SpotifyAuthRedirect(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = db.Service().UserStore.UpdateSpotifyToken(r.Context(), loginState.UserID, token)
+	err = user.UpdateSpotifyToken(r.Context(), transaction, loginState.UserID, token)
 	if err != nil {
 		log.Printf("update user spotify token: %s\n (loginState %+v)", err, loginState)
 		redirectQuery.Add("error", fmt.Sprintf("Error updating user Spotify token: %s", err))
@@ -163,21 +169,28 @@ func (c *Controller) SpotifyAuthRedirect(w http.ResponseWriter, r *http.Request)
 	}
 
 	spotifyClient := spotifyV2.New(authenticator.Client(ctx, token))
-	user, err := spotify.GetUser(ctx, spotifyClient)
+	userData, err := spotify.GetUser(ctx, spotifyClient)
 	if err != nil {
 		log.Printf("get spotify user: %s\n", err)
 		redirectQuery.Add("error", fmt.Sprintf("Error getting Spotify user: %s", err))
 		return
 	}
 
-	err = db.Service().UserStore.UpdateSpotifyInfo(ctx, loginState.UserID, user)
+	err = user.UpdateSpotifyInfo(ctx, transaction, loginState.UserID, userData)
 	if err != nil {
 		log.Printf("update user spotify info: %s\n", err)
 		redirectQuery.Add("error", fmt.Sprintf("Error updating user Spotify info: %s", err))
 		return
 	}
 
-	redirectQuery.Add("spotify_id", user.ID)
-	redirectQuery.Add("spotify_name", user.Display)
-	redirectQuery.Add("spotify_image", user.ImageURL)
+	err = transaction.Commit()
+	if err != nil {
+		log.Printf("commit tx: %s\n", err)
+		redirectQuery.Add("error", fmt.Sprintf("Error updating Spotify user info: %s", err))
+		return
+	}
+
+	redirectQuery.Add("spotify_id", userData.ID)
+	redirectQuery.Add("spotify_name", userData.Display)
+	redirectQuery.Add("spotify_image", userData.ImageURL)
 }

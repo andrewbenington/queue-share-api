@@ -2,13 +2,14 @@
 // versions:
 //   sqlc v1.26.0
 
-package gen
+package db
 
 import (
 	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
+	spotify "github.com/zmb3/spotify/v2"
 )
 
 type Room struct {
@@ -56,6 +57,32 @@ type SchemaMigration struct {
 	Dirty   bool  `json:"dirty"`
 }
 
+type SpotifyAlbumCache struct {
+	ID                   string         `json:"id"`
+	Uri                  string         `json:"uri"`
+	Name                 string         `json:"name"`
+	ArtistID             string         `json:"artist_id"`
+	ArtistUri            string         `json:"artist_uri"`
+	ArtistName           string         `json:"artist_name"`
+	AlbumGroup           sql.NullString `json:"album_group"`
+	AlbumType            sql.NullString `json:"album_type"`
+	ImageUrl             sql.NullString `json:"image_url"`
+	ReleaseDate          sql.NullTime   `json:"release_date"`
+	ReleaseDatePrecision sql.NullString `json:"release_date_precision"`
+	Genres               []string       `json:"genres"`
+	Popularity           sql.NullInt32  `json:"popularity"`
+}
+
+type SpotifyArtistCache struct {
+	ID            string         `json:"id"`
+	Uri           string         `json:"uri"`
+	Name          string         `json:"name"`
+	ImageUrl      sql.NullString `json:"image_url"`
+	Genres        []string       `json:"genres"`
+	Popularity    sql.NullInt32  `json:"popularity"`
+	FollowerCount sql.NullInt32  `json:"follower_count"`
+}
+
 type SpotifyHistory struct {
 	UserID           uuid.UUID      `json:"user_id"`
 	Timestamp        time.Time      `json:"timestamp"`
@@ -75,6 +102,9 @@ type SpotifyHistory struct {
 	Offline          bool           `json:"offline"`
 	OfflineTimestamp sql.NullTime   `json:"offline_timestamp"`
 	IncognitoMode    bool           `json:"incognito_mode"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+	FromHistory      bool           `json:"from_history"`
 }
 
 type SpotifyPermissionsVersion struct {
@@ -91,6 +121,29 @@ type SpotifyToken struct {
 	PermissionsVersion    int64     `json:"permissions_version"`
 }
 
+type SpotifyTrackCache struct {
+	ID           string                   `json:"id"`
+	Uri          string                   `json:"uri"`
+	Name         string                   `json:"name"`
+	AlbumID      string                   `json:"album_id"`
+	AlbumUri     string                   `json:"album_uri"`
+	AlbumName    string                   `json:"album_name"`
+	ArtistID     string                   `json:"artist_id"`
+	ArtistUri    string                   `json:"artist_uri"`
+	ArtistName   string                   `json:"artist_name"`
+	ImageUrl     sql.NullString           `json:"image_url"`
+	OtherArtists TrackArtist              `json:"other_artists"`
+	DurationMs   int32                    `json:"duration_ms"`
+	Popularity   int32                    `json:"popularity"`
+	Explicit     bool                     `json:"explicit"`
+	PreviewUrl   string                   `json:"preview_url"`
+	DiscNumber   int32                    `json:"disc_number"`
+	TrackNumber  int32                    `json:"track_number"`
+	Type         string                   `json:"type"`
+	ExternalIds  spotify.TrackExternalIDs `json:"external_ids"`
+	Isrc         sql.NullString           `json:"isrc"`
+}
+
 type User struct {
 	ID              uuid.UUID      `json:"id"`
 	Username        string         `json:"username"`
@@ -99,6 +152,18 @@ type User struct {
 	SpotifyName     sql.NullString `json:"spotify_name"`
 	SpotifyImageUrl sql.NullString `json:"spotify_image_url"`
 	Created         time.Time      `json:"created"`
+}
+
+type UserFriend struct {
+	UserID         uuid.UUID `json:"user_id"`
+	FriendID       uuid.UUID `json:"friend_id"`
+	AddedTimestamp time.Time `json:"added_timestamp"`
+}
+
+type UserFriendRequest struct {
+	UserID           uuid.UUID `json:"user_id"`
+	FriendID         uuid.UUID `json:"friend_id"`
+	RequestTimestamp time.Time `json:"request_timestamp"`
 }
 
 type UserPassword struct {

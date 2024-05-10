@@ -3,16 +3,87 @@
 //   sqlc v1.26.0
 // source: queries.sql
 
-package gen
+package db
 
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
+
+const albumCacheInsertBulk = `-- name: AlbumCacheInsertBulk :exec
+INSERT INTO
+    SPOTIFY_ALBUM_CACHE(
+        id,
+        uri,
+        name,
+        artist_id,
+        artist_uri,
+        artist_name,
+        album_group,
+        album_type,
+        image_url,
+        release_date,
+        release_date_precision,
+        genres,
+        popularity
+    )
+VALUES
+    (
+        unnest($1 :: text []),
+        unnest($2 :: TEXT []),
+        unnest($3 :: TEXT []),
+        unnest($4 :: TEXT []),
+        unnest($5 :: TEXT []),
+        unnest($6 :: TEXT []),
+        unnest($7 :: TEXT []),
+        unnest($8 :: TEXT []),
+        unnest($9 :: TEXT []),
+        unnest($10 :: date []),
+        unnest($11 :: TEXT []),
+        unnest($12 :: jsonb []),
+        unnest($13 :: int [])
+    ) ON CONFLICT DO NOTHING
+`
+
+type AlbumCacheInsertBulkParams struct {
+	ID                   []string          `json:"id"`
+	Uri                  []string          `json:"uri"`
+	Name                 []string          `json:"name"`
+	ArtistID             []string          `json:"artist_id"`
+	ArtistUri            []string          `json:"artist_uri"`
+	ArtistName           []string          `json:"artist_name"`
+	AlbumGroup           []string          `json:"album_group"`
+	AlbumType            []string          `json:"album_type"`
+	ImageUrl             []string          `json:"image_url"`
+	ReleaseDate          []time.Time       `json:"release_date"`
+	ReleaseDatePrecision []string          `json:"release_date_precision"`
+	Genres               []json.RawMessage `json:"genres"`
+	Popularity           []int32           `json:"popularity"`
+}
+
+func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsertBulkParams) error {
+	_, err := q.db.ExecContext(ctx, albumCacheInsertBulk,
+		pq.Array(arg.ID),
+		pq.Array(arg.Uri),
+		pq.Array(arg.Name),
+		pq.Array(arg.ArtistID),
+		pq.Array(arg.ArtistUri),
+		pq.Array(arg.ArtistName),
+		pq.Array(arg.AlbumGroup),
+		pq.Array(arg.AlbumType),
+		pq.Array(arg.ImageUrl),
+		pq.Array(arg.ReleaseDate),
+		pq.Array(arg.ReleaseDatePrecision),
+		pq.Array(arg.Genres),
+		pq.Array(arg.Popularity),
+	)
+	return err
+}
 
 const getSpotifyTokensByRoomCode = `-- name: GetSpotifyTokensByRoomCode :one
 SELECT
@@ -38,7 +109,7 @@ func (q *Queries) GetSpotifyTokensByRoomCode(ctx context.Context, code string) (
 	return &i, err
 }
 
-const historyGetAlbumStreamsByYear = `-- name: HistoryGetAlbumStreamsByYear :many
+const historyGetAlbumStreamCountByYear = `-- name: HistoryGetAlbumStreamCountByYear :many
 SELECT
     album_name,
     COUNT(*) AS occurrences
@@ -63,20 +134,20 @@ LIMIT
     35
 `
 
-type HistoryGetAlbumStreamsByYearParams struct {
+type HistoryGetAlbumStreamCountByYearParams struct {
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
 	Year         int32     `json:"year"`
 }
 
-type HistoryGetAlbumStreamsByYearRow struct {
+type HistoryGetAlbumStreamCountByYearRow struct {
 	AlbumName   string `json:"album_name"`
 	Occurrences int64  `json:"occurrences"`
 }
 
-func (q *Queries) HistoryGetAlbumStreamsByYear(ctx context.Context, arg HistoryGetAlbumStreamsByYearParams) ([]*HistoryGetAlbumStreamsByYearRow, error) {
-	rows, err := q.db.QueryContext(ctx, historyGetAlbumStreamsByYear,
+func (q *Queries) HistoryGetAlbumStreamCountByYear(ctx context.Context, arg HistoryGetAlbumStreamCountByYearParams) ([]*HistoryGetAlbumStreamCountByYearRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetAlbumStreamCountByYear,
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
@@ -86,9 +157,9 @@ func (q *Queries) HistoryGetAlbumStreamsByYear(ctx context.Context, arg HistoryG
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*HistoryGetAlbumStreamsByYearRow
+	var items []*HistoryGetAlbumStreamCountByYearRow
 	for rows.Next() {
-		var i HistoryGetAlbumStreamsByYearRow
+		var i HistoryGetAlbumStreamCountByYearRow
 		if err := rows.Scan(&i.AlbumName, &i.Occurrences); err != nil {
 			return nil, err
 		}
@@ -110,7 +181,9 @@ SELECT
     ARTIST_NAME,
     album_name,
     MS_PLAYED,
-    spotify_track_uri
+    spotify_track_uri,
+    spotify_album_uri,
+    spotify_artist_uri
 FROM
     SPOTIFY_HISTORY
 WHERE
@@ -121,26 +194,35 @@ WHERE
         OR $3 :: boolean
     )
 ORDER BY
-    timestamp ASC
+    timestamp DESC
+LIMIT $4
 `
 
 type HistoryGetAllParams struct {
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
+	MaxCount     int32     `json:"max_count"`
 }
 
 type HistoryGetAllRow struct {
-	Timestamp       time.Time `json:"timestamp"`
-	TrackName       string    `json:"track_name"`
-	ArtistName      string    `json:"artist_name"`
-	AlbumName       string    `json:"album_name"`
-	MsPlayed        int32     `json:"ms_played"`
-	SpotifyTrackUri string    `json:"spotify_track_uri"`
+	Timestamp        time.Time      `json:"timestamp"`
+	TrackName        string         `json:"track_name"`
+	ArtistName       string         `json:"artist_name"`
+	AlbumName        string         `json:"album_name"`
+	MsPlayed         int32          `json:"ms_played"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
 }
 
 func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([]*HistoryGetAllRow, error) {
-	rows, err := q.db.QueryContext(ctx, historyGetAll, arg.UserID, arg.MinMsPlayed, arg.IncludeSkips)
+	rows, err := q.db.QueryContext(ctx, historyGetAll,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.MaxCount,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -155,6 +237,8 @@ func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([
 			&i.AlbumName,
 			&i.MsPlayed,
 			&i.SpotifyTrackUri,
+			&i.SpotifyAlbumUri,
+			&i.SpotifyArtistUri,
 		); err != nil {
 			return nil, err
 		}
@@ -169,7 +253,7 @@ func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([
 	return items, nil
 }
 
-const historyGetArtistStreamsByYear = `-- name: HistoryGetArtistStreamsByYear :many
+const historyGetArtistStreamCountByYear = `-- name: HistoryGetArtistStreamCountByYear :many
 SELECT
     artist_name,
     COUNT(*) AS occurrences
@@ -194,20 +278,20 @@ LIMIT
     35
 `
 
-type HistoryGetArtistStreamsByYearParams struct {
+type HistoryGetArtistStreamCountByYearParams struct {
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
 	Year         int32     `json:"year"`
 }
 
-type HistoryGetArtistStreamsByYearRow struct {
+type HistoryGetArtistStreamCountByYearRow struct {
 	ArtistName  string `json:"artist_name"`
 	Occurrences int64  `json:"occurrences"`
 }
 
-func (q *Queries) HistoryGetArtistStreamsByYear(ctx context.Context, arg HistoryGetArtistStreamsByYearParams) ([]*HistoryGetArtistStreamsByYearRow, error) {
-	rows, err := q.db.QueryContext(ctx, historyGetArtistStreamsByYear,
+func (q *Queries) HistoryGetArtistStreamCountByYear(ctx context.Context, arg HistoryGetArtistStreamCountByYearParams) ([]*HistoryGetArtistStreamCountByYearRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetArtistStreamCountByYear,
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
@@ -217,9 +301,9 @@ func (q *Queries) HistoryGetArtistStreamsByYear(ctx context.Context, arg History
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*HistoryGetArtistStreamsByYearRow
+	var items []*HistoryGetArtistStreamCountByYearRow
 	for rows.Next() {
-		var i HistoryGetArtistStreamsByYearRow
+		var i HistoryGetArtistStreamCountByYearRow
 		if err := rows.Scan(&i.ArtistName, &i.Occurrences); err != nil {
 			return nil, err
 		}
@@ -234,14 +318,174 @@ func (q *Queries) HistoryGetArtistStreamsByYear(ctx context.Context, arg History
 	return items, nil
 }
 
-const historyGetByURI = `-- name: HistoryGetByURI :many
+const historyGetByAlbumURI = `-- name: HistoryGetByAlbumURI :many
 SELECT
     TIMESTAMP,
     TRACK_NAME,
     ARTIST_NAME,
     album_name,
     MS_PLAYED,
-    spotify_track_uri
+    spotify_track_uri,
+    spotify_artist_uri,
+    spotify_album_uri
+FROM
+    SPOTIFY_HISTORY
+WHERE
+    user_id = $1
+    AND ms_played >= $2
+    AND (
+        skipped != true
+        OR $3 :: boolean
+    )
+    AND spotify_album_uri = $4
+ORDER BY
+    timestamp ASC
+`
+
+type HistoryGetByAlbumURIParams struct {
+	UserID       uuid.UUID      `json:"user_id"`
+	MinMsPlayed  int32          `json:"min_ms_played"`
+	IncludeSkips bool           `json:"include_skips"`
+	Uri          sql.NullString `json:"uri"`
+}
+
+type HistoryGetByAlbumURIRow struct {
+	Timestamp        time.Time      `json:"timestamp"`
+	TrackName        string         `json:"track_name"`
+	ArtistName       string         `json:"artist_name"`
+	AlbumName        string         `json:"album_name"`
+	MsPlayed         int32          `json:"ms_played"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+}
+
+func (q *Queries) HistoryGetByAlbumURI(ctx context.Context, arg HistoryGetByAlbumURIParams) ([]*HistoryGetByAlbumURIRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetByAlbumURI,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.Uri,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetByAlbumURIRow
+	for rows.Next() {
+		var i HistoryGetByAlbumURIRow
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.TrackName,
+			&i.ArtistName,
+			&i.AlbumName,
+			&i.MsPlayed,
+			&i.SpotifyTrackUri,
+			&i.SpotifyArtistUri,
+			&i.SpotifyAlbumUri,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetByArtistURI = `-- name: HistoryGetByArtistURI :many
+SELECT
+    TIMESTAMP,
+    TRACK_NAME,
+    ARTIST_NAME,
+    album_name,
+    MS_PLAYED,
+    spotify_track_uri,
+    spotify_artist_uri,
+    spotify_album_uri
+FROM
+    SPOTIFY_HISTORY
+WHERE
+    user_id = $1
+    AND ms_played >= $2
+    AND (
+        skipped != true
+        OR $3 :: boolean
+    )
+    AND spotify_artist_uri = $4
+ORDER BY
+    timestamp ASC
+`
+
+type HistoryGetByArtistURIParams struct {
+	UserID       uuid.UUID      `json:"user_id"`
+	MinMsPlayed  int32          `json:"min_ms_played"`
+	IncludeSkips bool           `json:"include_skips"`
+	Uri          sql.NullString `json:"uri"`
+}
+
+type HistoryGetByArtistURIRow struct {
+	Timestamp        time.Time      `json:"timestamp"`
+	TrackName        string         `json:"track_name"`
+	ArtistName       string         `json:"artist_name"`
+	AlbumName        string         `json:"album_name"`
+	MsPlayed         int32          `json:"ms_played"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+}
+
+func (q *Queries) HistoryGetByArtistURI(ctx context.Context, arg HistoryGetByArtistURIParams) ([]*HistoryGetByArtistURIRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetByArtistURI,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.Uri,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetByArtistURIRow
+	for rows.Next() {
+		var i HistoryGetByArtistURIRow
+		if err := rows.Scan(
+			&i.Timestamp,
+			&i.TrackName,
+			&i.ArtistName,
+			&i.AlbumName,
+			&i.MsPlayed,
+			&i.SpotifyTrackUri,
+			&i.SpotifyArtistUri,
+			&i.SpotifyAlbumUri,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetByTrackURI = `-- name: HistoryGetByTrackURI :many
+SELECT
+    TIMESTAMP,
+    TRACK_NAME,
+    ARTIST_NAME,
+    album_name,
+    MS_PLAYED,
+    spotify_track_uri,
+    spotify_artist_uri,
+    spotify_album_uri
 FROM
     SPOTIFY_HISTORY
 WHERE
@@ -256,24 +500,26 @@ ORDER BY
     timestamp ASC
 `
 
-type HistoryGetByURIParams struct {
+type HistoryGetByTrackURIParams struct {
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
 	Uri          string    `json:"uri"`
 }
 
-type HistoryGetByURIRow struct {
-	Timestamp       time.Time `json:"timestamp"`
-	TrackName       string    `json:"track_name"`
-	ArtistName      string    `json:"artist_name"`
-	AlbumName       string    `json:"album_name"`
-	MsPlayed        int32     `json:"ms_played"`
-	SpotifyTrackUri string    `json:"spotify_track_uri"`
+type HistoryGetByTrackURIRow struct {
+	Timestamp        time.Time      `json:"timestamp"`
+	TrackName        string         `json:"track_name"`
+	ArtistName       string         `json:"artist_name"`
+	AlbumName        string         `json:"album_name"`
+	MsPlayed         int32          `json:"ms_played"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
 }
 
-func (q *Queries) HistoryGetByURI(ctx context.Context, arg HistoryGetByURIParams) ([]*HistoryGetByURIRow, error) {
-	rows, err := q.db.QueryContext(ctx, historyGetByURI,
+func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrackURIParams) ([]*HistoryGetByTrackURIRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetByTrackURI,
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
@@ -283,9 +529,9 @@ func (q *Queries) HistoryGetByURI(ctx context.Context, arg HistoryGetByURIParams
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*HistoryGetByURIRow
+	var items []*HistoryGetByTrackURIRow
 	for rows.Next() {
-		var i HistoryGetByURIRow
+		var i HistoryGetByTrackURIRow
 		if err := rows.Scan(
 			&i.Timestamp,
 			&i.TrackName,
@@ -293,6 +539,8 @@ func (q *Queries) HistoryGetByURI(ctx context.Context, arg HistoryGetByURIParams
 			&i.AlbumName,
 			&i.MsPlayed,
 			&i.SpotifyTrackUri,
+			&i.SpotifyArtistUri,
+			&i.SpotifyAlbumUri,
 		); err != nil {
 			return nil, err
 		}
@@ -329,7 +577,274 @@ func (q *Queries) HistoryGetTimestampRange(ctx context.Context, userID uuid.UUID
 	return &i, err
 }
 
-const historyGetTrackStreamsByYear = `-- name: HistoryGetTrackStreamsByYear :many
+const historyGetTopAlbumsInTimeframe = `-- name: HistoryGetTopAlbumsInTimeframe :many
+SELECT
+    spotify_album_uri,
+    COUNT(*) AS occurrences,
+    string_agg(track_name, '|~|')::text as TRACKS
+FROM
+    spotify_history
+WHERE
+    user_id = $1
+    AND ms_played >= $2
+    AND (
+        skipped != true
+        OR $3 :: boolean
+    )
+    AND timestamp BETWEEN $4 :: timestamp
+    AND $5 :: timestamp
+    AND (
+        $6::text IS NULL
+        OR spotify_artist_uri = $6::text
+    )
+GROUP BY
+    spotify_album_uri
+ORDER BY
+    COUNT(*) DESC
+LIMIT
+    $7
+`
+
+type HistoryGetTopAlbumsInTimeframeParams struct {
+	UserID       uuid.UUID      `json:"user_id"`
+	MinMsPlayed  int32          `json:"min_ms_played"`
+	IncludeSkips bool           `json:"include_skips"`
+	StartDate    time.Time      `json:"start_date"`
+	EndDate      time.Time      `json:"end_date"`
+	ArtistUri    sql.NullString `json:"artist_uri"`
+	MaxTracks    int32          `json:"max_tracks"`
+}
+
+type HistoryGetTopAlbumsInTimeframeRow struct {
+	SpotifyAlbumUri sql.NullString `json:"spotify_album_uri"`
+	Occurrences     int64          `json:"occurrences"`
+	Tracks          string         `json:"tracks"`
+}
+
+func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg HistoryGetTopAlbumsInTimeframeParams) ([]*HistoryGetTopAlbumsInTimeframeRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopAlbumsInTimeframe,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.StartDate,
+		arg.EndDate,
+		arg.ArtistUri,
+		arg.MaxTracks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopAlbumsInTimeframeRow
+	for rows.Next() {
+		var i HistoryGetTopAlbumsInTimeframeRow
+		if err := rows.Scan(&i.SpotifyAlbumUri, &i.Occurrences, &i.Tracks); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetTopArtistsInTimeframe = `-- name: HistoryGetTopArtistsInTimeframe :many
+SELECT
+    spotify_artist_uri,
+    COUNT(*) AS occurrences,
+    string_agg(track_name, '|~|')::text as TRACKS
+FROM
+    spotify_history
+WHERE
+    user_id = $1
+    AND ms_played >= $2
+    AND (
+        skipped != true
+        OR $3 :: boolean
+    )
+    AND timestamp BETWEEN $4 :: timestamp
+    AND $5 :: timestamp
+GROUP BY
+    spotify_artist_uri
+ORDER BY
+    COUNT(*) DESC
+LIMIT
+    $6
+`
+
+type HistoryGetTopArtistsInTimeframeParams struct {
+	UserID       uuid.UUID `json:"user_id"`
+	MinMsPlayed  int32     `json:"min_ms_played"`
+	IncludeSkips bool      `json:"include_skips"`
+	StartDate    time.Time `json:"start_date"`
+	EndDate      time.Time `json:"end_date"`
+	MaxTracks    int32     `json:"max_tracks"`
+}
+
+type HistoryGetTopArtistsInTimeframeRow struct {
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	Occurrences      int64          `json:"occurrences"`
+	Tracks           string         `json:"tracks"`
+}
+
+func (q *Queries) HistoryGetTopArtistsInTimeframe(ctx context.Context, arg HistoryGetTopArtistsInTimeframeParams) ([]*HistoryGetTopArtistsInTimeframeRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopArtistsInTimeframe,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.StartDate,
+		arg.EndDate,
+		arg.MaxTracks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopArtistsInTimeframeRow
+	for rows.Next() {
+		var i HistoryGetTopArtistsInTimeframeRow
+		if err := rows.Scan(&i.SpotifyArtistUri, &i.Occurrences, &i.Tracks); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetTopTracksInTimeframe = `-- name: HistoryGetTopTracksInTimeframe :many
+SELECT
+    spotify_track_uri,
+    COUNT(*) AS occurrences
+FROM
+    spotify_history
+WHERE
+    user_id = $1
+    AND ms_played >= $2
+    AND (
+        skipped != true
+        OR $3 :: boolean
+    )
+    AND timestamp BETWEEN $4 :: timestamp
+    AND $5 :: timestamp
+    AND (
+        $6::text IS NULL
+        OR spotify_artist_uri = $6::text
+    )
+    AND (
+        $7::text IS NULL
+        OR spotify_album_uri = $7::text
+    )
+GROUP BY
+    spotify_track_uri
+ORDER BY
+    COUNT(*) DESC
+LIMIT
+    $8
+`
+
+type HistoryGetTopTracksInTimeframeParams struct {
+	UserID       uuid.UUID      `json:"user_id"`
+	MinMsPlayed  int32          `json:"min_ms_played"`
+	IncludeSkips bool           `json:"include_skips"`
+	StartDate    time.Time      `json:"start_date"`
+	EndDate      time.Time      `json:"end_date"`
+	ArtistUri    sql.NullString `json:"artist_uri"`
+	AlbumUri     sql.NullString `json:"album_uri"`
+	MaxTracks    int32          `json:"max_tracks"`
+}
+
+type HistoryGetTopTracksInTimeframeRow struct {
+	SpotifyTrackUri string `json:"spotify_track_uri"`
+	Occurrences     int64  `json:"occurrences"`
+}
+
+func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg HistoryGetTopTracksInTimeframeParams) ([]*HistoryGetTopTracksInTimeframeRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopTracksInTimeframe,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.StartDate,
+		arg.EndDate,
+		arg.ArtistUri,
+		arg.AlbumUri,
+		arg.MaxTracks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopTracksInTimeframeRow
+	for rows.Next() {
+		var i HistoryGetTopTracksInTimeframeRow
+		if err := rows.Scan(&i.SpotifyTrackUri, &i.Occurrences); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetTopTracksWithoutURIs = `-- name: HistoryGetTopTracksWithoutURIs :many
+SELECT
+  SPOTIFY_TRACK_URI,
+  COUNT(SPOTIFY_TRACK_URI)
+FROM
+  spotify_history
+WHERE
+	spotify_artist_uri IS NULL
+GROUP BY
+  SPOTIFY_TRACK_URI
+ORDER BY
+  COUNT DESC
+LIMIT
+  50
+`
+
+type HistoryGetTopTracksWithoutURIsRow struct {
+	SpotifyTrackUri string `json:"spotify_track_uri"`
+	Count           int64  `json:"count"`
+}
+
+func (q *Queries) HistoryGetTopTracksWithoutURIs(ctx context.Context) ([]*HistoryGetTopTracksWithoutURIsRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopTracksWithoutURIs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopTracksWithoutURIsRow
+	for rows.Next() {
+		var i HistoryGetTopTracksWithoutURIsRow
+		if err := rows.Scan(&i.SpotifyTrackUri, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetTrackStreamCountByYear = `-- name: HistoryGetTrackStreamCountByYear :many
 SELECT
     track_name,
     COUNT(*) AS occurrences
@@ -354,20 +869,20 @@ LIMIT
     35
 `
 
-type HistoryGetTrackStreamsByYearParams struct {
+type HistoryGetTrackStreamCountByYearParams struct {
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
 	Year         int32     `json:"year"`
 }
 
-type HistoryGetTrackStreamsByYearRow struct {
+type HistoryGetTrackStreamCountByYearRow struct {
 	TrackName   string `json:"track_name"`
 	Occurrences int64  `json:"occurrences"`
 }
 
-func (q *Queries) HistoryGetTrackStreamsByYear(ctx context.Context, arg HistoryGetTrackStreamsByYearParams) ([]*HistoryGetTrackStreamsByYearRow, error) {
-	rows, err := q.db.QueryContext(ctx, historyGetTrackStreamsByYear,
+func (q *Queries) HistoryGetTrackStreamCountByYear(ctx context.Context, arg HistoryGetTrackStreamCountByYearParams) ([]*HistoryGetTrackStreamCountByYearRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTrackStreamCountByYear,
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
@@ -377,9 +892,9 @@ func (q *Queries) HistoryGetTrackStreamsByYear(ctx context.Context, arg HistoryG
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*HistoryGetTrackStreamsByYearRow
+	var items []*HistoryGetTrackStreamCountByYearRow
 	for rows.Next() {
-		var i HistoryGetTrackStreamsByYearRow
+		var i HistoryGetTrackStreamCountByYearRow
 		if err := rows.Scan(&i.TrackName, &i.Occurrences); err != nil {
 			return nil, err
 		}
@@ -392,6 +907,28 @@ func (q *Queries) HistoryGetTrackStreamsByYear(ctx context.Context, arg HistoryG
 		return nil, err
 	}
 	return items, nil
+}
+
+const historyGetTrackURIForAlbum = `-- name: HistoryGetTrackURIForAlbum :one
+SELECT spotify_track_uri
+FROM
+spotify_history
+WHERE
+artist_name = $1
+AND user_id = $2
+LIMIT 1
+`
+
+type HistoryGetTrackURIForAlbumParams struct {
+	ArtistName string    `json:"artist_name"`
+	UserID     uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) HistoryGetTrackURIForAlbum(ctx context.Context, arg HistoryGetTrackURIForAlbumParams) (string, error) {
+	row := q.db.QueryRowContext(ctx, historyGetTrackURIForAlbum, arg.ArtistName, arg.UserID)
+	var spotify_track_uri string
+	err := row.Scan(&spotify_track_uri)
+	return spotify_track_uri, err
 }
 
 const historyInsertBulk = `-- name: HistoryInsertBulk :exec
@@ -408,13 +945,16 @@ INSERT INTO
         artist_name,
         album_name,
         spotify_track_uri,
+        spotify_artist_uri,
+        spotify_album_uri,
         reason_start,
         reason_end,
         shuffle,
         skipped,
         offline,
         offline_timestamp,
-        incognito_mode
+        incognito_mode,
+        from_history
     )
 VALUES
     (
@@ -431,11 +971,14 @@ VALUES
         unnest($11 :: TEXT []),
         unnest($12 :: TEXT []),
         unnest($13 :: TEXT []),
-        unnest($14 :: BOOLEAN []),
-        unnest($15 :: BOOLEAN []),
+        unnest($14 :: TEXT []),
+        unnest($15 :: TEXT []),
         unnest($16 :: BOOLEAN []),
-        unnest($17 :: TIMESTAMP []),
-        unnest($18 :: BOOLEAN [])
+        unnest($17 :: BOOLEAN []),
+        unnest($18 :: BOOLEAN []),
+        unnest($19 :: TIMESTAMP []),
+        unnest($20 :: BOOLEAN []),
+        unnest($21 :: BOOLEAN [])
     ) ON CONFLICT DO NOTHING
 `
 
@@ -451,6 +994,8 @@ type HistoryInsertBulkParams struct {
 	ArtistName       []string    `json:"artist_name"`
 	AlbumName        []string    `json:"album_name"`
 	SpotifyTrackUri  []string    `json:"spotify_track_uri"`
+	SpotifyArtistUri []string    `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  []string    `json:"spotify_album_uri"`
 	ReasonStart      []string    `json:"reason_start"`
 	ReasonEnd        []string    `json:"reason_end"`
 	Shuffle          []bool      `json:"shuffle"`
@@ -458,6 +1003,7 @@ type HistoryInsertBulkParams struct {
 	Offline          []bool      `json:"offline"`
 	OfflineTimestamp []time.Time `json:"offline_timestamp"`
 	IncognitoMode    []bool      `json:"incognito_mode"`
+	FromHistory      []bool      `json:"from_history"`
 }
 
 func (q *Queries) HistoryInsertBulk(ctx context.Context, arg HistoryInsertBulkParams) error {
@@ -473,6 +1019,8 @@ func (q *Queries) HistoryInsertBulk(ctx context.Context, arg HistoryInsertBulkPa
 		pq.Array(arg.ArtistName),
 		pq.Array(arg.AlbumName),
 		pq.Array(arg.SpotifyTrackUri),
+		pq.Array(arg.SpotifyArtistUri),
+		pq.Array(arg.SpotifyAlbumUri),
 		pq.Array(arg.ReasonStart),
 		pq.Array(arg.ReasonEnd),
 		pq.Array(arg.Shuffle),
@@ -480,6 +1028,7 @@ func (q *Queries) HistoryInsertBulk(ctx context.Context, arg HistoryInsertBulkPa
 		pq.Array(arg.Offline),
 		pq.Array(arg.OfflineTimestamp),
 		pq.Array(arg.IncognitoMode),
+		pq.Array(arg.FromHistory),
 	)
 	return err
 }
@@ -498,13 +1047,16 @@ INSERT INTO
         artist_name,
         album_name,
         spotify_track_uri,
+        spotify_artist_uri,
+        spotify_album_uri,
         reason_start,
         reason_end,
         shuffle,
         skipped,
         offline,
         offline_timestamp,
-        incognito_mode
+        incognito_mode,
+        from_history
     )
 VALUES
     (
@@ -525,7 +1077,10 @@ VALUES
         $15,
         $16,
         $17,
-        $18
+        $18,
+        $19,
+        $20,
+        $21
     )
 `
 
@@ -541,6 +1096,8 @@ type HistoryInsertOneParams struct {
 	ArtistName       string         `json:"artist_name"`
 	AlbumName        string         `json:"album_name"`
 	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
 	ReasonStart      sql.NullString `json:"reason_start"`
 	ReasonEnd        sql.NullString `json:"reason_end"`
 	Shuffle          bool           `json:"shuffle"`
@@ -548,6 +1105,7 @@ type HistoryInsertOneParams struct {
 	Offline          bool           `json:"offline"`
 	OfflineTimestamp sql.NullTime   `json:"offline_timestamp"`
 	IncognitoMode    bool           `json:"incognito_mode"`
+	FromHistory      bool           `json:"from_history"`
 }
 
 func (q *Queries) HistoryInsertOne(ctx context.Context, arg HistoryInsertOneParams) error {
@@ -563,6 +1121,8 @@ func (q *Queries) HistoryInsertOne(ctx context.Context, arg HistoryInsertOnePara
 		arg.ArtistName,
 		arg.AlbumName,
 		arg.SpotifyTrackUri,
+		arg.SpotifyArtistUri,
+		arg.SpotifyAlbumUri,
 		arg.ReasonStart,
 		arg.ReasonEnd,
 		arg.Shuffle,
@@ -570,7 +1130,29 @@ func (q *Queries) HistoryInsertOne(ctx context.Context, arg HistoryInsertOnePara
 		arg.Offline,
 		arg.OfflineTimestamp,
 		arg.IncognitoMode,
+		arg.FromHistory,
 	)
+	return err
+}
+
+const historySetURIsForTrack = `-- name: HistorySetURIsForTrack :exec
+UPDATE
+spotify_history
+SET
+    spotify_artist_uri = $2,
+    spotify_album_uri = $3
+WHERE
+    spotify_track_uri = $1
+`
+
+type HistorySetURIsForTrackParams struct {
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+}
+
+func (q *Queries) HistorySetURIsForTrack(ctx context.Context, arg HistorySetURIsForTrackParams) error {
+	_, err := q.db.ExecContext(ctx, historySetURIsForTrack, arg.SpotifyTrackUri, arg.SpotifyArtistUri, arg.SpotifyAlbumUri)
 	return err
 }
 
@@ -1225,6 +1807,104 @@ func (q *Queries) RoomValidatePassword(ctx context.Context, arg RoomValidatePass
 	return column_1, err
 }
 
+const trackCacheInsertBulk = `-- name: TrackCacheInsertBulk :exec
+INSERT INTO
+    SPOTIFY_TRACK_CACHE(
+        id,
+        uri,
+        name,
+        album_id,
+        album_uri,
+        album_name,
+        artist_id,
+        artist_uri,
+        artist_name,
+        image_url,
+        other_artists,
+        duration_ms,
+        popularity,
+        explicit,
+        preview_url,
+        disc_number,
+        track_number,
+        type,
+        external_ids,
+        isrc
+    )
+VALUES
+    (
+        unnest($1 :: text []),
+        unnest($2 :: TEXT []),
+        unnest($3 :: TEXT []),
+        unnest($4 :: TEXT []),
+        unnest($5 :: TEXT []),
+        unnest($6 :: TEXT []),
+        unnest($7 :: TEXT []),
+        unnest($8 :: TEXT []),
+        unnest($9 :: TEXT []),
+        unnest($10 :: TEXT []),
+        unnest($11 :: JSONB []),
+        unnest($12 :: int []),
+        unnest($13 :: int []),
+        unnest($14 :: bool []),
+        unnest($15 :: TEXT []),
+        unnest($16 :: int []),
+        unnest($17 :: int []),
+        unnest($18 :: TEXT []),
+        unnest($19 :: jsonb []),
+        unnest($20 :: text [])
+    ) ON CONFLICT DO NOTHING
+`
+
+type TrackCacheInsertBulkParams struct {
+	ID           []string          `json:"id"`
+	Uri          []string          `json:"uri"`
+	Name         []string          `json:"name"`
+	AlbumID      []string          `json:"album_id"`
+	AlbumUri     []string          `json:"album_uri"`
+	AlbumName    []string          `json:"album_name"`
+	ArtistID     []string          `json:"artist_id"`
+	ArtistUri    []string          `json:"artist_uri"`
+	ArtistName   []string          `json:"artist_name"`
+	ImageUrl     []string          `json:"image_url"`
+	OtherArtists []json.RawMessage `json:"other_artists"`
+	DurationMs   []int32           `json:"duration_ms"`
+	Popularity   []int32           `json:"popularity"`
+	Explicit     []bool            `json:"explicit"`
+	PreviewUrl   []string          `json:"preview_url"`
+	DiscNumber   []int32           `json:"disc_number"`
+	TrackNumber  []int32           `json:"track_number"`
+	Type         []string          `json:"type"`
+	ExternalIds  []json.RawMessage `json:"external_ids"`
+	Isrc         []string          `json:"isrc"`
+}
+
+func (q *Queries) TrackCacheInsertBulk(ctx context.Context, arg TrackCacheInsertBulkParams) error {
+	_, err := q.db.ExecContext(ctx, trackCacheInsertBulk,
+		pq.Array(arg.ID),
+		pq.Array(arg.Uri),
+		pq.Array(arg.Name),
+		pq.Array(arg.AlbumID),
+		pq.Array(arg.AlbumUri),
+		pq.Array(arg.AlbumName),
+		pq.Array(arg.ArtistID),
+		pq.Array(arg.ArtistUri),
+		pq.Array(arg.ArtistName),
+		pq.Array(arg.ImageUrl),
+		pq.Array(arg.OtherArtists),
+		pq.Array(arg.DurationMs),
+		pq.Array(arg.Popularity),
+		pq.Array(arg.Explicit),
+		pq.Array(arg.PreviewUrl),
+		pq.Array(arg.DiscNumber),
+		pq.Array(arg.TrackNumber),
+		pq.Array(arg.Type),
+		pq.Array(arg.ExternalIds),
+		pq.Array(arg.Isrc),
+	)
+	return err
+}
+
 const userDeleteSpotifyInfo = `-- name: UserDeleteSpotifyInfo :exec
 UPDATE
     users
@@ -1239,6 +1919,56 @@ WHERE
 func (q *Queries) UserDeleteSpotifyInfo(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, userDeleteSpotifyInfo, id)
 	return err
+}
+
+const userDeleteSpotifyToken = `-- name: UserDeleteSpotifyToken :exec
+DELETE FROM spotify_tokens
+WHERE
+    user_id = $1
+`
+
+func (q *Queries) UserDeleteSpotifyToken(ctx context.Context, userID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, userDeleteSpotifyToken, userID)
+	return err
+}
+
+const userGetAllWithSpotify = `-- name: UserGetAllWithSpotify :many
+SELECT
+    id, username, display_name, spotify_account, spotify_name, spotify_image_url, created
+FROM
+    users
+WHERE spotify_account is not NULL
+`
+
+func (q *Queries) UserGetAllWithSpotify(ctx context.Context) ([]*User, error) {
+	rows, err := q.db.QueryContext(ctx, userGetAllWithSpotify)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyAccount,
+			&i.SpotifyName,
+			&i.SpotifyImageUrl,
+			&i.Created,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const userGetByID = `-- name: UserGetByID :one
@@ -1471,7 +2201,7 @@ func (q *Queries) UserGetSpotifyTokens(ctx context.Context, userID uuid.UUID) (*
 
 const userHasSpotifyHistory = `-- name: UserHasSpotifyHistory :one
 SELECT
-    EXISTS (SELECT user_id, timestamp, platform, ms_played, conn_country, ip_addr, user_agent, track_name, artist_name, album_name, spotify_track_uri, reason_start, reason_end, shuffle, skipped, offline, offline_timestamp, incognito_mode FROM SPOTIFY_HISTORY WHERE USER_ID = $1)
+    EXISTS (SELECT user_id, timestamp, platform, ms_played, conn_country, ip_addr, user_agent, track_name, artist_name, album_name, spotify_track_uri, reason_start, reason_end, shuffle, skipped, offline, offline_timestamp, incognito_mode, spotify_artist_uri, spotify_album_uri, from_history FROM SPOTIFY_HISTORY WHERE USER_ID = $1 AND from_history = true)
 `
 
 func (q *Queries) UserHasSpotifyHistory(ctx context.Context, userID uuid.UUID) (bool, error) {
@@ -1561,8 +2291,15 @@ func (q *Queries) UserUpdateSpotifyInfo(ctx context.Context, arg UserUpdateSpoti
 }
 
 const userUpdateSpotifyTokens = `-- name: UserUpdateSpotifyTokens :exec
-INSERT INTO spotify_tokens(user_id, encrypted_access_token, access_token_expiry, encrypted_refresh_token)
-    VALUES ($1, $2, $3, $4)
+WITH latest_perm_version AS (
+    SELECT id 
+    FROM spotify_permissions_versions 
+    ORDER BY id DESC 
+    LIMIT 1
+)
+INSERT INTO spotify_tokens(user_id, encrypted_access_token, access_token_expiry, encrypted_refresh_token, permissions_version)
+    SELECT $1, $2, $3, $4, id
+    FROM latest_perm_version
 ON CONFLICT ON CONSTRAINT spotify_tokens_user_id_key
     DO UPDATE SET
         encrypted_access_token = $2, access_token_expiry = $3, encrypted_refresh_token = $4

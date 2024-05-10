@@ -3,9 +3,11 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/andrewbenington/queue-share-api/app"
 	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/engine"
 	"github.com/andrewbenington/queue-share-api/version"
 	"gopkg.in/yaml.v3"
 )
@@ -29,5 +31,9 @@ func main() {
 	if len(os.Args) > 1 {
 		addr = os.Args[1]
 	}
+	now := time.Now()
+	engine.LastFetch = &now
+	go engine.Run()
+
 	a.Run(addr)
 }

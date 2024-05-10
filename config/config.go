@@ -64,6 +64,10 @@ func GetSpotifyRedirect() string {
 	return config.spotifyRedirectURL
 }
 
+func GetIsProd() bool {
+	return strings.EqualFold(config.env, "PROD")
+}
+
 func GetDBString() string {
 	switch strings.ToUpper(config.env) {
 	case "LOCAL":

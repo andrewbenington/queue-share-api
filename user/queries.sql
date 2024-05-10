@@ -1,6 +1,13 @@
 -- name: UserUpdateSpotifyTokens :exec
-INSERT INTO spotify_tokens(user_id, encrypted_access_token, access_token_expiry, encrypted_refresh_token)
-    VALUES ($1, $2, $3, $4)
+WITH latest_perm_version AS (
+    SELECT id 
+    FROM spotify_permissions_versions 
+    ORDER BY id DESC 
+    LIMIT 1
+)
+INSERT INTO spotify_tokens(user_id, encrypted_access_token, access_token_expiry, encrypted_refresh_token, permissions_version)
+    SELECT $1, $2, $3, $4, id
+    FROM latest_perm_version
 ON CONFLICT ON CONSTRAINT spotify_tokens_user_id_key
     DO UPDATE SET
         encrypted_access_token = $2, access_token_expiry = $3, encrypted_refresh_token = $4
@@ -103,6 +110,11 @@ SET
 WHERE
     id = $1;
 
+-- name: UserDeleteSpotifyToken :exec
+DELETE FROM spotify_tokens
+WHERE
+    user_id = $1;
+
 -- name: UserGetJoinedRooms :many
 SELECT
     r.id,
@@ -132,4 +144,11 @@ FROM
 
 -- name: UserHasSpotifyHistory :one
 SELECT
-    EXISTS (SELECT * FROM SPOTIFY_HISTORY WHERE USER_ID = @user_id);
+    EXISTS (SELECT * FROM SPOTIFY_HISTORY WHERE USER_ID = @user_id AND from_history = true);
+
+-- name: UserGetAllWithSpotify :many
+SELECT
+    *
+FROM
+    users
+WHERE spotify_account is not NULL;

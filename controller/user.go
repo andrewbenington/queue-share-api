@@ -11,7 +11,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
-	"github.com/andrewbenington/queue-share-api/db/gen"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/andrewbenington/queue-share-api/user"
@@ -46,7 +45,7 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, err := db.Service().UserStore.InsertUser(r.Context(), tx, req.Username, req.DisplayName, req.Password)
+	userID, err := user.InsertUser(r.Context(), tx, req.Username, req.DisplayName, req.Password)
 	if err != nil {
 		pgErr, ok := err.(*pgconn.PgError)
 		if ok && pgErr.Code == "23505" {
@@ -96,7 +95,7 @@ func (c *Controller) CurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := db.Service().UserStore.GetByID(r.Context(), userID)
+	u, err := user.GetByID(r.Context(), db.Service().DB, userID)
 
 	if err == sql.ErrNoRows {
 		requests.RespondAuthError(w)
@@ -123,7 +122,7 @@ func (c *Controller) GetUserHostedRooms(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rooms, err := db.Service().RoomStore.GetUserHostedRooms(r.Context(), userID, true)
+	rooms, err := room.GetUserHostedRooms(r.Context(), db.Service().DB, userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -141,7 +140,7 @@ func (c *Controller) GetUserJoinedRooms(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rooms, err := db.Service().RoomStore.GetUserJoinedRooms(r.Context(), userID, true)
+	rooms, err := room.GetUserJoinedRooms(r.Context(), db.Service().DB, userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -159,7 +158,7 @@ func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := db.Service().UserStore.UnlinkSpotify(r.Context(), userID)
+	err := user.UnlinkSpotify(r.Context(), db.Service().DB, userID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 	}
@@ -179,9 +178,10 @@ func (c *Controller) UserHasSpotifyHistory(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := gen.New((db.Service().DB)).UserHasSpotifyHistory(r.Context(), userUUID)
+	result, err := db.New((db.Service().DB)).UserHasSpotifyHistory(r.Context(), userUUID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
+		return
 	}
 
 	response := map[string]bool{"user_has_history": result}
