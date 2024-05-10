@@ -15,7 +15,7 @@ import (
 func (c *Controller) Pause(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -45,7 +45,7 @@ func (c *Controller) Pause(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) Play(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -86,7 +86,7 @@ func (c *Controller) Play(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) Next(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -116,7 +116,7 @@ func (c *Controller) Next(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) Previous(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -146,7 +146,7 @@ func (c *Controller) Previous(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) Devices(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -177,7 +177,7 @@ func (c *Controller) Devices(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) SetVolume(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -214,7 +214,7 @@ func (c *Controller) SetVolume(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) GetPlayback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return

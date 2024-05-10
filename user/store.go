@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/auth"
-	"github.com/andrewbenington/queue-share-api/db/gen"
+	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/spotify"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
@@ -23,8 +23,8 @@ func NewStore(db *sql.DB) *Store {
 	}
 }
 
-func (s *Store) InsertUser(ctx context.Context, tx *sql.Tx, username string, displayName string, password string) (newUserID string, err error) {
-	userUUID, err := gen.New(tx).UserInsertWithPassword(ctx, gen.UserInsertWithPasswordParams{
+func InsertUser(ctx context.Context, dbtx db.DBTX, username string, displayName string, password string) (newUserID string, err error) {
+	userUUID, err := db.New(dbtx).UserInsertWithPassword(ctx, db.UserInsertWithPasswordParams{
 		Username:    username,
 		DisplayName: displayName,
 		UserPass:    password,
@@ -35,7 +35,7 @@ func (s *Store) InsertUser(ctx context.Context, tx *sql.Tx, username string, dis
 	return userUUID.String(), nil
 }
 
-func (s *Store) UpdateSpotifyToken(ctx context.Context, userID string, oauthToken *oauth2.Token) error {
+func UpdateSpotifyToken(ctx context.Context, dbtx db.DBTX, userID string, oauthToken *oauth2.Token) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	userUUID, err := uuid.Parse(userID)
@@ -50,7 +50,7 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, userID string, oauthToke
 	if err != nil {
 		return fmt.Errorf("encrypt refresh token: %w", err)
 	}
-	return gen.New(s.db).UserUpdateSpotifyTokens(ctx, gen.UserUpdateSpotifyTokensParams{
+	return db.New(dbtx).UserUpdateSpotifyTokens(ctx, db.UserUpdateSpotifyTokensParams{
 		UserID:                userUUID,
 		EncryptedAccessToken:  encryptedAccessToken,
 		AccessTokenExpiry:     oauthToken.Expiry,
@@ -58,7 +58,7 @@ func (s *Store) UpdateSpotifyToken(ctx context.Context, userID string, oauthToke
 	})
 }
 
-func (s *Store) UpdateSpotifyInfo(ctx context.Context, userID string, info *spotify.SpotifyUser) error {
+func UpdateSpotifyInfo(ctx context.Context, dbtx db.DBTX, userID string, info *spotify.SpotifyUser) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -67,7 +67,7 @@ func (s *Store) UpdateSpotifyInfo(ctx context.Context, userID string, info *spot
 		return err
 	}
 
-	return gen.New(s.db).UserUpdateSpotifyInfo(ctx, gen.UserUpdateSpotifyInfoParams{
+	return db.New(dbtx).UserUpdateSpotifyInfo(ctx, db.UserUpdateSpotifyInfoParams{
 		ID:              userUUID,
 		SpotifyAccount:  sql.NullString{String: info.ID, Valid: true},
 		SpotifyName:     sql.NullString{String: info.Display, Valid: true},
@@ -75,8 +75,8 @@ func (s *Store) UpdateSpotifyInfo(ctx context.Context, userID string, info *spot
 	})
 }
 
-func (s *Store) Authenticate(ctx context.Context, username string, password string) (bool, error) {
-	return gen.New(s.db).UserValidatePassword(ctx, gen.UserValidatePasswordParams{
+func Authenticate(ctx context.Context, dbtx db.DBTX, username string, password string) (bool, error) {
+	return db.New(dbtx).UserValidatePassword(ctx, db.UserValidatePasswordParams{
 		Username: username,
 		UserPass: password,
 	})
@@ -89,8 +89,8 @@ type HostedRoom struct {
 	Created time.Time `json:"created"`
 }
 
-func (s *Store) GetByUsername(ctx context.Context, username string) (*User, error) {
-	row, err := gen.New(s.db).UserGetByUsername(ctx, username)
+func GetByUsername(ctx context.Context, dbtx db.DBTX, username string) (*User, error) {
+	row, err := db.New(dbtx).UserGetByUsername(ctx, username)
 	if err == sql.ErrNoRows {
 		return nil, err
 	} else if err != nil {
@@ -105,12 +105,12 @@ func (s *Store) GetByUsername(ctx context.Context, username string) (*User, erro
 	}, nil
 }
 
-func (s *Store) GetByID(ctx context.Context, userID string) (*User, error) {
+func GetByID(ctx context.Context, dbtx db.DBTX, userID string) (*User, error) {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return nil, fmt.Errorf("parse user uuid: %s", err)
 	}
-	row, err := gen.New(s.db).UserGetByID(ctx, userUUID)
+	row, err := db.New(dbtx).UserGetByID(ctx, userUUID)
 	if err == sql.ErrNoRows {
 		return nil, err
 	} else if err != nil {
@@ -125,10 +125,18 @@ func (s *Store) GetByID(ctx context.Context, userID string) (*User, error) {
 	}, nil
 }
 
-func (s *Store) UnlinkSpotify(ctx context.Context, userID string) error {
+func UnlinkSpotify(ctx context.Context, dbtx db.DBTX, userID string) error {
 	userUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return fmt.Errorf("parse user uuid: %s", err)
+		return fmt.Errorf("parse user uuid: %w", err)
 	}
-	return gen.New(s.db).UserDeleteSpotifyInfo(ctx, userUUID)
+	err = db.New(dbtx).UserDeleteSpotifyInfo(ctx, userUUID)
+	if err != nil {
+		return fmt.Errorf("delete user spotify data: %w", err)
+	}
+	err = db.New(dbtx).UserDeleteSpotifyToken(ctx, userUUID)
+	if err != nil {
+		return fmt.Errorf("delete user spotify token: %w", err)
+	}
+	return nil
 }

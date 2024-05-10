@@ -13,7 +13,7 @@ import (
 func (c *Controller) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -50,7 +50,7 @@ func (c *Controller) GetPlaylist(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) GetAlbum(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -87,7 +87,7 @@ func (c *Controller) GetAlbum(w http.ResponseWriter, r *http.Request) {
 func (c *Controller) GetArtist(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	reqCtx, err := getRequestContext(ctx, r)
+	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
