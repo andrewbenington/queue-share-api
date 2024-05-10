@@ -1,4 +1,5 @@
 version: "2"
+
 sql:
   - schema: "db/schema.sql"
     queries:
@@ -11,10 +12,15 @@ sql:
         emit_json_tags: true
         package: "db"
         out: "db"
+        rename:
+          spotify_track_cache: "TrackData"
+          uri: "URI"
+          artist_uri: "ArtistURI"
+          album_uri: "AlbumURI"
         overrides:
           - column: spotify_track_cache.other_artists
             go_type:
-              type: TrackArtist
+              type: "[]TrackArtist"
           - column: spotify_artist_cache.genres
             go_type:
               type: "[]string"
@@ -23,7 +29,11 @@ sql:
               type: "[]string"
           - column: spotify_track_cache.external_ids
             go_type:
-              import: "github.com/zmb3/spotify/v2"
-              type: TrackExternalIDs
-
+              type: map[string]string
+          - column: spotify_track_cache.image_url
+            go_type:
+              type: "*string"
+          - column: spotify_track_cache.isrc
+            go_type:
+              type: "*string"
     strict_order_by: false

@@ -12,13 +12,12 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/spotify"
 	"github.com/google/uuid"
-	z_spotify "github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
 type TopTracksResponse struct {
-	Rankings  []*history.MonthTopTracks      `json:"rankings"`
-	TrackData map[string]z_spotify.FullTrack `json:"track_data"`
+	Rankings  []*history.MonthTopTracks `json:"rankings"`
+	TrackData map[string]db.TrackData   `json:"track_data"`
 }
 
 func (c *Controller) GetTopTracksByMonth(w http.ResponseWriter, r *http.Request) {

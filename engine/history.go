@@ -102,30 +102,22 @@ func processHistory(ctx context.Context, spClient *z_spotify.Client, items []z_s
 			durationMS = nowDiffMS
 		}
 
-		fullTrack, err := spotify.GetTrack(ctx, spClient, item.Track.ID.String())
+		trackData, err := spotify.GetTrack(ctx, spClient, item.Track.ID.String())
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
 
-		firstArtistName := ""
-		firstArtistURI := sql.NullString{}
-
-		if len(fullTrack.Artists) > 0 {
-			firstArtistName = fullTrack.Artists[0].Name
-			firstArtistURI.String = string(fullTrack.Artists[0].URI)
-			firstArtistURI.Valid = true
-		}
 		row := db.HistoryInsertOneParams{
 			UserID:           userID,
 			Timestamp:        item.PlayedAt,
 			MsPlayed:         durationMS,
-			TrackName:        fullTrack.Name,
-			ArtistName:       firstArtistName,
-			AlbumName:        fullTrack.Album.Name,
+			TrackName:        trackData.Name,
+			ArtistName:       trackData.ArtistName,
+			AlbumName:        trackData.AlbumName,
 			SpotifyTrackUri:  string(item.Track.URI),
-			SpotifyArtistUri: firstArtistURI,
-			SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(fullTrack.Album.URI)},
+			SpotifyArtistUri: sql.NullString{Valid: true, String: string(trackData.ArtistURI)},
+			SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(trackData.AlbumURI)},
 		}
 
 		allRows = append(allRows, row)

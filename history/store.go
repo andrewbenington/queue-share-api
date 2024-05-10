@@ -184,7 +184,7 @@ func AllTrackStreamsByURI(ctx context.Context, transaction db.DBTX, userID strin
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		Uri:          uri,
+		URI:          uri,
 	})
 }
 
@@ -200,7 +200,7 @@ func AllArtistStreamsByURI(ctx context.Context, transaction db.DBTX, userID stri
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		Uri:          sql.NullString{Valid: true, String: uri},
+		URI:          sql.NullString{Valid: true, String: uri},
 	})
 }
 
@@ -216,7 +216,7 @@ func AllAlbumStreamsByURI(ctx context.Context, transaction db.DBTX, userID strin
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		Uri:          sql.NullString{Valid: true, String: uri},
+		URI:          sql.NullString{Valid: true, String: uri},
 	})
 }
 
@@ -304,8 +304,8 @@ func TrackStreamRankingsByMonth(ctx context.Context, transaction db.DBTX, userID
 				StartDate:    time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local),
 				EndDate:      time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.Local),
 				MaxTracks:    filter.MaxTracks,
-				ArtistUri:    NullStringFromPtr(filter.ArtistURI),
-				AlbumUri:     NullStringFromPtr(filter.AlbumURI),
+				ArtistURI:    NullStringFromPtr(filter.ArtistURI),
+				AlbumURI:     NullStringFromPtr(filter.AlbumURI),
 			})
 			if err != nil {
 				return nil, http.StatusNotFound, err
@@ -491,7 +491,7 @@ func AlbumStreamRankingsByMonth(ctx context.Context, transaction db.DBTX, userID
 				StartDate:    time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local),
 				EndDate:      time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.Local),
 				MaxTracks:    maxAlbums,
-				ArtistUri:    NullStringFromPtr(filter.ArtistURI),
+				ArtistURI:    NullStringFromPtr(filter.ArtistURI),
 			})
 
 			if err != nil {

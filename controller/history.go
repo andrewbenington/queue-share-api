@@ -30,14 +30,14 @@ const (
 )
 
 type HistoryEntry struct {
-	Timestamp       time.Time            `json:"timestamp"`
-	TrackName       string               `json:"track_name"`
-	AlbumName       string               `json:"album_name"`
-	MsPlayed        int32                `json:"ms_played"`
-	SpotifyTrackUri string               `json:"spotify_track_uri"`
-	SpotifyAlbumUri string               `json:"spotify_album_uri"`
-	ImageURL        string               `json:"image_url"`
-	Artists         []HistoryEntryArtist `json:"artists"`
+	Timestamp       time.Time        `json:"timestamp"`
+	TrackName       string           `json:"track_name"`
+	AlbumName       string           `json:"album_name"`
+	MsPlayed        int32            `json:"ms_played"`
+	SpotifyTrackUri string           `json:"spotify_track_uri"`
+	SpotifyAlbumUri string           `json:"spotify_album_uri"`
+	ImageURL        *string          `json:"image_url"`
+	Artists         []db.TrackArtist `json:"artists"`
 }
 
 type HistoryEntryArtist struct {
@@ -121,19 +121,18 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 			AlbumName:       row.AlbumName,
 			SpotifyAlbumUri: row.SpotifyAlbumUri.String,
 			MsPlayed:        row.MsPlayed,
+			Artists: []db.TrackArtist{
+				{
+					Name: row.ArtistName,
+					URI:  row.SpotifyArtistUri.String,
+					ID:   spotify.IDFromURIMust(row.SpotifyArtistUri.String),
+				},
+			},
 		}
 
 		if track, ok := trackByID[spotify.IDFromURIMust(row.SpotifyTrackUri)]; ok {
-			image := spotify.GetAlbum64Image(track.Album)
-			if image != nil {
-				entry.ImageURL = image.URL
-			}
-			for _, artist := range track.Artists {
-				entry.Artists = append(entry.Artists, HistoryEntryArtist{
-					Name: artist.Name,
-					URI:  string(artist.URI),
-				})
-			}
+			entry.ImageURL = track.ImageUrl
+			entry.Artists = append(entry.Artists, track.OtherArtists...)
 		}
 
 		entries = append(entries, entry)
@@ -332,9 +331,9 @@ type Stream struct {
 	SpotifyAlbumUri  string    `json:"spotify_album_uri"`
 }
 type TrackStatsResponse struct {
-	Track    *z_spotify.FullTrack `json:"track"`
-	Streams  []*Stream            `json:"streams"`
-	Rankings []MonthRanking       `json:"rankings"`
+	Track    *db.TrackData  `json:"track"`
+	Streams  []*Stream      `json:"streams"`
+	Rankings []MonthRanking `json:"rankings"`
 }
 
 func (c *Controller) GetTrackStatsByURI(w http.ResponseWriter, r *http.Request) {

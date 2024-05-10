@@ -52,10 +52,10 @@ VALUES
 
 type AlbumCacheInsertBulkParams struct {
 	ID                   []string          `json:"id"`
-	Uri                  []string          `json:"uri"`
+	URI                  []string          `json:"uri"`
 	Name                 []string          `json:"name"`
 	ArtistID             []string          `json:"artist_id"`
-	ArtistUri            []string          `json:"artist_uri"`
+	ArtistURI            []string          `json:"artist_uri"`
 	ArtistName           []string          `json:"artist_name"`
 	AlbumGroup           []string          `json:"album_group"`
 	AlbumType            []string          `json:"album_type"`
@@ -69,10 +69,10 @@ type AlbumCacheInsertBulkParams struct {
 func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsertBulkParams) error {
 	_, err := q.db.ExecContext(ctx, albumCacheInsertBulk,
 		pq.Array(arg.ID),
-		pq.Array(arg.Uri),
+		pq.Array(arg.URI),
 		pq.Array(arg.Name),
 		pq.Array(arg.ArtistID),
-		pq.Array(arg.ArtistUri),
+		pq.Array(arg.ArtistURI),
 		pq.Array(arg.ArtistName),
 		pq.Array(arg.AlbumGroup),
 		pq.Array(arg.AlbumType),
@@ -109,7 +109,7 @@ VALUES
 
 type ArtistCacheInsertBulkParams struct {
 	ID            []string          `json:"id"`
-	Uri           []string          `json:"uri"`
+	URI           []string          `json:"uri"`
 	Name          []string          `json:"name"`
 	ImageUrl      []string          `json:"image_url"`
 	Genres        []json.RawMessage `json:"genres"`
@@ -120,7 +120,7 @@ type ArtistCacheInsertBulkParams struct {
 func (q *Queries) ArtistCacheInsertBulk(ctx context.Context, arg ArtistCacheInsertBulkParams) error {
 	_, err := q.db.ExecContext(ctx, artistCacheInsertBulk,
 		pq.Array(arg.ID),
-		pq.Array(arg.Uri),
+		pq.Array(arg.URI),
 		pq.Array(arg.Name),
 		pq.Array(arg.ImageUrl),
 		pq.Array(arg.Genres),
@@ -391,7 +391,7 @@ type HistoryGetByAlbumURIParams struct {
 	UserID       uuid.UUID      `json:"user_id"`
 	MinMsPlayed  int32          `json:"min_ms_played"`
 	IncludeSkips bool           `json:"include_skips"`
-	Uri          sql.NullString `json:"uri"`
+	URI          sql.NullString `json:"uri"`
 }
 
 type HistoryGetByAlbumURIRow struct {
@@ -410,7 +410,7 @@ func (q *Queries) HistoryGetByAlbumURI(ctx context.Context, arg HistoryGetByAlbu
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
-		arg.Uri,
+		arg.URI,
 	)
 	if err != nil {
 		return nil, err
@@ -470,7 +470,7 @@ type HistoryGetByArtistURIParams struct {
 	UserID       uuid.UUID      `json:"user_id"`
 	MinMsPlayed  int32          `json:"min_ms_played"`
 	IncludeSkips bool           `json:"include_skips"`
-	Uri          sql.NullString `json:"uri"`
+	URI          sql.NullString `json:"uri"`
 }
 
 type HistoryGetByArtistURIRow struct {
@@ -489,7 +489,7 @@ func (q *Queries) HistoryGetByArtistURI(ctx context.Context, arg HistoryGetByArt
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
-		arg.Uri,
+		arg.URI,
 	)
 	if err != nil {
 		return nil, err
@@ -549,7 +549,7 @@ type HistoryGetByTrackURIParams struct {
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
-	Uri          string    `json:"uri"`
+	URI          string    `json:"uri"`
 }
 
 type HistoryGetByTrackURIRow struct {
@@ -570,7 +570,7 @@ func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrac
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
-		arg.Uri,
+		arg.URI,
 	)
 	if err != nil {
 		return nil, err
@@ -658,7 +658,7 @@ type HistoryGetTopAlbumsInTimeframeParams struct {
 	IncludeSkips bool           `json:"include_skips"`
 	StartDate    time.Time      `json:"start_date"`
 	EndDate      time.Time      `json:"end_date"`
-	ArtistUri    sql.NullString `json:"artist_uri"`
+	ArtistURI    sql.NullString `json:"artist_uri"`
 	MaxTracks    int32          `json:"max_tracks"`
 }
 
@@ -675,7 +675,7 @@ func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg Histor
 		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
-		arg.ArtistUri,
+		arg.ArtistURI,
 		arg.MaxTracks,
 	)
 	if err != nil {
@@ -851,8 +851,8 @@ type HistoryGetTopTracksInTimeframeParams struct {
 	IncludeSkips bool           `json:"include_skips"`
 	StartDate    time.Time      `json:"start_date"`
 	EndDate      time.Time      `json:"end_date"`
-	ArtistUri    sql.NullString `json:"artist_uri"`
-	AlbumUri     sql.NullString `json:"album_uri"`
+	ArtistURI    sql.NullString `json:"artist_uri"`
+	AlbumURI     sql.NullString `json:"album_uri"`
 	MaxTracks    int32          `json:"max_tracks"`
 }
 
@@ -868,8 +868,8 @@ func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg Histor
 		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
-		arg.ArtistUri,
-		arg.AlbumUri,
+		arg.ArtistURI,
+		arg.AlbumURI,
 		arg.MaxTracks,
 	)
 	if err != nil {
@@ -1946,6 +1946,55 @@ func (q *Queries) RoomValidatePassword(ctx context.Context, arg RoomValidatePass
 	return column_1, err
 }
 
+const trackCacheGetByID = `-- name: TrackCacheGetByID :many
+SELECT id, uri, name, album_id, album_uri, album_name, artist_id, artist_uri, artist_name, image_url, other_artists, duration_ms, popularity, explicit, preview_url, disc_number, track_number, type, external_ids, isrc FROM SPOTIFY_TRACK_CACHE
+WHERE id = ANY($1 :: text[])
+`
+
+func (q *Queries) TrackCacheGetByID(ctx context.Context, trackIds []string) ([]*TrackData, error) {
+	rows, err := q.db.QueryContext(ctx, trackCacheGetByID, pq.Array(trackIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TrackData
+	for rows.Next() {
+		var i TrackData
+		if err := rows.Scan(
+			&i.ID,
+			&i.URI,
+			&i.Name,
+			&i.AlbumID,
+			&i.AlbumURI,
+			&i.AlbumName,
+			&i.ArtistID,
+			&i.ArtistURI,
+			&i.ArtistName,
+			&i.ImageUrl,
+			pq.Array(&i.OtherArtists),
+			&i.DurationMs,
+			&i.Popularity,
+			&i.Explicit,
+			&i.PreviewUrl,
+			&i.DiscNumber,
+			&i.TrackNumber,
+			&i.Type,
+			&i.ExternalIds,
+			&i.Isrc,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const trackCacheInsertBulk = `-- name: TrackCacheInsertBulk :exec
 INSERT INTO
     SPOTIFY_TRACK_CACHE(
@@ -1997,13 +2046,13 @@ VALUES
 
 type TrackCacheInsertBulkParams struct {
 	ID           []string          `json:"id"`
-	Uri          []string          `json:"uri"`
+	URI          []string          `json:"uri"`
 	Name         []string          `json:"name"`
 	AlbumID      []string          `json:"album_id"`
-	AlbumUri     []string          `json:"album_uri"`
+	AlbumURI     []string          `json:"album_uri"`
 	AlbumName    []string          `json:"album_name"`
 	ArtistID     []string          `json:"artist_id"`
-	ArtistUri    []string          `json:"artist_uri"`
+	ArtistURI    []string          `json:"artist_uri"`
 	ArtistName   []string          `json:"artist_name"`
 	ImageUrl     []string          `json:"image_url"`
 	OtherArtists []json.RawMessage `json:"other_artists"`
@@ -2021,13 +2070,13 @@ type TrackCacheInsertBulkParams struct {
 func (q *Queries) TrackCacheInsertBulk(ctx context.Context, arg TrackCacheInsertBulkParams) error {
 	_, err := q.db.ExecContext(ctx, trackCacheInsertBulk,
 		pq.Array(arg.ID),
-		pq.Array(arg.Uri),
+		pq.Array(arg.URI),
 		pq.Array(arg.Name),
 		pq.Array(arg.AlbumID),
-		pq.Array(arg.AlbumUri),
+		pq.Array(arg.AlbumURI),
 		pq.Array(arg.AlbumName),
 		pq.Array(arg.ArtistID),
-		pq.Array(arg.ArtistUri),
+		pq.Array(arg.ArtistURI),
 		pq.Array(arg.ArtistName),
 		pq.Array(arg.ImageUrl),
 		pq.Array(arg.OtherArtists),

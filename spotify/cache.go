@@ -73,7 +73,7 @@ func init() {
 	}
 }
 
-func cacheTracks(ctx context.Context, tracks []*spotify.FullTrack) {
+func cacheFullTracks(ctx context.Context, tracks []*spotify.FullTrack) {
 	params := InsertParamsFromFullTracks(tracks)
 	err := db.New(db.Service().DB).TrackCacheInsertBulkNullable(ctx, params)
 	if err != nil {
@@ -172,14 +172,16 @@ func trackArtistFromSimple(artist spotify.SimpleArtist, _ int) db.TrackArtist {
 	}
 }
 
-func getTracksFromCache(ids []string) map[string]spotify.FullTrack {
-	cacheHits := map[string]spotify.FullTrack{}
-	for _, id := range ids {
-		if trackData, ok := spotifyTrackCache[id]; ok {
-			cacheHits[id] = trackData
-		}
+func getTracksFromCache(ctx context.Context, ids []string) (map[string]db.TrackData, error) {
+	rows, err := db.New(db.Service().DB).TrackCacheGetByID(ctx, ids)
+	if err != nil {
+		return nil, err
 	}
-	return cacheHits
+	cacheHits := map[string]db.TrackData{}
+	for _, row := range rows {
+		cacheHits[row.ID] = *row
+	}
+	return cacheHits, nil
 }
 
 func cacheArtists(artists []*spotify.FullArtist) {
@@ -234,6 +236,7 @@ func InsertParamsFromFullArtists(artists []*spotify.FullArtist) db.ArtistCacheIn
 
 	return params
 }
+
 func getArtistsFromCache(ids []string) map[string]spotify.FullArtist {
 	cacheHits := map[string]spotify.FullArtist{}
 	for _, id := range ids {
@@ -324,4 +327,42 @@ func GetAlbumCache() map[string]spotify.FullAlbum {
 
 func GetArtistCache() map[string]spotify.FullArtist {
 	return spotifyArtistCache
+}
+
+func TrackDataFromFullTrack(ft spotify.FullTrack) db.TrackData {
+	artist := ft.Artists[0]
+
+	image := GetAlbum64Image(ft.Album)
+	var imageURL *string
+	if image != nil {
+		imageURL = &image.URL
+	}
+
+	var isrc *string
+	if isrcField, ok := ft.ExternalIDs["isrc"]; ok {
+		isrc = &isrcField
+	}
+
+	return db.TrackData{
+		ID:           ft.ID.String(),
+		URI:          string(ft.URI),
+		Name:         ft.Name,
+		AlbumID:      ft.Album.ID.String(),
+		AlbumURI:     string(ft.Album.URI),
+		AlbumName:    ft.Album.Name,
+		ArtistID:     artist.ID.String(),
+		ArtistURI:    string(artist.URI),
+		ArtistName:   artist.Name,
+		ImageUrl:     imageURL,
+		OtherArtists: lo.Map(ft.Artists[1:], trackArtistFromSimple),
+		DurationMs:   int32(ft.Duration),
+		Popularity:   int32(ft.Popularity),
+		Explicit:     ft.Explicit,
+		PreviewUrl:   ft.PreviewURL,
+		DiscNumber:   int32(ft.DiscNumber),
+		TrackNumber:  int32(ft.TrackNumber),
+		Type:         ft.Type,
+		ExternalIds:  ft.ExternalIDs,
+		Isrc:         isrc,
+	}
 }

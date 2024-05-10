@@ -70,16 +70,10 @@ func loadURIsByPopularity() {
 		}
 
 		for _, track := range tracks {
-			firstArtistURI := sql.NullString{}
-
-			if len(track.Artists) > 0 {
-				firstArtistURI.String = string(track.Artists[0].URI)
-				firstArtistURI.Valid = true
-			}
 			db.New(db.Service().DB).HistorySetURIsForTrack(ctx, db.HistorySetURIsForTrackParams{
 				SpotifyTrackUri:  string(track.URI),
-				SpotifyArtistUri: firstArtistURI,
-				SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(track.Album.URI)},
+				SpotifyArtistUri: sql.NullString{Valid: true, String: string(track.ArtistURI)},
+				SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(track.AlbumURI)},
 			})
 			fmt.Printf("loaded URIs for %s\n", track.Name)
 		}

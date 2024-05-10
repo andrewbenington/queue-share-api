@@ -1,3 +1,7 @@
+-- name: TrackCacheGetByID :many
+SELECT * FROM SPOTIFY_TRACK_CACHE
+WHERE id = ANY(@track_ids :: text[]);
+
 -- name: TrackCacheInsertBulk :exec
 INSERT INTO
     SPOTIFY_TRACK_CACHE(

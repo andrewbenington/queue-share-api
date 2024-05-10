@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/zmb3/spotify/v2"
 )
 
@@ -26,9 +27,12 @@ func SearchSongs(ctx context.Context, spClient *spotify.Client, text string) ([]
 	return resultsTrunced, nil
 }
 
-func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*spotify.FullTrack, error) {
+func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.TrackData, error) {
 
-	tracks := getTracksFromCache([]string{id})
+	tracks, err := getTracksFromCache(ctx, []string{id})
+	if err != nil {
+		return nil, err
+	}
 
 	if track, ok := tracks[id]; ok {
 		return &track, nil
@@ -40,16 +44,22 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 	}
 	fmt.Printf("Cache miss: %s\n", track.Name)
 
-	cacheTracks(ctx, []*spotify.FullTrack{track})
+	cacheFullTracks(ctx, []*spotify.FullTrack{track})
 
-	return track, nil
+	trackData := TrackDataFromFullTrack(*track)
+
+	return &trackData, nil
 }
 
-func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]spotify.FullTrack, error) {
+func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.TrackData, error) {
+	tracks, err := getTracksFromCache(ctx, ids)
+	if err != nil {
+		log.Printf("error getting tracks from cache: %s", err)
+	} else {
+		log.Printf("%d/%d tracks already cached", len(tracks), len(ids))
+	}
 
-	tracks := getTracksFromCache(ids)
 	idsToGet := []spotify.ID{}
-	fmt.Printf("%d/%d tracks already cached\n", len(tracks), len(ids))
 
 	for _, id := range ids {
 		if _, ok := tracks[id]; !ok {
@@ -68,10 +78,10 @@ func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			return nil, err
 		}
 
-		cacheTracks(ctx, results)
+		cacheFullTracks(ctx, results)
 
 		for _, track := range results {
-			tracks[track.ID.String()] = *track
+			tracks[track.ID.String()] = TrackDataFromFullTrack(*track)
 		}
 	}
 
