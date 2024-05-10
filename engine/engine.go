@@ -70,8 +70,10 @@ func cycle() {
 			last_cycle_load_uris = &now
 		}
 	}
-	fmt.Println("doing cache cycle")
-	cacheURIsByPopularity()
+	fmt.Println("doing track cache cycle")
+	cacheTracksByPopularity()
+	fmt.Println("doing album cache cycle")
+	cacheAlbumsByPopularity()
 
 	fmt.Println("engine cycle complete")
 }

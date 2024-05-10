@@ -699,6 +699,52 @@ func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg Histor
 	return items, nil
 }
 
+const historyGetTopAlbumsNotInCache = `-- name: HistoryGetTopAlbumsNotInCache :many
+SELECT
+  SPOTIFY_ALBUM_URI,
+  COUNT(SPOTIFY_ALBUM_URI)
+FROM
+  spotify_history h
+LEFT JOIN spotify_album_cache ac
+ON h.spotify_album_uri = ac.uri
+WHERE
+	ac.uri is null
+GROUP BY
+  SPOTIFY_ALBUM_URI
+ORDER BY
+  COUNT DESC
+LIMIT
+  50
+`
+
+type HistoryGetTopAlbumsNotInCacheRow struct {
+	SpotifyAlbumUri sql.NullString `json:"spotify_album_uri"`
+	Count           int64          `json:"count"`
+}
+
+func (q *Queries) HistoryGetTopAlbumsNotInCache(ctx context.Context) ([]*HistoryGetTopAlbumsNotInCacheRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopAlbumsNotInCache)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopAlbumsNotInCacheRow
+	for rows.Next() {
+		var i HistoryGetTopAlbumsNotInCacheRow
+		if err := rows.Scan(&i.SpotifyAlbumUri, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const historyGetTopArtistsInTimeframe = `-- name: HistoryGetTopArtistsInTimeframe :many
 SELECT
     spotify_artist_uri,

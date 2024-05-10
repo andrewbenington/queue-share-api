@@ -68,7 +68,7 @@ func ForUser(ctx context.Context, userID uuid.UUID) (statusCode int, client *spo
 	tx := db.Service().DB
 	row, err := db.New(tx).UserGetSpotifyTokens(ctx, userID)
 	if err == sql.ErrNoRows {
-		return http.StatusNotFound, nil, fmt.Errorf("room credentials not found")
+		return http.StatusNotFound, nil, fmt.Errorf("room credentials not found for user %s", userID)
 	}
 
 	status, token, err := DecryptSpotifyToken(ctx, row.EncryptedAccessToken, row.AccessTokenExpiry, row.EncryptedRefreshToken)

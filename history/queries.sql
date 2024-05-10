@@ -402,3 +402,20 @@ ORDER BY
   COUNT DESC
 LIMIT
   50;
+
+-- name: HistoryGetTopAlbumsNotInCache :many
+SELECT
+  SPOTIFY_ALBUM_URI,
+  COUNT(SPOTIFY_ALBUM_URI)
+FROM
+  spotify_history h
+LEFT JOIN spotify_album_cache ac
+ON h.spotify_album_uri = ac.uri
+WHERE
+	ac.uri is null
+GROUP BY
+  SPOTIFY_ALBUM_URI
+ORDER BY
+  COUNT DESC
+LIMIT
+  50;
