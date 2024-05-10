@@ -77,7 +77,7 @@ func cacheFullTracks(ctx context.Context, tracks []*spotify.FullTrack) {
 	params := InsertParamsFromFullTracks(tracks)
 	err := db.New(db.Service().DB).TrackCacheInsertBulkNullable(ctx, params)
 	if err != nil {
-		fmt.Printf("Error inserting into album cache: %s", err)
+		fmt.Printf("Error inserting into track cache: %s", err)
 		return
 	}
 }

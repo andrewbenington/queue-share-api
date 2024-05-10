@@ -52,6 +52,7 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 }
 
 func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.TrackData, error) {
+	fmt.Println(ids)
 	tracks, err := getTracksFromCache(ctx, ids)
 	if err != nil {
 		log.Printf("error getting tracks from cache: %s", err)

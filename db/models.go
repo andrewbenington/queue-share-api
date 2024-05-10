@@ -131,7 +131,7 @@ type TrackData struct {
 	ArtistURI    string           `json:"artist_uri"`
 	ArtistName   string           `json:"artist_name"`
 	ImageUrl     *string          `json:"image_url"`
-	OtherArtists []TrackArtist    `json:"other_artists"`
+	OtherArtists TrackArtists     `json:"other_artists"`
 	DurationMs   int32            `json:"duration_ms"`
 	Popularity   int32            `json:"popularity"`
 	Explicit     bool             `json:"explicit"`

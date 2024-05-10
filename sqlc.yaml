@@ -20,7 +20,7 @@ sql:
         overrides:
           - column: spotify_track_cache.other_artists
             go_type:
-              type: "[]TrackArtist"
+              type: "TrackArtists"
           - column: spotify_artist_cache.genres
             go_type:
               type: "[]string"

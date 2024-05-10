@@ -1971,7 +1971,7 @@ func (q *Queries) TrackCacheGetByID(ctx context.Context, trackIds []string) ([]*
 			&i.ArtistURI,
 			&i.ArtistName,
 			&i.ImageUrl,
-			pq.Array(&i.OtherArtists),
+			&i.OtherArtists,
 			&i.DurationMs,
 			&i.Popularity,
 			&i.Explicit,

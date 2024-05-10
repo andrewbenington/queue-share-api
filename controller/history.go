@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -103,7 +104,12 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 
 	trackIDs := []string{}
 	for _, uri := range maps.Keys(trackURIs) {
-		trackIDs = append(trackIDs, spotify.IDFromURIMust(uri))
+		id, err := spotify.IDFromURI(uri)
+		if err != nil {
+			log.Println(id, err)
+			continue
+		}
+		trackIDs = append(trackIDs, id)
 	}
 
 	trackByID, err := spotify.GetTracks(ctx, spClient, trackIDs)
