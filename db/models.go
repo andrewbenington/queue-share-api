@@ -121,26 +121,26 @@ type SpotifyToken struct {
 }
 
 type TrackData struct {
-	ID           string            `json:"id"`
-	URI          string            `json:"uri"`
-	Name         string            `json:"name"`
-	AlbumID      string            `json:"album_id"`
-	AlbumURI     string            `json:"album_uri"`
-	AlbumName    string            `json:"album_name"`
-	ArtistID     string            `json:"artist_id"`
-	ArtistURI    string            `json:"artist_uri"`
-	ArtistName   string            `json:"artist_name"`
-	ImageUrl     *string           `json:"image_url"`
-	OtherArtists []TrackArtist     `json:"other_artists"`
-	DurationMs   int32             `json:"duration_ms"`
-	Popularity   int32             `json:"popularity"`
-	Explicit     bool              `json:"explicit"`
-	PreviewUrl   string            `json:"preview_url"`
-	DiscNumber   int32             `json:"disc_number"`
-	TrackNumber  int32             `json:"track_number"`
-	Type         string            `json:"type"`
-	ExternalIds  map[string]string `json:"external_ids"`
-	Isrc         *string           `json:"isrc"`
+	ID           string           `json:"id"`
+	URI          string           `json:"uri"`
+	Name         string           `json:"name"`
+	AlbumID      string           `json:"album_id"`
+	AlbumURI     string           `json:"album_uri"`
+	AlbumName    string           `json:"album_name"`
+	ArtistID     string           `json:"artist_id"`
+	ArtistURI    string           `json:"artist_uri"`
+	ArtistName   string           `json:"artist_name"`
+	ImageUrl     *string          `json:"image_url"`
+	OtherArtists []TrackArtist    `json:"other_artists"`
+	DurationMs   int32            `json:"duration_ms"`
+	Popularity   int32            `json:"popularity"`
+	Explicit     bool             `json:"explicit"`
+	PreviewUrl   string           `json:"preview_url"`
+	DiscNumber   int32            `json:"disc_number"`
+	TrackNumber  int32            `json:"track_number"`
+	Type         string           `json:"type"`
+	ExternalIds  TrackExternalIDs `json:"external_ids"`
+	Isrc         *string          `json:"isrc"`
 }
 
 type User struct {

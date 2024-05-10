@@ -29,7 +29,7 @@ sql:
               type: "[]string"
           - column: spotify_track_cache.external_ids
             go_type:
-              type: map[string]string
+              type: TrackExternalIDs
           - column: spotify_track_cache.image_url
             go_type:
               type: "*string"

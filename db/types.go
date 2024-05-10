@@ -5,3 +5,5 @@ type TrackArtist struct {
 	URI  string `json:"uri"`
 	Name string `json:"string"`
 }
+
+type TrackExternalIDs map[string]string
