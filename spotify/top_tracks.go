@@ -18,7 +18,7 @@ func TopTracks(ctx context.Context, spClient *spotify.Client) ([]TrackInfo, erro
 			ID:      entry.ID.String(),
 			Name:    entry.Name,
 			Artists: entry.Artists,
-			Image:   Get64Image(entry.Album),
+			Image:   GetAlbum64Image(entry.Album),
 		}
 		resultsTrunced = append(resultsTrunced, t)
 	}

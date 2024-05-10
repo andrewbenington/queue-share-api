@@ -1,12 +1,16 @@
 package spotify
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path"
+	"time"
 
+	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/samber/lo"
 	"github.com/zmb3/spotify/v2"
 )
 
@@ -69,19 +73,102 @@ func init() {
 	}
 }
 
-func cacheTracks(tracks []*spotify.FullTrack) {
-	log.Println(tracks)
-	for _, track := range tracks {
-		spotifyTrackCache[string(track.ID)] = *track
-	}
-	bytes, err := json.Marshal(spotifyTrackCache)
+func cacheTracks(ctx context.Context, tracks []*spotify.FullTrack) {
+	params := InsertParamsFromFullTracks(tracks)
+	err := db.New(db.Service().DB).TrackCacheInsertBulkNullable(ctx, params)
 	if err != nil {
-		fmt.Printf("Error serializing Spotify track cache: %s", err)
+		fmt.Printf("Error inserting into album cache: %s", err)
 		return
 	}
-	err = os.WriteFile(path.Join("temp", "track_cache.json"), bytes, 0644)
-	if err != nil {
-		fmt.Printf("Error serializing Spotify track cache: %s", err)
+}
+
+func InsertParamsFromFullTracks(tracks []*spotify.FullTrack) db.TrackCacheInsertBulkNullableParams {
+	params := db.TrackCacheInsertBulkNullableParams{
+		ID:           []string{},
+		Uri:          []string{},
+		Name:         []string{},
+		AlbumID:      []string{},
+		AlbumUri:     []string{},
+		AlbumName:    []string{},
+		ArtistID:     []string{},
+		ArtistUri:    []string{},
+		ArtistName:   []string{},
+		ImageUrl:     []*string{},
+		OtherArtists: []*string{},
+		DurationMs:   []int32{},
+		Popularity:   []int32{},
+		Explicit:     []bool{},
+		PreviewUrl:   []string{},
+		DiscNumber:   []int32{},
+		TrackNumber:  []int32{},
+		Type:         []string{},
+		ExternalIds:  []*string{},
+		Isrc:         []*string{},
+	}
+
+	for _, track := range tracks {
+		album := track.Album
+		artist := track.Artists[0]
+		params.ID = append(params.ID, track.ID.String())
+		params.Uri = append(params.Uri, string(track.URI))
+		params.Name = append(params.Name, track.Name)
+		params.AlbumID = append(params.AlbumID, album.ID.String())
+		params.AlbumUri = append(params.AlbumUri, string(album.URI))
+		params.AlbumName = append(params.AlbumName, album.Name)
+		params.ArtistID = append(params.ArtistID, artist.ID.String())
+		params.ArtistUri = append(params.ArtistUri, string(artist.URI))
+		params.ArtistName = append(params.ArtistName, artist.Name)
+
+		if len(track.Artists) > 1 {
+			trackArtists := lo.Map(track.Artists[1:], trackArtistFromSimple)
+			bytes, err := json.Marshal(trackArtists)
+			if err != nil {
+				log.Println(err)
+				params.OtherArtists = append(params.OtherArtists, nil)
+			} else {
+				str := string(bytes)
+				params.OtherArtists = append(params.OtherArtists, &str)
+			}
+		} else {
+			params.OtherArtists = append(params.OtherArtists, nil)
+		}
+
+		params.DurationMs = append(params.DurationMs, int32(track.Duration))
+		params.Popularity = append(params.Popularity, int32(track.Popularity))
+		params.Explicit = append(params.Explicit, track.Explicit)
+		params.PreviewUrl = append(params.PreviewUrl, track.PreviewURL)
+		params.DiscNumber = append(params.DiscNumber, int32(track.DiscNumber))
+		params.TrackNumber = append(params.TrackNumber, int32(track.TrackNumber))
+		params.Type = append(params.Type, track.Type)
+
+		if track.ExternalIDs != nil {
+			bytes, err := json.Marshal(track.ExternalIDs)
+			if err != nil {
+				log.Println(err)
+				params.ExternalIds = append(params.ExternalIds, nil)
+			} else {
+				str := string(bytes)
+				params.ExternalIds = append(params.ExternalIds, &str)
+			}
+		} else {
+			params.ExternalIds = append(params.ExternalIds, nil)
+		}
+
+		if isrc, ok := track.ExternalIDs["isrc"]; ok {
+			params.Isrc = append(params.Isrc, &isrc)
+		} else {
+			params.Isrc = append(params.Isrc, nil)
+		}
+	}
+
+	return params
+}
+
+func trackArtistFromSimple(artist spotify.SimpleArtist, _ int) db.TrackArtist {
+	return db.TrackArtist{
+		Name: artist.Name,
+		ID:   artist.ID.String(),
+		URI:  string(artist.URI),
 	}
 }
 
@@ -110,6 +197,43 @@ func cacheArtists(artists []*spotify.FullArtist) {
 	}
 }
 
+func InsertParamsFromFullArtists(artists []*spotify.FullArtist) db.ArtistCacheInsertBulkNullableParams {
+	params := db.ArtistCacheInsertBulkNullableParams{
+		ID:            []string{},
+		Uri:           []string{},
+		Name:          []string{},
+		ImageUrl:      []*string{},
+		Genres:        []*string{},
+		Popularity:    []int32{},
+		FollowerCount: []int32{},
+	}
+
+	for _, artist := range artists {
+		params.ID = append(params.ID, artist.ID.String())
+		params.Uri = append(params.Uri, string(artist.URI))
+		params.Name = append(params.Name, artist.Name)
+		image := GetArtist64Image(*artist)
+		if image != nil {
+			params.ImageUrl = append(params.ImageUrl, &image.URL)
+		} else {
+			params.ImageUrl = append(params.ImageUrl, nil)
+		}
+
+		bytes, err := json.Marshal(artist.Genres)
+		if err != nil {
+			log.Println(err)
+			params.Genres = append(params.Genres, nil)
+		} else {
+			str := string(bytes)
+			params.Genres = append(params.Genres, &str)
+		}
+
+		params.Popularity = append(params.Popularity, int32(artist.Popularity))
+		params.FollowerCount = append(params.FollowerCount, int32(artist.Followers.Count))
+	}
+
+	return params
+}
 func getArtistsFromCache(ids []string) map[string]spotify.FullArtist {
 	cacheHits := map[string]spotify.FullArtist{}
 	for _, id := range ids {
@@ -120,20 +244,64 @@ func getArtistsFromCache(ids []string) map[string]spotify.FullArtist {
 	return cacheHits
 }
 
-func cacheAlbums(albums []*spotify.FullAlbum) {
-	log.Println(albums)
-	for _, album := range albums {
-		spotifyAlbumCache[string(album.ID)] = *album
-	}
-	bytes, err := json.Marshal(spotifyAlbumCache)
+func cacheAlbums(ctx context.Context, albums []*spotify.FullAlbum) {
+	params := InsertParamsFromFullAlbums(albums)
+	err := db.New(db.Service().DB).AlbumCacheInsertBulkNullable(ctx, params)
 	if err != nil {
-		fmt.Printf("Error serializing Spotify album cache: %s", err)
+		fmt.Printf("Error inserting into album cache: %s", err)
 		return
 	}
-	err = os.WriteFile(path.Join("temp", "album_cache.json"), bytes, 0644)
-	if err != nil {
-		fmt.Printf("Error serializing Spotify album cache: %s", err)
+}
+
+func InsertParamsFromFullAlbums(albums []*spotify.FullAlbum) db.AlbumCacheInsertBulkNullableParams {
+	params := db.AlbumCacheInsertBulkNullableParams{
+		ID:                   []string{},
+		Uri:                  []string{},
+		Name:                 []string{},
+		ArtistID:             []string{},
+		ArtistUri:            []string{},
+		ArtistName:           []string{},
+		AlbumGroup:           []*string{},
+		AlbumType:            []*string{},
+		ImageUrl:             []*string{},
+		ReleaseDate:          []time.Time{},
+		ReleaseDatePrecision: []*string{},
+		Genres:               []*string{},
+		Popularity:           []int32{},
 	}
+
+	for _, album := range albums {
+		artist := album.Artists[0]
+		params.ID = append(params.ID, album.ID.String())
+		params.Uri = append(params.Uri, string(album.URI))
+		params.Name = append(params.Name, album.Name)
+		params.ArtistID = append(params.ArtistID, artist.ID.String())
+		params.ArtistUri = append(params.ArtistUri, string(artist.URI))
+		params.ArtistName = append(params.ArtistName, artist.Name)
+		params.AlbumGroup = append(params.AlbumGroup, &album.AlbumGroup)
+		params.AlbumType = append(params.AlbumType, &album.AlbumType)
+		image := GetAlbum64Image(album.SimpleAlbum)
+		if image != nil {
+			params.ImageUrl = append(params.ImageUrl, &image.URL)
+		} else {
+			params.ImageUrl = append(params.ImageUrl, nil)
+		}
+		params.ReleaseDate = append(params.ReleaseDate, album.ReleaseDateTime())
+		params.ReleaseDatePrecision = append(params.ReleaseDatePrecision, &album.ReleaseDatePrecision)
+
+		bytes, err := json.Marshal(album.Genres)
+		if err != nil {
+			log.Println(err)
+			params.Genres = append(params.Genres, nil)
+		} else {
+			str := string(bytes)
+			params.Genres = append(params.Genres, &str)
+		}
+
+		params.Popularity = append(params.Popularity, int32(album.Popularity))
+	}
+
+	return params
 }
 
 func getAlbumsFromCache(ids []string) map[string]spotify.FullAlbum {

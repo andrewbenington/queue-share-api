@@ -8,6 +8,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/lib/pq v1.10.9
+	github.com/samber/lo v1.39.0
 	github.com/stretchr/testify v1.8.4
 	github.com/zmb3/spotify/v2 v2.3.1
 	golang.org/x/exp v0.0.0-20240416160154-fe59bbe5cc7f

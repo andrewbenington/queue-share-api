@@ -29,7 +29,7 @@ func Run() {
 		// fmt.Println("night; sleeping for 3 hours")
 		// time.Sleep(CYCLE_PERIOD_NIGHT)
 		// } else {
-		log.Printf("day; sleeping for %s", cycle_period.String())
+		log.Printf("engine sleeping for %s", cycle_period.String())
 
 		time.Sleep(cycle_period)
 
@@ -57,8 +57,11 @@ func cycle() {
 			fmt.Println("doing profile cycle")
 			doSpotifyProfileCycle()
 			last_cycle_spotify_profile = &now
+
+			fmt.Println("uploading cache")
 			uploadTrackCache(ctx)
 			uploadAlbumCache(ctx)
+			uploadArtistCache(ctx)
 		}
 
 		if shouldDoCycle(last_cycle_load_uris, cycle_period_load_uris) {
@@ -67,8 +70,8 @@ func cycle() {
 			last_cycle_load_uris = &now
 		}
 	}
-
-	fmt.Println("uploading cache")
+	fmt.Println("doing cache cycle")
+	cacheURIsByPopularity()
 
 	fmt.Println("engine cycle complete")
 }

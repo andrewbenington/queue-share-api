@@ -19,7 +19,7 @@ func SearchSongs(ctx context.Context, spClient *spotify.Client, text string) ([]
 			ID:      entry.ID.String(),
 			Name:    entry.Name,
 			Artists: entry.Artists,
-			Image:   Get64Image(entry.Album),
+			Image:   GetAlbum64Image(entry.Album),
 		}
 		resultsTrunced = append(resultsTrunced, t)
 	}
@@ -40,7 +40,7 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 	}
 	fmt.Printf("Cache miss: %s\n", track.Name)
 
-	cacheTracks([]*spotify.FullTrack{track})
+	cacheTracks(ctx, []*spotify.FullTrack{track})
 
 	return track, nil
 }
@@ -68,7 +68,7 @@ func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			return nil, err
 		}
 
-		cacheTracks(results)
+		cacheTracks(ctx, results)
 
 		for _, track := range results {
 			tracks[track.ID.String()] = *track
@@ -142,7 +142,7 @@ func GetAlbum(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 		return nil, err
 	}
 
-	cacheAlbums([]*spotify.FullAlbum{album})
+	cacheAlbums(ctx, []*spotify.FullAlbum{album})
 
 	return album, nil
 }
@@ -175,7 +175,7 @@ func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			result.Tracks = spotify.SimpleTrackPage{}
 		}
 
-		cacheAlbums(results)
+		cacheAlbums(ctx, results)
 
 		for _, album := range results {
 			albums[album.ID.String()] = *album

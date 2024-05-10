@@ -124,7 +124,7 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if track, ok := trackByID[spotify.IDFromURIMust(row.SpotifyTrackUri)]; ok {
-			image := spotify.Get64Image(track.Album)
+			image := spotify.GetAlbum64Image(track.Album)
 			if image != nil {
 				entry.ImageURL = image.URL
 			}

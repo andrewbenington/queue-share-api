@@ -79,3 +79,24 @@ VALUES
         unnest(@genres :: jsonb []),
         unnest(@popularity :: int [])
     ) ON CONFLICT DO NOTHING;
+
+-- name: ArtistCacheInsertBulk :exec
+INSERT INTO
+    SPOTIFY_ARTIST_CACHE(id,
+        uri,
+        name,
+        image_url,
+        genres,
+        popularity,
+        follower_count
+    )
+VALUES
+    (
+        unnest(@id :: text []),
+        unnest(@uri :: TEXT []),
+        unnest(@name :: TEXT []),
+        unnest(@image_url :: TEXT []),
+        unnest(@genres :: jsonb []),
+        unnest(@popularity :: int []),
+        unnest(@follower_count :: int [])
+    ) ON CONFLICT DO NOTHING;

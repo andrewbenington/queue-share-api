@@ -85,6 +85,51 @@ func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsert
 	return err
 }
 
+const artistCacheInsertBulk = `-- name: ArtistCacheInsertBulk :exec
+INSERT INTO
+    SPOTIFY_ARTIST_CACHE(id,
+        uri,
+        name,
+        image_url,
+        genres,
+        popularity,
+        follower_count
+    )
+VALUES
+    (
+        unnest($1 :: text []),
+        unnest($2 :: TEXT []),
+        unnest($3 :: TEXT []),
+        unnest($4 :: TEXT []),
+        unnest($5 :: jsonb []),
+        unnest($6 :: int []),
+        unnest($7 :: int [])
+    ) ON CONFLICT DO NOTHING
+`
+
+type ArtistCacheInsertBulkParams struct {
+	ID            []string          `json:"id"`
+	Uri           []string          `json:"uri"`
+	Name          []string          `json:"name"`
+	ImageUrl      []string          `json:"image_url"`
+	Genres        []json.RawMessage `json:"genres"`
+	Popularity    []int32           `json:"popularity"`
+	FollowerCount []int32           `json:"follower_count"`
+}
+
+func (q *Queries) ArtistCacheInsertBulk(ctx context.Context, arg ArtistCacheInsertBulkParams) error {
+	_, err := q.db.ExecContext(ctx, artistCacheInsertBulk,
+		pq.Array(arg.ID),
+		pq.Array(arg.Uri),
+		pq.Array(arg.Name),
+		pq.Array(arg.ImageUrl),
+		pq.Array(arg.Genres),
+		pq.Array(arg.Popularity),
+		pq.Array(arg.FollowerCount),
+	)
+	return err
+}
+
 const getSpotifyTokensByRoomCode = `-- name: GetSpotifyTokensByRoomCode :one
 SELECT
     st.encrypted_access_token,
@@ -518,6 +563,8 @@ type HistoryGetByTrackURIRow struct {
 	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
 }
 
+// LEFT JOIN spotify_track_cache
+// ON uri = spotify_track_uri
 func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrackURIParams) ([]*HistoryGetByTrackURIRow, error) {
 	rows, err := q.db.QueryContext(ctx, historyGetByTrackURI,
 		arg.UserID,
@@ -787,6 +834,52 @@ func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg Histor
 	for rows.Next() {
 		var i HistoryGetTopTracksInTimeframeRow
 		if err := rows.Scan(&i.SpotifyTrackUri, &i.Occurrences); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const historyGetTopTracksNotInCache = `-- name: HistoryGetTopTracksNotInCache :many
+SELECT
+  SPOTIFY_TRACK_URI,
+  COUNT(SPOTIFY_TRACK_URI)
+FROM
+  spotify_history h
+LEFT JOIN spotify_track_cache tc
+ON h.spotify_track_uri = tc.uri
+WHERE
+	tc.uri is null
+GROUP BY
+  SPOTIFY_TRACK_URI
+ORDER BY
+  COUNT DESC
+LIMIT
+  50
+`
+
+type HistoryGetTopTracksNotInCacheRow struct {
+	SpotifyTrackUri string `json:"spotify_track_uri"`
+	Count           int64  `json:"count"`
+}
+
+func (q *Queries) HistoryGetTopTracksNotInCache(ctx context.Context) ([]*HistoryGetTopTracksNotInCacheRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopTracksNotInCache)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopTracksNotInCacheRow
+	for rows.Next() {
+		var i HistoryGetTopTracksNotInCacheRow
+		if err := rows.Scan(&i.SpotifyTrackUri, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)

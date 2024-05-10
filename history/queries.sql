@@ -133,6 +133,8 @@ SELECT
     spotify_album_uri
 FROM
     SPOTIFY_HISTORY
+-- LEFT JOIN spotify_track_cache
+-- ON uri = spotify_track_uri
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
@@ -377,6 +379,23 @@ FROM
   spotify_history
 WHERE
 	spotify_artist_uri IS NULL
+GROUP BY
+  SPOTIFY_TRACK_URI
+ORDER BY
+  COUNT DESC
+LIMIT
+  50;
+
+-- name: HistoryGetTopTracksNotInCache :many
+SELECT
+  SPOTIFY_TRACK_URI,
+  COUNT(SPOTIFY_TRACK_URI)
+FROM
+  spotify_history h
+LEFT JOIN spotify_track_cache tc
+ON h.spotify_track_uri = tc.uri
+WHERE
+	tc.uri is null
 GROUP BY
   SPOTIFY_TRACK_URI
 ORDER BY
