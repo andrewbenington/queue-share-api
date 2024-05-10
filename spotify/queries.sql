@@ -104,3 +104,9 @@ VALUES
         unnest(@popularity :: int []),
         unnest(@follower_count :: int [])
     ) ON CONFLICT DO NOTHING;
+
+-- name: TrackCacheUpdateImage :exec
+UPDATE SPOTIFY_TRACK_CACHE tc
+SET tc.image_url = ac.image_url
+FROM SPOTIFY_ALBUM_CACHE ac
+WHERE ac.uri = tc.album_uri

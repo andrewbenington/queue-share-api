@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"strings"
 	"time"
+
+	"github.com/andrewbenington/queue-share-api/config"
 )
 
 const (
@@ -46,7 +46,7 @@ func cycle() {
 	ctx := context.Background()
 	now := time.Now()
 
-	if strings.EqualFold(os.Getenv("IS_PROD"), "true") {
+	if config.GetIsProd() {
 		if shouldDoCycle(last_cycle_history, cycle_period_history) {
 			fmt.Println("doing history cycle")
 			doHistoryCycle(ctx)
@@ -58,10 +58,10 @@ func cycle() {
 			doSpotifyProfileCycle()
 			last_cycle_spotify_profile = &now
 
-			fmt.Println("uploading cache")
-			uploadTrackCache(ctx)
-			uploadAlbumCache(ctx)
-			uploadArtistCache(ctx)
+			// fmt.Println("uploading cache")
+			// uploadTrackCache(ctx)
+			// uploadAlbumCache(ctx)
+			// uploadArtistCache(ctx)
 		}
 
 		if shouldDoCycle(last_cycle_load_uris, cycle_period_load_uris) {
@@ -70,10 +70,10 @@ func cycle() {
 			last_cycle_load_uris = &now
 		}
 	}
-	fmt.Println("doing track cache cycle")
-	cacheTracksByPopularity()
-	fmt.Println("doing album cache cycle")
-	cacheAlbumsByPopularity()
+	// fmt.Println("doing track cache cycle")
+	// cacheTracksByPopularity()
+	// fmt.Println("doing album cache cycle")
+	// cacheAlbumsByPopularity()
 
 	fmt.Println("engine cycle complete")
 }

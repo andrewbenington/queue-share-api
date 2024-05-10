@@ -2093,6 +2093,22 @@ func (q *Queries) TrackCacheInsertBulk(ctx context.Context, arg TrackCacheInsert
 	return err
 }
 
+const trackCacheUpdateImage = `-- name: TrackCacheUpdateImage :exec
+UPDATE SPOTIFY_TRACK_CACHE
+SET image_url = $1
+WHERE album_uri = $2
+`
+
+type TrackCacheUpdateImageParams struct {
+	ImageUrl *string `json:"image_url"`
+	AlbumURI string  `json:"album_uri"`
+}
+
+func (q *Queries) TrackCacheUpdateImage(ctx context.Context, arg TrackCacheUpdateImageParams) error {
+	_, err := q.db.ExecContext(ctx, trackCacheUpdateImage, arg.ImageUrl, arg.AlbumURI)
+	return err
+}
+
 const userDeleteSpotifyInfo = `-- name: UserDeleteSpotifyInfo :exec
 UPDATE
     users

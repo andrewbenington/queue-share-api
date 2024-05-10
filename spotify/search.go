@@ -20,7 +20,7 @@ func SearchSongs(ctx context.Context, spClient *spotify.Client, text string) ([]
 			ID:      entry.ID.String(),
 			Name:    entry.Name,
 			Artists: entry.Artists,
-			Image:   GetAlbum64Image(entry.Album),
+			Image:   GetAlbum300Image(entry.Album),
 		}
 		resultsTrunced = append(resultsTrunced, t)
 	}

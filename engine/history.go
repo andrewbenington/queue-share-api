@@ -56,6 +56,8 @@ func getHistoryForUser(ctx context.Context, userID uuid.UUID) {
 		if err != nil {
 			fmt.Println(err)
 			return
+		} else {
+			log.Println("%d history entries found for %s", len(returnedRows), userID)
 		}
 
 		if len(returnedRows) == 0 {

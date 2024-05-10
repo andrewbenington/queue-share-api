@@ -118,6 +118,12 @@ func InsertParamsFromFullTracks(tracks []*spotify.FullTrack) db.TrackCacheInsert
 		params.ArtistID = append(params.ArtistID, artist.ID.String())
 		params.ArtistUri = append(params.ArtistUri, string(artist.URI))
 		params.ArtistName = append(params.ArtistName, artist.Name)
+		image := GetAlbum300Image(track.Album)
+		if image != nil {
+			params.ImageUrl = append(params.ImageUrl, &image.URL)
+		} else {
+			params.ImageUrl = append(params.ImageUrl, nil)
+		}
 
 		if len(track.Artists) > 1 {
 			trackArtists := lo.Map(track.Artists[1:], trackArtistFromSimple)
@@ -214,7 +220,7 @@ func InsertParamsFromFullArtists(artists []*spotify.FullArtist) db.ArtistCacheIn
 		params.ID = append(params.ID, artist.ID.String())
 		params.Uri = append(params.Uri, string(artist.URI))
 		params.Name = append(params.Name, artist.Name)
-		image := GetArtist64Image(*artist)
+		image := GetArtist300Image(*artist)
 		if image != nil {
 			params.ImageUrl = append(params.ImageUrl, &image.URL)
 		} else {
@@ -283,7 +289,7 @@ func InsertParamsFromFullAlbums(albums []*spotify.FullAlbum) db.AlbumCacheInsert
 		params.ArtistName = append(params.ArtistName, artist.Name)
 		params.AlbumGroup = append(params.AlbumGroup, &album.AlbumGroup)
 		params.AlbumType = append(params.AlbumType, &album.AlbumType)
-		image := GetAlbum64Image(album.SimpleAlbum)
+		image := GetAlbum300Image(album.SimpleAlbum)
 		if image != nil {
 			params.ImageUrl = append(params.ImageUrl, &image.URL)
 		} else {
@@ -332,7 +338,7 @@ func GetArtistCache() map[string]spotify.FullArtist {
 func TrackDataFromFullTrack(ft spotify.FullTrack) db.TrackData {
 	artist := ft.Artists[0]
 
-	image := GetAlbum64Image(ft.Album)
+	image := GetAlbum300Image(ft.Album)
 	var imageURL *string
 	if image != nil {
 		imageURL = &image.URL

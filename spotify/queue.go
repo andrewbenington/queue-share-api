@@ -49,7 +49,7 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 			ID:         queue.CurrentlyPlaying.ID.String(),
 			Name:       queue.CurrentlyPlaying.Name,
 			Artists:    queue.CurrentlyPlaying.Artists,
-			Image:      GetAlbum64Image(queue.CurrentlyPlaying.Album),
+			Image:      GetAlbum300Image(queue.CurrentlyPlaying.Album),
 			DurationMS: queue.CurrentlyPlaying.Duration,
 		},
 	}
@@ -58,7 +58,7 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 			ID:         entry.ID.String(),
 			Name:       entry.Name,
 			Artists:    entry.Artists,
-			Image:      GetAlbum64Image(entry.Album),
+			Image:      GetAlbum300Image(entry.Album),
 			DurationMS: entry.Duration,
 		}
 		cq.Queue = append(cq.Queue, qe)
@@ -75,18 +75,18 @@ func PushToUserQueue(ctx context.Context, client *spotify.Client, songID string)
 	return nil
 }
 
-func GetAlbum64Image(t spotify.SimpleAlbum) *spotify.Image {
+func GetAlbum300Image(t spotify.SimpleAlbum) *spotify.Image {
 	for i := range t.Images {
-		if t.Images[i].Height == 64 {
+		if t.Images[i].Height >= 300 {
 			return &t.Images[i]
 		}
 	}
 	return nil
 }
 
-func GetArtist64Image(a spotify.FullArtist) *spotify.Image {
+func GetArtist300Image(a spotify.FullArtist) *spotify.Image {
 	for i := range a.Images {
-		if a.Images[i].Height == 64 {
+		if a.Images[i].Height >= 300 {
 			return &a.Images[i]
 		}
 	}
