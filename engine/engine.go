@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	cycle_period                 = time.Second * 10
+	cycle_period                 = time.Minute * 30
 	cycle_period_history         = time.Minute * 30
 	cycle_period_load_uris       = time.Hour * 3
 	cycle_period_spotify_profile = time.Hour * 24
@@ -58,10 +58,10 @@ func cycle() {
 			doSpotifyProfileCycle()
 			last_cycle_spotify_profile = &now
 
-			// fmt.Println("uploading cache")
+			fmt.Println("uploading cache")
 			// uploadTrackCache(ctx)
-			// uploadAlbumCache(ctx)
-			// uploadArtistCache(ctx)
+			uploadAlbumCache(ctx)
+			uploadArtistCache(ctx)
 		}
 
 		if shouldDoCycle(last_cycle_load_uris, cycle_period_load_uris) {
@@ -70,6 +70,7 @@ func cycle() {
 			last_cycle_load_uris = &now
 		}
 	}
+
 	// fmt.Println("doing track cache cycle")
 	// cacheTracksByPopularity()
 	// fmt.Println("doing album cache cycle")

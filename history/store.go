@@ -298,7 +298,7 @@ func TrackStreamRankingsByMonth(ctx context.Context, transaction db.DBTX, userID
 
 	for year := minYear; year <= maxYear; year++ {
 		for month := 1; month <= 12; month++ {
-			rows, err := db.New(db.Service().DB).HistoryGetTopTracksInTimeframe(ctx, db.HistoryGetTopTracksInTimeframeParams{
+			rows, err := db.New(db.Service().DB).HistoryGetTopTracksInTimeframeDedup(ctx, db.HistoryGetTopTracksInTimeframeDedupParams{
 				UserID:       userUUID,
 				MinMsPlayed:  filter.MinMSPlayed,
 				IncludeSkips: filter.IncludeSkipped,

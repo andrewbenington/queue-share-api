@@ -152,7 +152,7 @@ func GetAlbum(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 		return nil, err
 	}
 
-	cacheAlbums(ctx, []*spotify.FullAlbum{album})
+	cacheFullAlbums(ctx, []*spotify.FullAlbum{album})
 
 	return album, nil
 }
@@ -182,7 +182,7 @@ func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			result.Tracks = spotify.SimpleTrackPage{}
 		}
 
-		cacheAlbums(ctx, results)
+		cacheFullAlbums(ctx, results)
 
 		for _, album := range results {
 			albums[album.ID.String()] = *album

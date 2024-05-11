@@ -223,14 +223,17 @@ const historyGetAll = `-- name: HistoryGetAll :many
 SELECT
     TIMESTAMP,
     TRACK_NAME,
-    ARTIST_NAME,
-    album_name,
+    h.ARTIST_NAME,
+    h.album_name,
     MS_PLAYED,
     spotify_track_uri,
     spotify_album_uri,
-    spotify_artist_uri
+    spotify_artist_uri,
+    image_url,
+    other_artists
 FROM
-    SPOTIFY_HISTORY
+    SPOTIFY_HISTORY h
+    JOIN SPOTIFY_TRACK_CACHE ON URI = spotify_track_uri
 WHERE
     user_id = $1
     AND ms_played >= $2
@@ -240,7 +243,8 @@ WHERE
     )
 ORDER BY
     timestamp DESC
-LIMIT $4
+LIMIT
+    $4
 `
 
 type HistoryGetAllParams struct {
@@ -259,6 +263,8 @@ type HistoryGetAllRow struct {
 	SpotifyTrackUri  string         `json:"spotify_track_uri"`
 	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
 	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	ImageUrl         *string        `json:"image_url"`
+	OtherArtists     TrackArtists   `json:"other_artists"`
 }
 
 func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([]*HistoryGetAllRow, error) {
@@ -284,6 +290,8 @@ func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([
 			&i.SpotifyTrackUri,
 			&i.SpotifyAlbumUri,
 			&i.SpotifyArtistUri,
+			&i.ImageUrl,
+			&i.OtherArtists,
 		); err != nil {
 			return nil, err
 		}
@@ -521,35 +529,142 @@ func (q *Queries) HistoryGetByArtistURI(ctx context.Context, arg HistoryGetByArt
 	return items, nil
 }
 
+const historyGetByArtistURIDedup = `-- name: HistoryGetByArtistURIDedup :many
+WITH top_isrcs as (
+    SELECT
+        tc.isrc,
+        COUNT(*) AS occurrences
+    FROM
+        spotify_history h
+        JOIN spotify_track_cache tc ON tc.uri = h.spotify_track_uri
+    WHERE
+        user_id = $1
+        AND ms_played >= $2
+        AND (
+            skipped != true
+            OR $3 :: boolean
+        )
+        AND spotify_artist_uri = $4
+    GROUP BY
+        tc.isrc
+    ORDER BY
+        COUNT(*) DESC
+    LIMIT
+        40
+), pref_albums as (
+    select
+        distinct on (top_isrcs.isrc) top_isrcs.isrc, top_isrcs.occurrences,
+        tc.name,
+        tc.album_name,
+        ac.release_Date,
+        ac.album_type,
+        ac.uri
+    from
+        top_isrcs
+        JOIN spotify_track_cache tc ON tc.isrc = top_isrcs.isrc
+        JOIN spotify_album_cache ac ON ac.id = tc.album_id
+    ORDER BY
+        top_isrcs.isrc,
+        CASE
+            WHEN ac.album_type = 'album' THEN 1
+            WHEN ac.album_type = 'single' THEN 2
+            WHEN ac.album_type = 'compilation' THEN 3
+            ELSE 4
+        END,
+        release_date desc
+)
+select
+    isrc, occurrences, name, album_name, release_date, album_type, uri
+from
+    pref_albums
+ORDER BY
+    occurrences DESC
+`
+
+type HistoryGetByArtistURIDedupParams struct {
+	UserID       uuid.UUID      `json:"user_id"`
+	MinMsPlayed  int32          `json:"min_ms_played"`
+	IncludeSkips bool           `json:"include_skips"`
+	URI          sql.NullString `json:"uri"`
+}
+
+type HistoryGetByArtistURIDedupRow struct {
+	Isrc        sql.NullString `json:"isrc"`
+	Occurrences int64          `json:"occurrences"`
+	Name        string         `json:"name"`
+	AlbumName   string         `json:"album_name"`
+	ReleaseDate sql.NullTime   `json:"release_date"`
+	AlbumType   sql.NullString `json:"album_type"`
+	URI         string         `json:"uri"`
+}
+
+func (q *Queries) HistoryGetByArtistURIDedup(ctx context.Context, arg HistoryGetByArtistURIDedupParams) ([]*HistoryGetByArtistURIDedupRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetByArtistURIDedup,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.URI,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetByArtistURIDedupRow
+	for rows.Next() {
+		var i HistoryGetByArtistURIDedupRow
+		if err := rows.Scan(
+			&i.Isrc,
+			&i.Occurrences,
+			&i.Name,
+			&i.AlbumName,
+			&i.ReleaseDate,
+			&i.AlbumType,
+			&i.URI,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const historyGetByTrackURI = `-- name: HistoryGetByTrackURI :many
 SELECT
     TIMESTAMP,
-    TRACK_NAME,
-    ARTIST_NAME,
-    album_name,
+    h.TRACK_NAME,
+    h.ARTIST_NAME,
+    h.album_name,
     MS_PLAYED,
     spotify_track_uri,
     spotify_artist_uri,
     spotify_album_uri
 FROM
-    SPOTIFY_HISTORY
+    SPOTIFY_HISTORY h
+    JOIN spotify_track_cache tc1 ON tc1.uri = $1
+    JOIN spotify_track_cache tc2 ON tc2.isrc = tc1.isrc
 WHERE
-    user_id = $1
-    AND ms_played >= $2
+    user_id = $2
+    AND ms_played >= $3
     AND (
         skipped != true
-        OR $3 :: boolean
+        OR $4 :: boolean
     )
-    AND spotify_track_uri = $4
+    AND h.spotify_track_uri = tc2.uri
 ORDER BY
     timestamp ASC
 `
 
 type HistoryGetByTrackURIParams struct {
+	URI          string    `json:"uri"`
 	UserID       uuid.UUID `json:"user_id"`
 	MinMsPlayed  int32     `json:"min_ms_played"`
 	IncludeSkips bool      `json:"include_skips"`
-	URI          string    `json:"uri"`
 }
 
 type HistoryGetByTrackURIRow struct {
@@ -563,14 +678,12 @@ type HistoryGetByTrackURIRow struct {
 	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
 }
 
-// LEFT JOIN spotify_track_cache
-// ON uri = spotify_track_uri
 func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrackURIParams) ([]*HistoryGetByTrackURIRow, error) {
 	rows, err := q.db.QueryContext(ctx, historyGetByTrackURI,
+		arg.URI,
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
-		arg.URI,
 	)
 	if err != nil {
 		return nil, err
@@ -628,7 +741,7 @@ const historyGetTopAlbumsInTimeframe = `-- name: HistoryGetTopAlbumsInTimeframe 
 SELECT
     spotify_album_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|')::text as TRACKS
+    string_agg(track_name, '|~|') :: text as TRACKS
 FROM
     spotify_history
 WHERE
@@ -641,8 +754,8 @@ WHERE
     AND timestamp BETWEEN $4 :: timestamp
     AND $5 :: timestamp
     AND (
-        $6::text IS NULL
-        OR spotify_artist_uri = $6::text
+        $6 :: text IS NULL
+        OR spotify_artist_uri = $6 :: text
     )
 GROUP BY
     spotify_album_uri
@@ -701,20 +814,19 @@ func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg Histor
 
 const historyGetTopAlbumsNotInCache = `-- name: HistoryGetTopAlbumsNotInCache :many
 SELECT
-  SPOTIFY_ALBUM_URI,
-  COUNT(SPOTIFY_ALBUM_URI)
+    SPOTIFY_ALBUM_URI,
+    COUNT(SPOTIFY_ALBUM_URI)
 FROM
-  spotify_history h
-LEFT JOIN spotify_album_cache ac
-ON h.spotify_album_uri = ac.uri
+    spotify_history h
+    LEFT JOIN spotify_album_cache ac ON h.spotify_album_uri = ac.uri
 WHERE
-	ac.uri is null
+    ac.uri is null
 GROUP BY
-  SPOTIFY_ALBUM_URI
+    SPOTIFY_ALBUM_URI
 ORDER BY
-  COUNT DESC
+    COUNT DESC
 LIMIT
-  50
+    50
 `
 
 type HistoryGetTopAlbumsNotInCacheRow struct {
@@ -749,7 +861,7 @@ const historyGetTopArtistsInTimeframe = `-- name: HistoryGetTopArtistsInTimefram
 SELECT
     spotify_artist_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|')::text as TRACKS
+    string_agg(track_name, '|~|') :: text as TRACKS
 FROM
     spotify_history
 WHERE
@@ -830,12 +942,12 @@ WHERE
     AND timestamp BETWEEN $4 :: timestamp
     AND $5 :: timestamp
     AND (
-        $6::text IS NULL
-        OR spotify_artist_uri = $6::text
+        $6 :: text IS NULL
+        OR spotify_artist_uri = $6 :: text
     )
     AND (
-        $7::text IS NULL
-        OR spotify_album_uri = $7::text
+        $7 :: text IS NULL
+        OR spotify_album_uri = $7 :: text
     )
 GROUP BY
     spotify_track_uri
@@ -893,22 +1005,134 @@ func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg Histor
 	return items, nil
 }
 
+const historyGetTopTracksInTimeframeDedup = `-- name: HistoryGetTopTracksInTimeframeDedup :many
+WITH top_isrcs as (
+    SELECT
+        tc.isrc,
+        COUNT(*) AS occurrences,
+        (array_agg (distinct h.spotify_track_uri)) as spotify_track_uris
+    FROM
+        spotify_history h
+        JOIN spotify_track_cache tc ON tc.uri = h.spotify_track_uri
+    WHERE
+        user_id = $1
+        AND ms_played >= $2
+        AND (
+            skipped != true
+            OR $3 :: boolean
+        )
+        AND timestamp BETWEEN $4 :: timestamp
+        AND $5 :: timestamp
+        AND (
+            $6 :: text IS NULL
+            OR spotify_artist_uri = $6 :: text
+        )
+        AND (
+            $7 :: text IS NULL
+            OR spotify_album_uri = $7 :: text
+        )
+    GROUP BY
+        tc.isrc
+    ORDER BY
+        COUNT(*) DESC
+    LIMIT
+        $8
+), pref_albums as (
+    select
+        distinct on (top_isrcs.isrc) top_isrcs.isrc, top_isrcs.occurrences, top_isrcs.spotify_track_uris,
+        tc.uri as spotify_track_uri
+    from
+        top_isrcs
+        JOIN spotify_track_cache tc ON tc.isrc = top_isrcs.isrc
+        JOIN spotify_album_cache ac ON ac.id = tc.album_id
+    ORDER BY
+        top_isrcs.isrc,
+        CASE
+            WHEN ac.album_type = 'album' THEN 1
+            WHEN ac.album_type = 'single' THEN 2
+            WHEN ac.album_type = 'compilation' THEN 3
+            ELSE 4
+        END,
+        release_date desc
+)
+select
+    isrc, occurrences, spotify_track_uris, spotify_track_uri
+from
+    pref_albums
+ORDER BY
+    occurrences desc
+`
+
+type HistoryGetTopTracksInTimeframeDedupParams struct {
+	UserID       uuid.UUID      `json:"user_id"`
+	MinMsPlayed  int32          `json:"min_ms_played"`
+	IncludeSkips bool           `json:"include_skips"`
+	StartDate    time.Time      `json:"start_date"`
+	EndDate      time.Time      `json:"end_date"`
+	ArtistURI    sql.NullString `json:"artist_uri"`
+	AlbumURI     sql.NullString `json:"album_uri"`
+	MaxTracks    int32          `json:"max_tracks"`
+}
+
+type HistoryGetTopTracksInTimeframeDedupRow struct {
+	Isrc             sql.NullString `json:"isrc"`
+	Occurrences      int64          `json:"occurrences"`
+	SpotifyTrackUris interface{}    `json:"spotify_track_uris"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+}
+
+func (q *Queries) HistoryGetTopTracksInTimeframeDedup(ctx context.Context, arg HistoryGetTopTracksInTimeframeDedupParams) ([]*HistoryGetTopTracksInTimeframeDedupRow, error) {
+	rows, err := q.db.QueryContext(ctx, historyGetTopTracksInTimeframeDedup,
+		arg.UserID,
+		arg.MinMsPlayed,
+		arg.IncludeSkips,
+		arg.StartDate,
+		arg.EndDate,
+		arg.ArtistURI,
+		arg.AlbumURI,
+		arg.MaxTracks,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopTracksInTimeframeDedupRow
+	for rows.Next() {
+		var i HistoryGetTopTracksInTimeframeDedupRow
+		if err := rows.Scan(
+			&i.Isrc,
+			&i.Occurrences,
+			&i.SpotifyTrackUris,
+			&i.SpotifyTrackUri,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const historyGetTopTracksNotInCache = `-- name: HistoryGetTopTracksNotInCache :many
 SELECT
-  SPOTIFY_TRACK_URI,
-  COUNT(SPOTIFY_TRACK_URI)
+    SPOTIFY_TRACK_URI,
+    COUNT(SPOTIFY_TRACK_URI)
 FROM
-  spotify_history h
-LEFT JOIN spotify_track_cache tc
-ON h.spotify_track_uri = tc.uri
+    spotify_history h
+    LEFT JOIN spotify_track_cache tc ON h.spotify_track_uri = tc.uri
 WHERE
-	tc.uri is null
+    tc.uri is null
 GROUP BY
-  SPOTIFY_TRACK_URI
+    SPOTIFY_TRACK_URI
 ORDER BY
-  COUNT DESC
+    COUNT DESC
 LIMIT
-  50
+    50
 `
 
 type HistoryGetTopTracksNotInCacheRow struct {
@@ -941,18 +1165,18 @@ func (q *Queries) HistoryGetTopTracksNotInCache(ctx context.Context) ([]*History
 
 const historyGetTopTracksWithoutURIs = `-- name: HistoryGetTopTracksWithoutURIs :many
 SELECT
-  SPOTIFY_TRACK_URI,
-  COUNT(SPOTIFY_TRACK_URI)
+    SPOTIFY_TRACK_URI,
+    COUNT(SPOTIFY_TRACK_URI)
 FROM
-  spotify_history
+    spotify_history
 WHERE
-	spotify_artist_uri IS NULL
+    spotify_artist_uri IS NULL
 GROUP BY
-  SPOTIFY_TRACK_URI
+    SPOTIFY_TRACK_URI
 ORDER BY
-  COUNT DESC
+    COUNT DESC
 LIMIT
-  50
+    50
 `
 
 type HistoryGetTopTracksWithoutURIsRow struct {
@@ -1049,13 +1273,15 @@ func (q *Queries) HistoryGetTrackStreamCountByYear(ctx context.Context, arg Hist
 }
 
 const historyGetTrackURIForAlbum = `-- name: HistoryGetTrackURIForAlbum :one
-SELECT spotify_track_uri
+SELECT
+    spotify_track_uri
 FROM
-spotify_history
+    spotify_history
 WHERE
-artist_name = $1
-AND user_id = $2
-LIMIT 1
+    artist_name = $1
+    AND user_id = $2
+LIMIT
+    1
 `
 
 type HistoryGetTrackURIForAlbumParams struct {
@@ -1276,22 +1502,22 @@ func (q *Queries) HistoryInsertOne(ctx context.Context, arg HistoryInsertOnePara
 
 const historySetURIsForTrack = `-- name: HistorySetURIsForTrack :exec
 UPDATE
-spotify_history
+    spotify_history
 SET
-    spotify_artist_uri = $2,
-    spotify_album_uri = $3
+    spotify_artist_uri = $1,
+    spotify_album_uri = $2
 WHERE
-    spotify_track_uri = $1
+    spotify_track_uri = $3
 `
 
 type HistorySetURIsForTrackParams struct {
-	SpotifyTrackUri  string         `json:"spotify_track_uri"`
 	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
 	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
 }
 
 func (q *Queries) HistorySetURIsForTrack(ctx context.Context, arg HistorySetURIsForTrackParams) error {
-	_, err := q.db.ExecContext(ctx, historySetURIsForTrack, arg.SpotifyTrackUri, arg.SpotifyArtistUri, arg.SpotifyAlbumUri)
+	_, err := q.db.ExecContext(ctx, historySetURIsForTrack, arg.SpotifyArtistUri, arg.SpotifyAlbumUri, arg.SpotifyTrackUri)
 	return err
 }
 
@@ -2090,22 +2316,6 @@ func (q *Queries) TrackCacheInsertBulk(ctx context.Context, arg TrackCacheInsert
 		pq.Array(arg.ExternalIds),
 		pq.Array(arg.Isrc),
 	)
-	return err
-}
-
-const trackCacheUpdateImage = `-- name: TrackCacheUpdateImage :exec
-UPDATE SPOTIFY_TRACK_CACHE
-SET image_url = $1
-WHERE album_uri = $2
-`
-
-type TrackCacheUpdateImageParams struct {
-	ImageUrl *string `json:"image_url"`
-	AlbumURI string  `json:"album_uri"`
-}
-
-func (q *Queries) TrackCacheUpdateImage(ctx context.Context, arg TrackCacheUpdateImageParams) error {
-	_, err := q.db.ExecContext(ctx, trackCacheUpdateImage, arg.ImageUrl, arg.AlbumURI)
 	return err
 }
 

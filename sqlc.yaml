@@ -17,6 +17,8 @@ sql:
           uri: "URI"
           artist_uri: "ArtistURI"
           album_uri: "AlbumURI"
+          spotify_album_cache: "AlbumData"
+          spotify_artist_cache: "ArtistData"
         overrides:
           - column: spotify_track_cache.other_artists
             go_type:
@@ -36,4 +38,16 @@ sql:
           - column: spotify_track_cache.isrc
             go_type:
               type: "*string"
+          - column: spotify_album_cache.album_group
+            go_type:
+              type: "*string"
+          - column: spotify_album_cache.album_type
+            go_type:
+              type: "*string"
+          - column: spotify_album_cache.image_url
+            go_type:
+              type: "*string"
+          - column: spotify_album_cache.release_date
+            go_type:
+              type: "*time.Time"
     strict_order_by: false

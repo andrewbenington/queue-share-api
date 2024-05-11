@@ -11,6 +11,32 @@ import (
 	"github.com/google/uuid"
 )
 
+type AlbumData struct {
+	ID                   string         `json:"id"`
+	URI                  string         `json:"uri"`
+	Name                 string         `json:"name"`
+	ArtistID             string         `json:"artist_id"`
+	ArtistURI            string         `json:"artist_uri"`
+	ArtistName           string         `json:"artist_name"`
+	AlbumGroup           *string        `json:"album_group"`
+	AlbumType            *string        `json:"album_type"`
+	ImageUrl             *string        `json:"image_url"`
+	ReleaseDate          *time.Time     `json:"release_date"`
+	ReleaseDatePrecision sql.NullString `json:"release_date_precision"`
+	Genres               []string       `json:"genres"`
+	Popularity           sql.NullInt32  `json:"popularity"`
+}
+
+type ArtistData struct {
+	ID            string         `json:"id"`
+	URI           string         `json:"uri"`
+	Name          string         `json:"name"`
+	ImageUrl      sql.NullString `json:"image_url"`
+	Genres        []string       `json:"genres"`
+	Popularity    sql.NullInt32  `json:"popularity"`
+	FollowerCount sql.NullInt32  `json:"follower_count"`
+}
+
 type Room struct {
 	ID                uuid.UUID    `json:"id"`
 	Name              string       `json:"name"`
@@ -54,32 +80,6 @@ type RoomQueueTrack struct {
 type SchemaMigration struct {
 	Version int64 `json:"version"`
 	Dirty   bool  `json:"dirty"`
-}
-
-type SpotifyAlbumCache struct {
-	ID                   string         `json:"id"`
-	URI                  string         `json:"uri"`
-	Name                 string         `json:"name"`
-	ArtistID             string         `json:"artist_id"`
-	ArtistURI            string         `json:"artist_uri"`
-	ArtistName           string         `json:"artist_name"`
-	AlbumGroup           sql.NullString `json:"album_group"`
-	AlbumType            sql.NullString `json:"album_type"`
-	ImageUrl             sql.NullString `json:"image_url"`
-	ReleaseDate          sql.NullTime   `json:"release_date"`
-	ReleaseDatePrecision sql.NullString `json:"release_date_precision"`
-	Genres               []string       `json:"genres"`
-	Popularity           sql.NullInt32  `json:"popularity"`
-}
-
-type SpotifyArtistCache struct {
-	ID            string         `json:"id"`
-	URI           string         `json:"uri"`
-	Name          string         `json:"name"`
-	ImageUrl      sql.NullString `json:"image_url"`
-	Genres        []string       `json:"genres"`
-	Popularity    sql.NullInt32  `json:"popularity"`
-	FollowerCount sql.NullInt32  `json:"follower_count"`
 }
 
 type SpotifyHistory struct {

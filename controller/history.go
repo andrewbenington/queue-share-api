@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -22,7 +21,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/spotify"
 	"github.com/google/uuid"
 	z_spotify "github.com/zmb3/spotify/v2"
-	"golang.org/x/exp/maps"
 )
 
 const (
@@ -96,28 +94,6 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 		trackURIs[row.SpotifyTrackUri] = true
 	}
 
-	code, spClient, err := client.ForUser(ctx, userUUID)
-	if err != nil {
-		http.Error(w, err.Error(), code)
-		return
-	}
-
-	trackIDs := []string{}
-	for _, uri := range maps.Keys(trackURIs) {
-		id, err := spotify.IDFromURI(uri)
-		if err != nil {
-			log.Println(id, err)
-			continue
-		}
-		trackIDs = append(trackIDs, id)
-	}
-
-	trackByID, err := spotify.GetTracks(ctx, spClient, trackIDs)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
 	entries := []HistoryEntry{}
 	for _, row := range rows {
 		entry := HistoryEntry{
@@ -127,18 +103,18 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 			AlbumName:       row.AlbumName,
 			SpotifyAlbumUri: row.SpotifyAlbumUri.String,
 			MsPlayed:        row.MsPlayed,
-			Artists: []db.TrackArtist{
-				{
+			Artists: append(
+				[]db.TrackArtist{{
 					Name: row.ArtistName,
 					URI:  row.SpotifyArtistUri.String,
 					ID:   spotify.IDFromURIMust(row.SpotifyArtistUri.String),
-				},
-			},
+				}},
+				row.OtherArtists...),
+			ImageURL: row.ImageUrl,
 		}
 
-		if track, ok := trackByID[spotify.IDFromURIMust(row.SpotifyTrackUri)]; ok {
-			entry.ImageURL = track.ImageUrl
-			entry.Artists = append(entry.Artists, track.OtherArtists...)
+		if len(row.OtherArtists) > 0 {
+			entry.Artists = append(entry.Artists, row.OtherArtists...)
 		}
 
 		entries = append(entries, entry)
