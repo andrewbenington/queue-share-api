@@ -29,12 +29,12 @@ func doSpotifyProfileCycle() {
 			continue
 		}
 
-		if user.SpotifyAccount.String != userData.ID || user.SpotifyName.String != userData.User.DisplayName || (len(userData.Images) > 0 && user.SpotifyImageUrl.String != userData.Images[0].URL) {
+		if user.SpotifyAccount.String != userData.ID || user.SpotifyName.String != userData.User.DisplayName || (len(userData.Images) > 0 && user.SpotifyImageUrl != nil && *user.SpotifyImageUrl != userData.Images[0].URL) {
 			err = db.New(db.Service().DB).UserUpdateSpotifyInfo(ctx, db.UserUpdateSpotifyInfoParams{
 				ID:              user.ID,
 				SpotifyAccount:  sql.NullString{Valid: true, String: userData.ID},
 				SpotifyName:     sql.NullString{Valid: true, String: userData.User.DisplayName},
-				SpotifyImageUrl: sql.NullString{Valid: true, String: userData.Images[0].URL},
+				SpotifyImageUrl: &userData.Images[0].URL,
 			})
 			if err != nil {
 				fmt.Printf("Could not update spotify data for user %s: %s\n", user.ID, err)

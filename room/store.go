@@ -25,7 +25,7 @@ func NewStore(db *sql.DB) *Store {
 }
 
 func GetByCode(ctx context.Context, dbtx db.DBTX, code string) (Room, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	row, err := db.New(dbtx).RoomGetByCode(ctx, strings.ToUpper(code))
 	if err != nil {
@@ -38,7 +38,7 @@ func GetByCode(ctx context.Context, dbtx db.DBTX, code string) (Room, error) {
 			Username:     row.HostUsername,
 			DisplayName:  row.HostDisplay,
 			SpotifyName:  row.HostSpotifyName.String,
-			SpotifyImage: row.HostImage.String,
+			SpotifyImage: row.HostImage,
 		},
 		Code:    row.Code,
 		Name:    row.Name,
@@ -47,7 +47,7 @@ func GetByCode(ctx context.Context, dbtx db.DBTX, code string) (Room, error) {
 }
 
 func GetHostID(ctx context.Context, dbtx db.DBTX, code string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	id, err := db.New(dbtx).RoomGetHostID(ctx, strings.ToUpper(code))
 	if err != nil {
@@ -57,7 +57,7 @@ func GetHostID(ctx context.Context, dbtx db.DBTX, code string) (string, error) {
 }
 
 func GetEncryptedRoomTokens(ctx context.Context, dbtx db.DBTX, code string) (accessToken []byte, accessTokenExpiry time.Time, refreshToken []byte, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	row, err := db.New(dbtx).GetSpotifyTokensByRoomCode(ctx, strings.ToUpper(code))
 	if err != nil {
@@ -67,7 +67,7 @@ func GetEncryptedRoomTokens(ctx context.Context, dbtx db.DBTX, code string) (acc
 }
 
 func Insert(ctx context.Context, dbtx db.DBTX, insertParams InsertRoomParams) (Room, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	hostUUID, err := uuid.Parse(insertParams.HostID)
 	if err != nil {
@@ -187,13 +187,20 @@ func GetAllMembers(ctx context.Context, dbtx db.DBTX, roomID string) ([]Member, 
 			Username:     row.Username,
 			DisplayName:  row.DisplayName,
 			SpotifyName:  row.SpotifyName.String,
-			SpotifyImage: row.SpotifyImageUrl.String,
+			SpotifyImage: stringFromPointer(row.SpotifyImageUrl),
 			IsModerator:  row.IsModerator,
 			QueuedTracks: int(row.QueuedTracks),
 		})
 	}
 
 	return users, nil
+}
+
+func stringFromPointer(ptr *string) string {
+	if ptr == nil {
+		return ""
+	}
+	return *ptr
 }
 
 func SetModerator(ctx context.Context, dbtx db.DBTX, roomID string, userID string, isModerator bool) error {
@@ -393,7 +400,7 @@ func GetUserHostedRooms(ctx context.Context, dbtx db.DBTX, userID string, isOpen
 				ID:           row.HostID.String(),
 				Username:     row.HostUsername,
 				DisplayName:  row.HostDisplayName,
-				SpotifyImage: row.HostSpotifyImageUrl.String,
+				SpotifyImage: row.HostSpotifyImageUrl,
 			},
 			Created: row.Created,
 		}
@@ -424,7 +431,7 @@ func GetUserJoinedRooms(ctx context.Context, dbtx db.DBTX, userID string, isOpen
 				ID:           row.HostID.String(),
 				Username:     row.HostUsername,
 				DisplayName:  row.HostDisplayName,
-				SpotifyImage: row.HostSpotifyImageUrl.String,
+				SpotifyImage: row.HostSpotifyImageUrl,
 			},
 			Created: row.Created,
 		}

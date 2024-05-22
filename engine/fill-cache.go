@@ -8,13 +8,13 @@ import (
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/config"
 	"github.com/andrewbenington/queue-share-api/db"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/google/uuid"
 )
 
 // func loadURIsFromCache() {
 // 	ctx := context.Background()
-// 	cache := spotify.GetTrackCache()
+// 	cache := service.GetTrackCache()
 // 	for _, track := range cache {
 // 		firstArtistURI := sql.NullString{}
 
@@ -49,21 +49,21 @@ func loadURIsByPopularity() {
 
 		_, spClient, err := client.ForUser(ctx, uuid.MustParse(userID))
 		if err != nil {
-			fmt.Printf("Could not get spotify client: %s\n", err)
+			fmt.Printf("Could not get service client: %s\n", err)
 			return
 		}
 
 		trackIDs := []string{}
 		for _, row := range rows {
-			id, err := spotify.IDFromURI(row.SpotifyTrackUri)
+			id, err := service.IDFromURI(row.SpotifyTrackUri)
 			if err != nil {
-				fmt.Printf("Could not get spotify ID from uri %s\n", row.SpotifyTrackUri)
+				fmt.Printf("Could not get service ID from uri %s\n", row.SpotifyTrackUri)
 				continue
 			}
 			trackIDs = append(trackIDs, id)
 		}
 
-		tracks, err := spotify.GetTracks(ctx, spClient, trackIDs)
+		tracks, err := service.GetTracks(ctx, spClient, trackIDs)
 		if err != nil {
 			fmt.Printf("Could not get track IDs %s\n", err)
 			continue
@@ -99,21 +99,21 @@ func cacheTracksByPopularity() {
 
 		_, spClient, err := client.ForUser(ctx, uuid.MustParse(userID))
 		if err != nil {
-			fmt.Printf("Could not get spotify client: %s\n", err)
+			fmt.Printf("Could not get service client: %s\n", err)
 			return
 		}
 
 		trackIDs := []string{}
 		for _, row := range rows {
-			id, err := spotify.IDFromURI(row.SpotifyTrackUri)
+			id, err := service.IDFromURI(row.SpotifyTrackUri)
 			if err != nil {
-				fmt.Printf("Could not get spotify ID from uri %s\n", row.SpotifyTrackUri)
+				fmt.Printf("Could not get service ID from uri %s\n", row.SpotifyTrackUri)
 				continue
 			}
 			trackIDs = append(trackIDs, id)
 		}
 
-		tracks, err := spotify.GetTracks(ctx, spClient, trackIDs)
+		tracks, err := service.GetTracks(ctx, spClient, trackIDs)
 		if err != nil {
 			fmt.Printf("Could not get track IDs %s\n", err)
 			continue
@@ -142,21 +142,21 @@ func cacheAlbumsByPopularity() {
 
 		_, spClient, err := client.ForUser(ctx, uuid.MustParse(userID))
 		if err != nil {
-			fmt.Printf("Could not get spotify client: %s\n", err)
+			fmt.Printf("Could not get service client: %s\n", err)
 			return
 		}
 
 		albumIDs := []string{}
 		for _, row := range rows {
-			id, err := spotify.IDFromURI(row.SpotifyAlbumUri.String)
+			id, err := service.IDFromURI(row.SpotifyAlbumUri.String)
 			if err != nil {
-				fmt.Printf("Could not get spotify ID from uri %s\n", row.SpotifyAlbumUri.String)
+				fmt.Printf("Could not get service ID from uri %s\n", row.SpotifyAlbumUri.String)
 				continue
 			}
 			albumIDs = append(albumIDs, id)
 		}
 
-		albums, err := spotify.GetAlbums(ctx, spClient, albumIDs)
+		albums, err := service.GetAlbums(ctx, spClient, albumIDs)
 		if err != nil {
 			fmt.Printf("Could not get album IDs %s\n", err)
 			continue
@@ -185,21 +185,21 @@ func updateTrackImageByAlbumPopularity() {
 
 		_, spClient, err := client.ForUser(ctx, uuid.MustParse(userID))
 		if err != nil {
-			fmt.Printf("Could not get spotify client: %s\n", err)
+			fmt.Printf("Could not get service client: %s\n", err)
 			return
 		}
 
 		albumIDs := []string{}
 		for _, row := range rows {
-			id, err := spotify.IDFromURI(row.SpotifyAlbumUri.String)
+			id, err := service.IDFromURI(row.SpotifyAlbumUri.String)
 			if err != nil {
-				fmt.Printf("Could not get spotify ID from uri %s\n", row.SpotifyAlbumUri.String)
+				fmt.Printf("Could not get service ID from uri %s\n", row.SpotifyAlbumUri.String)
 				continue
 			}
 			albumIDs = append(albumIDs, id)
 		}
 
-		albums, err := spotify.GetAlbums(ctx, spClient, albumIDs)
+		albums, err := service.GetAlbums(ctx, spClient, albumIDs)
 		if err != nil {
 			fmt.Printf("Could not get album IDs %s\n", err)
 			continue

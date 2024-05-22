@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -110,6 +111,57 @@ func (q *Queries) ArtistCacheInsertBulkNullable(ctx context.Context, arg ArtistC
 		pq.Array(arg.Genres),
 		pq.Array(arg.Popularity),
 		pq.Array(arg.FollowerCount),
+	)
+	return err
+}
+
+type HistoryInsertBulkNullableParams struct {
+	UserIds          []uuid.UUID `json:"user_ids"`
+	Timestamp        []time.Time `json:"timestamp"`
+	Platform         []string    `json:"platform"`
+	MsPlayed         []int32     `json:"ms_played"`
+	ConnCountry      []string    `json:"conn_country"`
+	IpAddr           []string    `json:"ip_addr"`
+	UserAgent        []string    `json:"user_agent"`
+	TrackName        []string    `json:"track_name"`
+	ArtistName       []string    `json:"artist_name"`
+	AlbumName        []string    `json:"album_name"`
+	SpotifyTrackUri  []string    `json:"spotify_track_uri"`
+	SpotifyArtistUri []*string   `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  []*string   `json:"spotify_album_uri"`
+	ReasonStart      []string    `json:"reason_start"`
+	ReasonEnd        []string    `json:"reason_end"`
+	Shuffle          []bool      `json:"shuffle"`
+	Skipped          []bool      `json:"skipped"`
+	Offline          []bool      `json:"offline"`
+	OfflineTimestamp []time.Time `json:"offline_timestamp"`
+	IncognitoMode    []bool      `json:"incognito_mode"`
+	FromHistory      []bool      `json:"from_history"`
+}
+
+func (q *Queries) HistoryInsertBulkNullable(ctx context.Context, arg HistoryInsertBulkNullableParams) error {
+	_, err := q.db.ExecContext(ctx, historyInsertBulk,
+		pq.Array(arg.UserIds),
+		pq.Array(arg.Timestamp),
+		pq.Array(arg.Platform),
+		pq.Array(arg.MsPlayed),
+		pq.Array(arg.ConnCountry),
+		pq.Array(arg.IpAddr),
+		pq.Array(arg.UserAgent),
+		pq.Array(arg.TrackName),
+		pq.Array(arg.ArtistName),
+		pq.Array(arg.AlbumName),
+		pq.Array(arg.SpotifyTrackUri),
+		pq.Array(arg.SpotifyArtistUri),
+		pq.Array(arg.SpotifyAlbumUri),
+		pq.Array(arg.ReasonStart),
+		pq.Array(arg.ReasonEnd),
+		pq.Array(arg.Shuffle),
+		pq.Array(arg.Skipped),
+		pq.Array(arg.Offline),
+		pq.Array(arg.OfflineTimestamp),
+		pq.Array(arg.IncognitoMode),
+		pq.Array(arg.FromHistory),
 	)
 	return err
 }

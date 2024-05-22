@@ -77,6 +77,12 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		requests.RespondInternalError(w)
 		return
 	}
+	err = transaction.Commit()
+	if err != nil {
+		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	w.Write(body)
 }

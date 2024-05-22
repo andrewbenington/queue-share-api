@@ -14,8 +14,9 @@ import (
 )
 
 type App struct {
-	Router     *mux.Router
-	Controller *controller.Controller
+	Router          *mux.Router
+	Controller      *controller.Controller
+	StatsController *controller.StatsController
 }
 
 func (a *App) Initialize() {
@@ -51,7 +52,7 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/room/{code}/album", a.Controller.GetAlbum).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/artist", a.Controller.GetArtist).Methods("GET", "OPTIONS")
 
-	a.Router.HandleFunc("/room/{code}/search", a.Controller.SearchFromRoom).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/search", a.Controller.SearchTracksFromRoom).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/guest", a.Controller.AddGuest).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/guests-and-members", a.Controller.GetRoomGuestsAndMembers).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/join", a.Controller.JoinRoomAsMember).Methods("POST", "OPTIONS")
@@ -68,22 +69,39 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/user/spotify", a.Controller.UnlinkSpotify).Methods("DELETE", "OPTIONS")
 	a.Router.HandleFunc("/user/has-spotify-history", a.Controller.UserHasSpotifyHistory).Methods("GET", "OPTIONS")
 
-	a.Router.HandleFunc("/stats/upload", a.Controller.UploadHistory).Methods("POST", "OPTIONS")
-	a.Router.HandleFunc("/stats/history", a.Controller.GetAllHistory).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/songs-by-month", a.Controller.GetTopTracksByMonth).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/artists-by-month", a.Controller.GetTopArtistsByMonth).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/albums-by-month", a.Controller.GetTopAlbumsByMonth).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/tracks-by-year", a.Controller.GetTopTracksByYear).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/albums-by-year", a.Controller.GetTopAlbumsByYear).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/artists-by-year", a.Controller.GetTopArtistsByYear).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/all-track-streams", a.Controller.GetAllStreamsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/friend-suggestions", a.Controller.UserFriendRequestData).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/friend-request", a.Controller.UserSendFriendRequest).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/user/friend-request", a.Controller.UserDeleteFriendRequest).Methods("DELETE", "OPTIONS")
+	a.Router.HandleFunc("/user/friends", a.Controller.UserGetFriends).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/friends", a.Controller.UserAcceptFriendRequest).Methods("POST", "OPTIONS")
 
-	a.Router.HandleFunc("/stats/streams", a.Controller.GetAllStreamsByURI).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/track", a.Controller.GetTrackStatsByURI).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/artist", a.Controller.GetArtistStatsByURI).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/album", a.Controller.GetAlbumStatsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/upload", a.StatsController.UploadHistory).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/stats/history", a.StatsController.GetAllHistory).Methods("GET", "OPTIONS")
 
-	a.Router.HandleFunc("/spotify/search", a.Controller.SearchByUser).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/songs-by-month", a.StatsController.GetTopTracksByMonth).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/artists-by-month", a.StatsController.GetTopArtistsByTimeframe).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/albums-by-month", a.StatsController.GetTopAlbumsByMonth).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/stats/tracks-by-year", a.StatsController.GetTopTracksByYear).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/albums-by-year", a.StatsController.GetTopAlbumsByYear).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/artists-by-year", a.StatsController.GetTopArtistsByYear).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/stats/all-track-streams", a.StatsController.GetAllStreamsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/streams", a.StatsController.GetAllStreamsByURI).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/stats/track", a.StatsController.GetTrackStatsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/artist", a.StatsController.GetArtistStatsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/album", a.StatsController.GetAlbumStatsByURI).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/stats/compare-tracks", a.StatsController.UserCompareFriendTopTracks).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/compare-artists", a.StatsController.UserCompareFriendTopArtists).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/rankings/track", a.StatsController.GetTrackRankingsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/album", a.StatsController.GetAlbumRankingsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/artist", a.StatsController.GetArtistRankingsByURI).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/spotify/search-tracks", a.Controller.SearchTracksByUser).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/spotify/search-artists", a.Controller.SearchArtistsByUser).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")

@@ -28,13 +28,13 @@ type AlbumData struct {
 }
 
 type ArtistData struct {
-	ID            string         `json:"id"`
-	URI           string         `json:"uri"`
-	Name          string         `json:"name"`
-	ImageUrl      sql.NullString `json:"image_url"`
-	Genres        []string       `json:"genres"`
-	Popularity    sql.NullInt32  `json:"popularity"`
-	FollowerCount sql.NullInt32  `json:"follower_count"`
+	ID            string   `json:"id"`
+	URI           string   `json:"uri"`
+	Name          string   `json:"name"`
+	ImageUrl      *string  `json:"image_url"`
+	Genres        []string `json:"genres"`
+	Popularity    int      `json:"popularity"`
+	FollowerCount int      `json:"follower_count"`
 }
 
 type Room struct {
@@ -149,7 +149,7 @@ type User struct {
 	DisplayName     string         `json:"display_name"`
 	SpotifyAccount  sql.NullString `json:"spotify_account"`
 	SpotifyName     sql.NullString `json:"spotify_name"`
-	SpotifyImageUrl sql.NullString `json:"spotify_image_url"`
+	SpotifyImageUrl *string        `json:"spotify_image_url"`
 	Created         time.Time      `json:"created"`
 }
 

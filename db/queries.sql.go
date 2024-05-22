@@ -87,7 +87,8 @@ func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsert
 
 const artistCacheInsertBulk = `-- name: ArtistCacheInsertBulk :exec
 INSERT INTO
-    SPOTIFY_ARTIST_CACHE(id,
+    SPOTIFY_ARTIST_CACHE(
+        id,
         uri,
         name,
         image_url,
@@ -163,20 +164,14 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND timestamp BETWEEN ($4 :: int || '-01-01 00:00:00') :: timestamp
-    AND (
-        cast((($4 :: int) + 1) as text) || '-01-01 00:00:00'
-    ) :: timestamp
+    AND (skipped != TRUE
+        OR $3::boolean)
+    AND timestamp BETWEEN ($4::int || '-01-01 00:00:00')::timestamp AND (cast((($4::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     album_name
 ORDER BY
     COUNT(*) DESC
-LIMIT
-    35
+LIMIT 35
 `
 
 type HistoryGetAlbumStreamCountByYearParams struct {
@@ -237,14 +232,11 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
+    AND (skipped != TRUE
+        OR $3::boolean)
 ORDER BY
     timestamp DESC
-LIMIT
-    $4
+LIMIT $4
 `
 
 type HistoryGetAllParams struct {
@@ -315,20 +307,14 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND timestamp BETWEEN ($4 :: int || '-01-01 00:00:00') :: timestamp
-    AND (
-        cast((($4 :: int) + 1) as text) || '-01-01 00:00:00'
-    ) :: timestamp
+    AND (skipped != TRUE
+        OR $3::boolean)
+    AND timestamp BETWEEN ($4::int || '-01-01 00:00:00')::timestamp AND (cast((($4::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     artist_name
 ORDER BY
     COUNT(*) DESC
-LIMIT
-    35
+LIMIT 35
 `
 
 type HistoryGetArtistStreamCountByYearParams struct {
@@ -386,10 +372,8 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
+    AND (skipped != TRUE
+        OR $3::boolean)
     AND spotify_album_uri = $4
 ORDER BY
     timestamp ASC
@@ -452,26 +436,23 @@ func (q *Queries) HistoryGetByAlbumURI(ctx context.Context, arg HistoryGetByAlbu
 
 const historyGetByArtistURI = `-- name: HistoryGetByArtistURI :many
 SELECT
-    TIMESTAMP,
-    TRACK_NAME,
-    ARTIST_NAME,
-    album_name,
-    MS_PLAYED,
-    spotify_track_uri,
-    spotify_artist_uri,
-    spotify_album_uri
+    sh.TIMESTAMP,
+    sh.TRACK_NAME,
+    sh.album_name,
+    sh.MS_PLAYED,
+    sh.spotify_track_uri,
+    sh.spotify_album_uri,
+    tc.isrc
 FROM
-    SPOTIFY_HISTORY
-WHERE
-    user_id = $1
-    AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND spotify_artist_uri = $4
-ORDER BY
-    timestamp ASC
+    SPOTIFY_HISTORY sh
+    JOIN SPOTIFY_TRACK_CACHE tc ON sh.spotify_track_uri = tc.uri
+        AND user_id = $1
+        AND ms_played >= $2
+        AND (skipped != TRUE
+            OR $3::boolean)
+        AND spotify_artist_uri = $4
+    ORDER BY
+        timestamp ASC
 `
 
 type HistoryGetByArtistURIParams struct {
@@ -482,14 +463,13 @@ type HistoryGetByArtistURIParams struct {
 }
 
 type HistoryGetByArtistURIRow struct {
-	Timestamp        time.Time      `json:"timestamp"`
-	TrackName        string         `json:"track_name"`
-	ArtistName       string         `json:"artist_name"`
-	AlbumName        string         `json:"album_name"`
-	MsPlayed         int32          `json:"ms_played"`
-	SpotifyTrackUri  string         `json:"spotify_track_uri"`
-	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
-	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+	Timestamp       time.Time      `json:"timestamp"`
+	TrackName       string         `json:"track_name"`
+	AlbumName       string         `json:"album_name"`
+	MsPlayed        int32          `json:"ms_played"`
+	SpotifyTrackUri string         `json:"spotify_track_uri"`
+	SpotifyAlbumUri sql.NullString `json:"spotify_album_uri"`
+	Isrc            *string        `json:"isrc"`
 }
 
 func (q *Queries) HistoryGetByArtistURI(ctx context.Context, arg HistoryGetByArtistURIParams) ([]*HistoryGetByArtistURIRow, error) {
@@ -509,117 +489,11 @@ func (q *Queries) HistoryGetByArtistURI(ctx context.Context, arg HistoryGetByArt
 		if err := rows.Scan(
 			&i.Timestamp,
 			&i.TrackName,
-			&i.ArtistName,
 			&i.AlbumName,
 			&i.MsPlayed,
 			&i.SpotifyTrackUri,
-			&i.SpotifyArtistUri,
 			&i.SpotifyAlbumUri,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const historyGetByArtistURIDedup = `-- name: HistoryGetByArtistURIDedup :many
-WITH top_isrcs as (
-    SELECT
-        tc.isrc,
-        COUNT(*) AS occurrences
-    FROM
-        spotify_history h
-        JOIN spotify_track_cache tc ON tc.uri = h.spotify_track_uri
-    WHERE
-        user_id = $1
-        AND ms_played >= $2
-        AND (
-            skipped != true
-            OR $3 :: boolean
-        )
-        AND spotify_artist_uri = $4
-    GROUP BY
-        tc.isrc
-    ORDER BY
-        COUNT(*) DESC
-    LIMIT
-        40
-), pref_albums as (
-    select
-        distinct on (top_isrcs.isrc) top_isrcs.isrc, top_isrcs.occurrences,
-        tc.name,
-        tc.album_name,
-        ac.release_Date,
-        ac.album_type,
-        ac.uri
-    from
-        top_isrcs
-        JOIN spotify_track_cache tc ON tc.isrc = top_isrcs.isrc
-        JOIN spotify_album_cache ac ON ac.id = tc.album_id
-    ORDER BY
-        top_isrcs.isrc,
-        CASE
-            WHEN ac.album_type = 'album' THEN 1
-            WHEN ac.album_type = 'single' THEN 2
-            WHEN ac.album_type = 'compilation' THEN 3
-            ELSE 4
-        END,
-        release_date desc
-)
-select
-    isrc, occurrences, name, album_name, release_date, album_type, uri
-from
-    pref_albums
-ORDER BY
-    occurrences DESC
-`
-
-type HistoryGetByArtistURIDedupParams struct {
-	UserID       uuid.UUID      `json:"user_id"`
-	MinMsPlayed  int32          `json:"min_ms_played"`
-	IncludeSkips bool           `json:"include_skips"`
-	URI          sql.NullString `json:"uri"`
-}
-
-type HistoryGetByArtistURIDedupRow struct {
-	Isrc        sql.NullString `json:"isrc"`
-	Occurrences int64          `json:"occurrences"`
-	Name        string         `json:"name"`
-	AlbumName   string         `json:"album_name"`
-	ReleaseDate sql.NullTime   `json:"release_date"`
-	AlbumType   sql.NullString `json:"album_type"`
-	URI         string         `json:"uri"`
-}
-
-func (q *Queries) HistoryGetByArtistURIDedup(ctx context.Context, arg HistoryGetByArtistURIDedupParams) ([]*HistoryGetByArtistURIDedupRow, error) {
-	rows, err := q.db.QueryContext(ctx, historyGetByArtistURIDedup,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-		arg.URI,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*HistoryGetByArtistURIDedupRow
-	for rows.Next() {
-		var i HistoryGetByArtistURIDedupRow
-		if err := rows.Scan(
 			&i.Isrc,
-			&i.Occurrences,
-			&i.Name,
-			&i.AlbumName,
-			&i.ReleaseDate,
-			&i.AlbumType,
-			&i.URI,
 		); err != nil {
 			return nil, err
 		}
@@ -643,7 +517,8 @@ SELECT
     MS_PLAYED,
     spotify_track_uri,
     spotify_artist_uri,
-    spotify_album_uri
+    spotify_album_uri,
+    tc1.isrc
 FROM
     SPOTIFY_HISTORY h
     JOIN spotify_track_cache tc1 ON tc1.uri = $1
@@ -651,10 +526,8 @@ FROM
 WHERE
     user_id = $2
     AND ms_played >= $3
-    AND (
-        skipped != true
-        OR $4 :: boolean
-    )
+    AND (skipped != TRUE
+        OR $4::boolean)
     AND h.spotify_track_uri = tc2.uri
 ORDER BY
     timestamp ASC
@@ -676,6 +549,7 @@ type HistoryGetByTrackURIRow struct {
 	SpotifyTrackUri  string         `json:"spotify_track_uri"`
 	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
 	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+	Isrc             *string        `json:"isrc"`
 }
 
 func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrackURIParams) ([]*HistoryGetByTrackURIRow, error) {
@@ -701,6 +575,7 @@ func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrac
 			&i.SpotifyTrackUri,
 			&i.SpotifyArtistUri,
 			&i.SpotifyAlbumUri,
+			&i.Isrc,
 		); err != nil {
 			return nil, err
 		}
@@ -717,8 +592,8 @@ func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrac
 
 const historyGetTimestampRange = `-- name: HistoryGetTimestampRange :one
 SELECT
-    MIN(timestamp) :: timestamp AS first,
-    MAX(timestamp) :: timestamp AS last
+    MIN(timestamp)::timestamp AS first,
+    MAX(timestamp)::timestamp AS last
 FROM
     spotify_history
 WHERE
@@ -741,28 +616,22 @@ const historyGetTopAlbumsInTimeframe = `-- name: HistoryGetTopAlbumsInTimeframe 
 SELECT
     spotify_album_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|') :: text as TRACKS
+    string_agg(track_name, '|~|')::text AS TRACKS
 FROM
     spotify_history
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND timestamp BETWEEN $4 :: timestamp
-    AND $5 :: timestamp
-    AND (
-        $6 :: text IS NULL
-        OR spotify_artist_uri = $6 :: text
-    )
+    AND (skipped != TRUE
+        OR $3::boolean)
+    AND timestamp BETWEEN $4::timestamp AND $5::timestamp
+    AND ($6::text IS NULL
+        OR spotify_artist_uri = $6::text)
 GROUP BY
     spotify_album_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT
-    $7
+LIMIT $7
 `
 
 type HistoryGetTopAlbumsInTimeframeParams struct {
@@ -820,13 +689,12 @@ FROM
     spotify_history h
     LEFT JOIN spotify_album_cache ac ON h.spotify_album_uri = ac.uri
 WHERE
-    ac.uri is null
+    ac.uri IS NULL
 GROUP BY
     SPOTIFY_ALBUM_URI
 ORDER BY
     COUNT DESC
-LIMIT
-    50
+LIMIT 50
 `
 
 type HistoryGetTopAlbumsNotInCacheRow struct {
@@ -861,24 +729,20 @@ const historyGetTopArtistsInTimeframe = `-- name: HistoryGetTopArtistsInTimefram
 SELECT
     spotify_artist_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|') :: text as TRACKS
+    string_agg(track_name, '|~|')::text AS TRACKS
 FROM
     spotify_history
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND timestamp BETWEEN $4 :: timestamp
-    AND $5 :: timestamp
+    AND (skipped != TRUE
+        OR $3::boolean)
+    AND timestamp BETWEEN $4::timestamp AND $5::timestamp
 GROUP BY
     spotify_artist_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT
-    $6
+LIMIT $6
 `
 
 type HistoryGetTopArtistsInTimeframeParams struct {
@@ -887,7 +751,7 @@ type HistoryGetTopArtistsInTimeframeParams struct {
 	IncludeSkips bool      `json:"include_skips"`
 	StartDate    time.Time `json:"start_date"`
 	EndDate      time.Time `json:"end_date"`
-	MaxTracks    int32     `json:"max_tracks"`
+	Max          int32     `json:"max"`
 }
 
 type HistoryGetTopArtistsInTimeframeRow struct {
@@ -903,7 +767,7 @@ func (q *Queries) HistoryGetTopArtistsInTimeframe(ctx context.Context, arg Histo
 		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
-		arg.MaxTracks,
+		arg.Max,
 	)
 	if err != nil {
 		return nil, err
@@ -935,26 +799,18 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND timestamp BETWEEN $4 :: timestamp
-    AND $5 :: timestamp
-    AND (
-        $6 :: text IS NULL
-        OR spotify_artist_uri = $6 :: text
-    )
-    AND (
-        $7 :: text IS NULL
-        OR spotify_album_uri = $7 :: text
-    )
+    AND (skipped != TRUE
+        OR $3::boolean)
+    AND timestamp BETWEEN $4::timestamp AND $5::timestamp
+    AND ($6::text IS NULL
+        OR spotify_artist_uri = $6::text)
+    AND ($7::text IS NULL
+        OR spotify_album_uri = $7::text)
 GROUP BY
     spotify_track_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT
-    $8
+LIMIT $8
 `
 
 type HistoryGetTopTracksInTimeframeParams struct {
@@ -1006,61 +862,57 @@ func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg Histor
 }
 
 const historyGetTopTracksInTimeframeDedup = `-- name: HistoryGetTopTracksInTimeframeDedup :many
-WITH top_isrcs as (
+WITH top_isrcs AS (
     SELECT
         tc.isrc,
         COUNT(*) AS occurrences,
-        (array_agg (distinct h.spotify_track_uri)) as spotify_track_uris
+(array_agg(DISTINCT h.spotify_track_uri)) AS spotify_track_uris
     FROM
         spotify_history h
         JOIN spotify_track_cache tc ON tc.uri = h.spotify_track_uri
     WHERE
         user_id = $1
         AND ms_played >= $2
-        AND (
-            skipped != true
-            OR $3 :: boolean
-        )
-        AND timestamp BETWEEN $4 :: timestamp
-        AND $5 :: timestamp
-        AND (
-            $6 :: text IS NULL
-            OR spotify_artist_uri = $6 :: text
-        )
-        AND (
-            $7 :: text IS NULL
-            OR spotify_album_uri = $7 :: text
-        )
+        AND (skipped != TRUE
+            OR $3::boolean)
+        AND timestamp BETWEEN $4::timestamp AND $5::timestamp
+        AND ($6::text IS NULL
+            OR spotify_artist_uri = $6::text)
+        AND ($7::text IS NULL
+            OR spotify_album_uri = $7::text)
     GROUP BY
         tc.isrc
     ORDER BY
         COUNT(*) DESC
-    LIMIT
-        $8
-), pref_albums as (
-    select
-        distinct on (top_isrcs.isrc) top_isrcs.isrc, top_isrcs.occurrences, top_isrcs.spotify_track_uris,
-        tc.uri as spotify_track_uri
-    from
+    LIMIT $8
+),
+pref_albums AS (
+    SELECT DISTINCT ON (top_isrcs.isrc)
+        top_isrcs.isrc, top_isrcs.occurrences, top_isrcs.spotify_track_uris,
+        tc.uri AS spotify_track_uri
+    FROM
         top_isrcs
         JOIN spotify_track_cache tc ON tc.isrc = top_isrcs.isrc
         JOIN spotify_album_cache ac ON ac.id = tc.album_id
     ORDER BY
         top_isrcs.isrc,
-        CASE
-            WHEN ac.album_type = 'album' THEN 1
-            WHEN ac.album_type = 'single' THEN 2
-            WHEN ac.album_type = 'compilation' THEN 3
-            ELSE 4
+        CASE WHEN ac.album_type = 'album' THEN
+            1
+        WHEN ac.album_type = 'single' THEN
+            2
+        WHEN ac.album_type = 'compilation' THEN
+            3
+        ELSE
+            4
         END,
-        release_date desc
+        release_date DESC
 )
-select
+SELECT
     isrc, occurrences, spotify_track_uris, spotify_track_uri
-from
+FROM
     pref_albums
 ORDER BY
-    occurrences desc
+    occurrences DESC
 `
 
 type HistoryGetTopTracksInTimeframeDedupParams struct {
@@ -1126,13 +978,12 @@ FROM
     spotify_history h
     LEFT JOIN spotify_track_cache tc ON h.spotify_track_uri = tc.uri
 WHERE
-    tc.uri is null
+    tc.uri IS NULL
 GROUP BY
     SPOTIFY_TRACK_URI
 ORDER BY
     COUNT DESC
-LIMIT
-    50
+LIMIT 50
 `
 
 type HistoryGetTopTracksNotInCacheRow struct {
@@ -1175,8 +1026,7 @@ GROUP BY
     SPOTIFY_TRACK_URI
 ORDER BY
     COUNT DESC
-LIMIT
-    50
+LIMIT 50
 `
 
 type HistoryGetTopTracksWithoutURIsRow struct {
@@ -1216,20 +1066,14 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (
-        skipped != true
-        OR $3 :: boolean
-    )
-    AND timestamp BETWEEN ($4 :: int || '-01-01 00:00:00') :: timestamp
-    AND (
-        cast((($4 :: int) + 1) as text) || '-01-01 00:00:00'
-    ) :: timestamp
+    AND (skipped != TRUE
+        OR $3::boolean)
+    AND timestamp BETWEEN ($4::int || '-01-01 00:00:00')::timestamp AND (cast((($4::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     track_name
 ORDER BY
     COUNT(*) DESC
-LIMIT
-    35
+LIMIT 35
 `
 
 type HistoryGetTrackStreamCountByYearParams struct {
@@ -1280,8 +1124,7 @@ FROM
 WHERE
     artist_name = $1
     AND user_id = $2
-LIMIT
-    1
+LIMIT 1
 `
 
 type HistoryGetTrackURIForAlbumParams struct {
@@ -1297,54 +1140,73 @@ func (q *Queries) HistoryGetTrackURIForAlbum(ctx context.Context, arg HistoryGet
 }
 
 const historyInsertBulk = `-- name: HistoryInsertBulk :exec
-INSERT INTO
-    SPOTIFY_HISTORY(
-        user_id,
-        timestamp,
-        platform,
-        ms_played,
-        conn_country,
-        ip_addr,
-        user_agent,
-        track_name,
-        artist_name,
-        album_name,
-        spotify_track_uri,
-        spotify_artist_uri,
-        spotify_album_uri,
-        reason_start,
-        reason_end,
-        shuffle,
-        skipped,
-        offline,
-        offline_timestamp,
-        incognito_mode,
-        from_history
-    )
-VALUES
-    (
-        unnest($1 :: UUID []),
-        unnest($2 :: TIMESTAMP []),
-        unnest($3 :: TEXT []),
-        unnest($4 :: INTEGER []),
-        unnest($5 :: TEXT []),
-        unnest($6 :: TEXT []),
-        unnest($7 :: TEXT []),
-        unnest($8 :: TEXT []),
-        unnest($9 :: TEXT []),
-        unnest($10 :: TEXT []),
-        unnest($11 :: TEXT []),
-        unnest($12 :: TEXT []),
-        unnest($13 :: TEXT []),
-        unnest($14 :: TEXT []),
-        unnest($15 :: TEXT []),
-        unnest($16 :: BOOLEAN []),
-        unnest($17 :: BOOLEAN []),
-        unnest($18 :: BOOLEAN []),
-        unnest($19 :: TIMESTAMP []),
-        unnest($20 :: BOOLEAN []),
-        unnest($21 :: BOOLEAN [])
-    ) ON CONFLICT DO NOTHING
+INSERT INTO SPOTIFY_HISTORY(
+    user_id,
+    timestamp,
+    platform,
+    ms_played,
+    conn_country,
+    ip_addr,
+    user_agent,
+    track_name,
+    artist_name,
+    album_name,
+    spotify_track_uri,
+    spotify_artist_uri,
+    spotify_album_uri,
+    reason_start,
+    reason_end,
+    shuffle,
+    skipped,
+    offline,
+    offline_timestamp,
+    incognito_mode,
+    from_history)
+VALUES (
+    unnest(
+        $1::uuid[]),
+    unnest(
+        $2::timestamp[]),
+    unnest(
+        $3::text[]),
+    unnest(
+        $4::integer[]),
+    unnest(
+        $5::text[]),
+    unnest(
+        $6::text[]),
+    unnest(
+        $7::text[]),
+    unnest(
+        $8::text[]),
+    unnest(
+        $9::text[]),
+    unnest(
+        $10::text[]),
+    unnest(
+        $11::text[]),
+    unnest(
+        $12::text[]),
+    unnest(
+        $13::text[]),
+    unnest(
+        $14::text[]),
+    unnest(
+        $15::text[]),
+    unnest(
+        $16::boolean[]),
+    unnest(
+        $17::boolean[]),
+    unnest(
+        $18::boolean[]),
+    unnest(
+        $19::timestamp[]),
+    unnest(
+        $20::boolean[]),
+    unnest(
+        $21::boolean[]))
+ON CONFLICT
+    DO NOTHING
 `
 
 type HistoryInsertBulkParams struct {
@@ -1399,54 +1261,50 @@ func (q *Queries) HistoryInsertBulk(ctx context.Context, arg HistoryInsertBulkPa
 }
 
 const historyInsertOne = `-- name: HistoryInsertOne :exec
-INSERT INTO
-    SPOTIFY_HISTORY(
-        user_id,
-        timestamp,
-        platform,
-        ms_played,
-        conn_country,
-        ip_addr,
-        user_agent,
-        track_name,
-        artist_name,
-        album_name,
-        spotify_track_uri,
-        spotify_artist_uri,
-        spotify_album_uri,
-        reason_start,
-        reason_end,
-        shuffle,
-        skipped,
-        offline,
-        offline_timestamp,
-        incognito_mode,
-        from_history
-    )
-VALUES
-    (
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10,
-        $11,
-        $12,
-        $13,
-        $14,
-        $15,
-        $16,
-        $17,
-        $18,
-        $19,
-        $20,
-        $21
-    )
+INSERT INTO SPOTIFY_HISTORY(
+    user_id,
+    timestamp,
+    platform,
+    ms_played,
+    conn_country,
+    ip_addr,
+    user_agent,
+    track_name,
+    artist_name,
+    album_name,
+    spotify_track_uri,
+    spotify_artist_uri,
+    spotify_album_uri,
+    reason_start,
+    reason_end,
+    shuffle,
+    skipped,
+    offline,
+    offline_timestamp,
+    incognito_mode,
+    from_history)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16,
+    $17,
+    $18,
+    $19,
+    $20,
+    $21)
 `
 
 type HistoryInsertOneParams struct {
@@ -1522,8 +1380,12 @@ func (q *Queries) HistorySetURIsForTrack(ctx context.Context, arg HistorySetURIs
 }
 
 const roomAddMember = `-- name: RoomAddMember :exec
-INSERT INTO room_members(user_id, room_id)
-    VALUES ($1, $2)
+INSERT INTO room_members(
+    user_id,
+    room_id)
+VALUES (
+    $1,
+    $2)
 `
 
 type RoomAddMemberParams struct {
@@ -1537,7 +1399,10 @@ func (q *Queries) RoomAddMember(ctx context.Context, arg RoomAddMemberParams) er
 }
 
 const roomAddMemberByUsername = `-- name: RoomAddMemberByUsername :one
-INSERT INTO room_members(user_id, room_id, is_moderator)
+INSERT INTO room_members(
+    user_id,
+    room_id,
+    is_moderator)
 SELECT
     u.id,
     $1,
@@ -1657,7 +1522,7 @@ type RoomGetAllMembersRow struct {
 	Username        string         `json:"username"`
 	DisplayName     string         `json:"display_name"`
 	SpotifyName     sql.NullString `json:"spotify_name"`
-	SpotifyImageUrl sql.NullString `json:"spotify_image_url"`
+	SpotifyImageUrl *string        `json:"spotify_image_url"`
 	IsModerator     bool           `json:"is_moderator"`
 	QueuedTracks    int32          `json:"queued_tracks"`
 }
@@ -1717,7 +1582,7 @@ type RoomGetByCodeRow struct {
 	HostUsername    string         `json:"host_username"`
 	HostDisplay     string         `json:"host_display"`
 	HostSpotifyName sql.NullString `json:"host_spotify_name"`
-	HostImage       sql.NullString `json:"host_image"`
+	HostImage       *string        `json:"host_image"`
 	Code            string         `json:"code"`
 	Created         time.Time      `json:"created"`
 }
@@ -1847,7 +1712,9 @@ func (q *Queries) RoomGuestGetName(ctx context.Context, arg RoomGuestGetNamePara
 }
 
 const roomGuestInsert = `-- name: RoomGuestInsert :one
-INSERT INTO room_guests(room_id, name)
+INSERT INTO room_guests(
+    room_id,
+    name)
 SELECT
     r.id,
     $1
@@ -1878,7 +1745,10 @@ func (q *Queries) RoomGuestInsert(ctx context.Context, arg RoomGuestInsertParams
 }
 
 const roomGuestInsertWithID = `-- name: RoomGuestInsertWithID :one
-INSERT INTO room_guests(id, room_id, name)
+INSERT INTO room_guests(
+    id,
+    room_id,
+    name)
 SELECT
     $2::uuid,
     r.id,
@@ -1912,12 +1782,23 @@ func (q *Queries) RoomGuestInsertWithID(ctx context.Context, arg RoomGuestInsert
 
 const roomInsertWithPassword = `-- name: RoomInsertWithPassword :one
 WITH new_room AS (
-INSERT INTO rooms(name, host_id)
-        VALUES ($1, $2)
-    RETURNING
-        id, name, host_id, code, created
-), new_pass AS (
-INSERT INTO room_passwords(room_id, encrypted_password)
+    INSERT INTO rooms(
+        name,
+        host_id)
+    VALUES (
+        $1,
+        $2)
+RETURNING
+    id,
+    name,
+    host_id,
+    code,
+    created
+),
+new_pass AS (
+    INSERT INTO room_passwords(
+        room_id,
+        encrypted_password)
     SELECT
         id,
         crypt($3, gen_salt('bf'))
@@ -1994,7 +1875,10 @@ func (q *Queries) RoomRemoveMember(ctx context.Context, arg RoomRemoveMemberPara
 }
 
 const roomSetGuestQueueTrack = `-- name: RoomSetGuestQueueTrack :exec
-INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
+INSERT INTO room_queue_tracks(
+    track_id,
+    guest_id,
+    room_id)
 SELECT
     $1,
     $2::uuid,
@@ -2036,7 +1920,10 @@ func (q *Queries) RoomSetIsOpen(ctx context.Context, arg RoomSetIsOpenParams) er
 }
 
 const roomSetMemberQueueTrack = `-- name: RoomSetMemberQueueTrack :exec
-INSERT INTO room_queue_tracks(track_id, user_id, room_id)
+INSERT INTO room_queue_tracks(
+    track_id,
+    user_id,
+    room_id)
 SELECT
     $1,
     $2::uuid,
@@ -2173,8 +2060,12 @@ func (q *Queries) RoomValidatePassword(ctx context.Context, arg RoomValidatePass
 }
 
 const trackCacheGetByID = `-- name: TrackCacheGetByID :many
-SELECT id, uri, name, album_id, album_uri, album_name, artist_id, artist_uri, artist_name, image_url, other_artists, duration_ms, popularity, explicit, preview_url, disc_number, track_number, type, external_ids, isrc FROM SPOTIFY_TRACK_CACHE
-WHERE id = ANY($1 :: text[])
+SELECT
+    id, uri, name, album_id, album_uri, album_name, artist_id, artist_uri, artist_name, image_url, other_artists, duration_ms, popularity, explicit, preview_url, disc_number, track_number, type, external_ids, isrc
+FROM
+    SPOTIFY_TRACK_CACHE
+WHERE
+    id = ANY($1 :: text [])
 `
 
 func (q *Queries) TrackCacheGetByID(ctx context.Context, trackIds []string) ([]*TrackData, error) {
@@ -2319,15 +2210,31 @@ func (q *Queries) TrackCacheInsertBulk(ctx context.Context, arg TrackCacheInsert
 	return err
 }
 
+const userDeleteFriendRequest = `-- name: UserDeleteFriendRequest :exec
+DELETE FROM user_friend_requests
+WHERE user_id = $1
+  AND friend_id = $2
+`
+
+type UserDeleteFriendRequestParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	FriendID uuid.UUID `json:"friend_id"`
+}
+
+func (q *Queries) UserDeleteFriendRequest(ctx context.Context, arg UserDeleteFriendRequestParams) error {
+	_, err := q.db.ExecContext(ctx, userDeleteFriendRequest, arg.UserID, arg.FriendID)
+	return err
+}
+
 const userDeleteSpotifyInfo = `-- name: UserDeleteSpotifyInfo :exec
 UPDATE
-    users
+  users
 SET
-    spotify_account = NULL,
-    spotify_name = NULL,
-    spotify_image_url = NULL
+  spotify_account = NULL,
+  spotify_name = NULL,
+  spotify_image_url = NULL
 WHERE
-    id = $1
+  id = $1
 `
 
 func (q *Queries) UserDeleteSpotifyInfo(ctx context.Context, id uuid.UUID) error {
@@ -2337,8 +2244,7 @@ func (q *Queries) UserDeleteSpotifyInfo(ctx context.Context, id uuid.UUID) error
 
 const userDeleteSpotifyToken = `-- name: UserDeleteSpotifyToken :exec
 DELETE FROM spotify_tokens
-WHERE
-    user_id = $1
+WHERE user_id = $1
 `
 
 func (q *Queries) UserDeleteSpotifyToken(ctx context.Context, userID uuid.UUID) error {
@@ -2348,10 +2254,11 @@ func (q *Queries) UserDeleteSpotifyToken(ctx context.Context, userID uuid.UUID) 
 
 const userGetAllWithSpotify = `-- name: UserGetAllWithSpotify :many
 SELECT
-    id, username, display_name, spotify_account, spotify_name, spotify_image_url, created
+  id, username, display_name, spotify_account, spotify_name, spotify_image_url, created
 FROM
-    users
-WHERE spotify_account is not NULL
+  users
+WHERE
+  spotify_account IS NOT NULL
 `
 
 func (q *Queries) UserGetAllWithSpotify(ctx context.Context) ([]*User, error) {
@@ -2387,16 +2294,16 @@ func (q *Queries) UserGetAllWithSpotify(ctx context.Context) ([]*User, error) {
 
 const userGetByID = `-- name: UserGetByID :one
 SELECT
-    id,
-    username,
-    display_name,
-    spotify_account,
-    spotify_name,
-    spotify_image_url
+  id,
+  username,
+  display_name,
+  spotify_account,
+  spotify_name,
+  spotify_image_url
 FROM
-    users u
+  users u
 WHERE
-    id = $1
+  id = $1
 `
 
 type UserGetByIDRow struct {
@@ -2405,7 +2312,7 @@ type UserGetByIDRow struct {
 	DisplayName     string         `json:"display_name"`
 	SpotifyAccount  sql.NullString `json:"spotify_account"`
 	SpotifyName     sql.NullString `json:"spotify_name"`
-	SpotifyImageUrl sql.NullString `json:"spotify_image_url"`
+	SpotifyImageUrl *string        `json:"spotify_image_url"`
 }
 
 func (q *Queries) UserGetByID(ctx context.Context, id uuid.UUID) (*UserGetByIDRow, error) {
@@ -2424,16 +2331,16 @@ func (q *Queries) UserGetByID(ctx context.Context, id uuid.UUID) (*UserGetByIDRo
 
 const userGetByUsername = `-- name: UserGetByUsername :one
 SELECT
-    id,
-    username,
-    display_name,
-    spotify_account,
-    spotify_name,
-    spotify_image_url
+  id,
+  username,
+  display_name,
+  spotify_account,
+  spotify_name,
+  spotify_image_url
 FROM
-    users u
+  users u
 WHERE
-    username = $1
+  username = $1
 `
 
 type UserGetByUsernameRow struct {
@@ -2442,7 +2349,7 @@ type UserGetByUsernameRow struct {
 	DisplayName     string         `json:"display_name"`
 	SpotifyAccount  sql.NullString `json:"spotify_account"`
 	SpotifyName     sql.NullString `json:"spotify_name"`
-	SpotifyImageUrl sql.NullString `json:"spotify_image_url"`
+	SpotifyImageUrl *string        `json:"spotify_image_url"`
 }
 
 func (q *Queries) UserGetByUsername(ctx context.Context, username string) (*UserGetByUsernameRow, error) {
@@ -2459,21 +2366,156 @@ func (q *Queries) UserGetByUsername(ctx context.Context, username string) (*User
 	return &i, err
 }
 
+const userGetFriendRequestExists = `-- name: UserGetFriendRequestExists :one
+SELECT
+  EXISTS (
+    SELECT
+      user_id, friend_id, request_timestamp
+    FROM
+      user_friend_requests
+    WHERE
+      user_id = $1
+      AND friend_id = $2)
+`
+
+type UserGetFriendRequestExistsParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	FriendID uuid.UUID `json:"friend_id"`
+}
+
+func (q *Queries) UserGetFriendRequestExists(ctx context.Context, arg UserGetFriendRequestExistsParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, userGetFriendRequestExists, arg.UserID, arg.FriendID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const userGetFriendSuggestions = `-- name: UserGetFriendSuggestions :many
+SELECT
+  id,
+  username,
+  display_name,
+  spotify_image_url
+FROM
+  users u
+WHERE
+  NOT EXISTS (
+    SELECT
+      user_id, friend_id, request_timestamp
+    FROM
+      user_friend_requests fr
+    WHERE
+      fr.user_id = $1
+      AND fr.friend_id = u.id)
+  AND NOT EXISTS (
+    SELECT
+      user_id, friend_id, request_timestamp
+    FROM
+      user_friend_requests fr
+    WHERE
+      fr.friend_id = $1
+      AND fr.user_id = u.id)
+  AND NOT EXISTS (
+    SELECT
+      user_id, friend_id, added_timestamp
+    FROM
+      user_friends f
+    WHERE
+      f.user_id = $1
+      AND f.friend_id = u.id)
+  AND u.id != $1
+`
+
+type UserGetFriendSuggestionsRow struct {
+	ID              uuid.UUID `json:"id"`
+	Username        string    `json:"username"`
+	DisplayName     string    `json:"display_name"`
+	SpotifyImageUrl *string   `json:"spotify_image_url"`
+}
+
+func (q *Queries) UserGetFriendSuggestions(ctx context.Context, userID uuid.UUID) ([]*UserGetFriendSuggestionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, userGetFriendSuggestions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*UserGetFriendSuggestionsRow
+	for rows.Next() {
+		var i UserGetFriendSuggestionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const userGetFriends = `-- name: UserGetFriends :many
+SELECT
+  u.id, u.username, u.display_name, u.spotify_account, u.spotify_name, u.spotify_image_url, u.created
+FROM
+  user_friends f
+  JOIN users u ON u.id = f.friend_id
+    AND f.user_id = $1
+`
+
+func (q *Queries) UserGetFriends(ctx context.Context, userID uuid.UUID) ([]*User, error) {
+	rows, err := q.db.QueryContext(ctx, userGetFriends, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyAccount,
+			&i.SpotifyName,
+			&i.SpotifyImageUrl,
+			&i.Created,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const userGetHostedRooms = `-- name: UserGetHostedRooms :many
 SELECT
-    r.id,
-    r.name,
-    r.code,
-    r.created,
-    u.id AS host_id,
-    u.username AS host_username,
-    u.display_name AS host_display_name,
-    u.spotify_image_url AS host_spotify_image_url
+  r.id,
+  r.name,
+  r.code,
+  r.created,
+  u.id AS host_id,
+  u.username AS host_username,
+  u.display_name AS host_display_name,
+  u.spotify_image_url AS host_spotify_image_url
 FROM
-    rooms r
-    JOIN users u ON r.host_id = u.id
-        AND u.id = $1
-        AND r.is_open = $2
+  rooms r
+  JOIN users u ON r.host_id = u.id
+    AND u.id = $1
+    AND r.is_open = $2
 `
 
 type UserGetHostedRoomsParams struct {
@@ -2482,14 +2524,14 @@ type UserGetHostedRoomsParams struct {
 }
 
 type UserGetHostedRoomsRow struct {
-	ID                  uuid.UUID      `json:"id"`
-	Name                string         `json:"name"`
-	Code                string         `json:"code"`
-	Created             time.Time      `json:"created"`
-	HostID              uuid.UUID      `json:"host_id"`
-	HostUsername        string         `json:"host_username"`
-	HostDisplayName     string         `json:"host_display_name"`
-	HostSpotifyImageUrl sql.NullString `json:"host_spotify_image_url"`
+	ID                  uuid.UUID `json:"id"`
+	Name                string    `json:"name"`
+	Code                string    `json:"code"`
+	Created             time.Time `json:"created"`
+	HostID              uuid.UUID `json:"host_id"`
+	HostUsername        string    `json:"host_username"`
+	HostDisplayName     string    `json:"host_display_name"`
+	HostSpotifyImageUrl *string   `json:"host_spotify_image_url"`
 }
 
 func (q *Queries) UserGetHostedRooms(ctx context.Context, arg UserGetHostedRoomsParams) ([]*UserGetHostedRoomsRow, error) {
@@ -2526,20 +2568,20 @@ func (q *Queries) UserGetHostedRooms(ctx context.Context, arg UserGetHostedRooms
 
 const userGetJoinedRooms = `-- name: UserGetJoinedRooms :many
 SELECT
-    r.id,
-    r.name,
-    r.code,
-    r.created,
-    u.id AS host_id,
-    u.username AS host_username,
-    u.display_name AS host_display_name,
-    u.spotify_image_url AS host_spotify_image_url
+  r.id,
+  r.name,
+  r.code,
+  r.created,
+  u.id AS host_id,
+  u.username AS host_username,
+  u.display_name AS host_display_name,
+  u.spotify_image_url AS host_spotify_image_url
 FROM
-    rooms r
-    JOIN room_members rm ON rm.user_id = $1
-        AND r.id = rm.room_id
-        AND r.is_open = $2
-    JOIN users u ON r.host_id = u.id
+  rooms r
+  JOIN room_members rm ON rm.user_id = $1
+    AND r.id = rm.room_id
+    AND r.is_open = $2
+  JOIN users u ON r.host_id = u.id
 `
 
 type UserGetJoinedRoomsParams struct {
@@ -2548,14 +2590,14 @@ type UserGetJoinedRoomsParams struct {
 }
 
 type UserGetJoinedRoomsRow struct {
-	ID                  uuid.UUID      `json:"id"`
-	Name                string         `json:"name"`
-	Code                string         `json:"code"`
-	Created             time.Time      `json:"created"`
-	HostID              uuid.UUID      `json:"host_id"`
-	HostUsername        string         `json:"host_username"`
-	HostDisplayName     string         `json:"host_display_name"`
-	HostSpotifyImageUrl sql.NullString `json:"host_spotify_image_url"`
+	ID                  uuid.UUID `json:"id"`
+	Name                string    `json:"name"`
+	Code                string    `json:"code"`
+	Created             time.Time `json:"created"`
+	HostID              uuid.UUID `json:"host_id"`
+	HostUsername        string    `json:"host_username"`
+	HostDisplayName     string    `json:"host_display_name"`
+	HostSpotifyImageUrl *string   `json:"host_spotify_image_url"`
 }
 
 func (q *Queries) UserGetJoinedRooms(ctx context.Context, arg UserGetJoinedRoomsParams) ([]*UserGetJoinedRoomsRow, error) {
@@ -2590,14 +2632,115 @@ func (q *Queries) UserGetJoinedRooms(ctx context.Context, arg UserGetJoinedRooms
 	return items, nil
 }
 
+const userGetReceivedFriendRequests = `-- name: UserGetReceivedFriendRequests :many
+SELECT
+  id,
+  username,
+  display_name,
+  spotify_image_url,
+  request_timestamp
+FROM
+  user_friend_requests fr
+  JOIN users u ON fr.user_id = u.id
+    AND $1 = fr.friend_id
+`
+
+type UserGetReceivedFriendRequestsRow struct {
+	ID               uuid.UUID `json:"id"`
+	Username         string    `json:"username"`
+	DisplayName      string    `json:"display_name"`
+	SpotifyImageUrl  *string   `json:"spotify_image_url"`
+	RequestTimestamp time.Time `json:"request_timestamp"`
+}
+
+func (q *Queries) UserGetReceivedFriendRequests(ctx context.Context, userID uuid.UUID) ([]*UserGetReceivedFriendRequestsRow, error) {
+	rows, err := q.db.QueryContext(ctx, userGetReceivedFriendRequests, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*UserGetReceivedFriendRequestsRow
+	for rows.Next() {
+		var i UserGetReceivedFriendRequestsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyImageUrl,
+			&i.RequestTimestamp,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const userGetSentFriendRequests = `-- name: UserGetSentFriendRequests :many
+SELECT
+  id,
+  username,
+  display_name,
+  spotify_image_url,
+  request_timestamp
+FROM
+  user_friend_requests fr
+  JOIN users u ON fr.friend_id = u.id
+    AND $1 = fr.user_id
+`
+
+type UserGetSentFriendRequestsRow struct {
+	ID               uuid.UUID `json:"id"`
+	Username         string    `json:"username"`
+	DisplayName      string    `json:"display_name"`
+	SpotifyImageUrl  *string   `json:"spotify_image_url"`
+	RequestTimestamp time.Time `json:"request_timestamp"`
+}
+
+func (q *Queries) UserGetSentFriendRequests(ctx context.Context, userID uuid.UUID) ([]*UserGetSentFriendRequestsRow, error) {
+	rows, err := q.db.QueryContext(ctx, userGetSentFriendRequests, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*UserGetSentFriendRequestsRow
+	for rows.Next() {
+		var i UserGetSentFriendRequestsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyImageUrl,
+			&i.RequestTimestamp,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const userGetSpotifyTokens = `-- name: UserGetSpotifyTokens :one
 SELECT
-    st.encrypted_access_token,
-    st.access_token_expiry,
-    st.encrypted_refresh_token
+  st.encrypted_access_token,
+  st.access_token_expiry,
+  st.encrypted_refresh_token
 FROM
-    spotify_tokens AS st
-    WHERE st.user_id = $1
+  spotify_tokens AS st
+WHERE
+  st.user_id = $1
 `
 
 type UserGetSpotifyTokensRow struct {
@@ -2615,7 +2758,14 @@ func (q *Queries) UserGetSpotifyTokens(ctx context.Context, userID uuid.UUID) (*
 
 const userHasSpotifyHistory = `-- name: UserHasSpotifyHistory :one
 SELECT
-    EXISTS (SELECT user_id, timestamp, platform, ms_played, conn_country, ip_addr, user_agent, track_name, artist_name, album_name, spotify_track_uri, reason_start, reason_end, shuffle, skipped, offline, offline_timestamp, incognito_mode, spotify_artist_uri, spotify_album_uri, from_history FROM SPOTIFY_HISTORY WHERE USER_ID = $1 AND from_history = true)
+  EXISTS (
+    SELECT
+      user_id, timestamp, platform, ms_played, conn_country, ip_addr, user_agent, track_name, artist_name, album_name, spotify_track_uri, reason_start, reason_end, shuffle, skipped, offline, offline_timestamp, incognito_mode, spotify_artist_uri, spotify_album_uri, from_history
+    FROM
+      SPOTIFY_HISTORY
+    WHERE
+      USER_ID = $1
+      AND from_history = TRUE)
 `
 
 func (q *Queries) UserHasSpotifyHistory(ctx context.Context, userID uuid.UUID) (bool, error) {
@@ -2625,23 +2775,51 @@ func (q *Queries) UserHasSpotifyHistory(ctx context.Context, userID uuid.UUID) (
 	return exists, err
 }
 
+const userInsertFriend = `-- name: UserInsertFriend :exec
+INSERT INTO user_friends(
+  user_id,
+  friend_id)
+VALUES (
+  $1,
+  $2)
+`
+
+type UserInsertFriendParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	FriendID uuid.UUID `json:"friend_id"`
+}
+
+func (q *Queries) UserInsertFriend(ctx context.Context, arg UserInsertFriendParams) error {
+	_, err := q.db.ExecContext(ctx, userInsertFriend, arg.UserID, arg.FriendID)
+	return err
+}
+
 const userInsertWithPassword = `-- name: UserInsertWithPassword :one
 WITH new_user AS (
-INSERT INTO users(username, display_name)
-        VALUES ($1, $2)
-    RETURNING
-        id, username, display_name, created)
-    INSERT INTO user_passwords(user_id, encrypted_password)
-    SELECT
-        id,
-        crypt($3, gen_salt('bf'))
-    FROM
-        new_user
-    RETURNING (
-        SELECT
-            id
-        FROM
-            new_user)
+  INSERT INTO users(
+    username,
+    display_name)
+  VALUES (
+    $1,
+    $2)
+RETURNING
+  id,
+  username,
+  display_name,
+  created)
+INSERT INTO user_passwords(
+  user_id,
+  encrypted_password)
+SELECT
+  id,
+  crypt($3, gen_salt('bf'))
+FROM
+  new_user
+RETURNING (
+  SELECT
+    id
+  FROM
+    new_user)
 `
 
 type UserInsertWithPasswordParams struct {
@@ -2657,13 +2835,56 @@ func (q *Queries) UserInsertWithPassword(ctx context.Context, arg UserInsertWith
 	return id, err
 }
 
+const userIsFriends = `-- name: UserIsFriends :one
+SELECT
+  EXISTS (
+    SELECT
+      user_id, friend_id, added_timestamp
+    FROM
+      user_friends
+    WHERE
+      user_id = $1
+      AND friend_id = $2)
+`
+
+type UserIsFriendsParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	FriendID uuid.UUID `json:"friend_id"`
+}
+
+func (q *Queries) UserIsFriends(ctx context.Context, arg UserIsFriendsParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, userIsFriends, arg.UserID, arg.FriendID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const userSendFriendRequest = `-- name: UserSendFriendRequest :exec
+INSERT INTO user_friend_requests(
+  user_id,
+  friend_id)
+VALUES (
+  $1,
+  $2)
+`
+
+type UserSendFriendRequestParams struct {
+	UserID   uuid.UUID `json:"user_id"`
+	FriendID uuid.UUID `json:"friend_id"`
+}
+
+func (q *Queries) UserSendFriendRequest(ctx context.Context, arg UserSendFriendRequestParams) error {
+	_, err := q.db.ExecContext(ctx, userSendFriendRequest, arg.UserID, arg.FriendID)
+	return err
+}
+
 const userUpdatePassword = `-- name: UserUpdatePassword :exec
 UPDATE
-    users
+  users
 SET
-    encrypted_password = crypt($1, gen_salt('bf'))
+  encrypted_password = crypt($1, gen_salt('bf'))
 WHERE
-    id = $2
+  id = $2
 `
 
 type UserUpdatePasswordParams struct {
@@ -2678,20 +2899,20 @@ func (q *Queries) UserUpdatePassword(ctx context.Context, arg UserUpdatePassword
 
 const userUpdateSpotifyInfo = `-- name: UserUpdateSpotifyInfo :exec
 UPDATE
-    users
+  users
 SET
-    spotify_account = $2,
-    spotify_name = $3,
-    spotify_image_url = $4
+  spotify_account = $2,
+  spotify_name = $3,
+  spotify_image_url = $4
 WHERE
-    id = $1
+  id = $1
 `
 
 type UserUpdateSpotifyInfoParams struct {
 	ID              uuid.UUID      `json:"id"`
 	SpotifyAccount  sql.NullString `json:"spotify_account"`
 	SpotifyName     sql.NullString `json:"spotify_name"`
-	SpotifyImageUrl sql.NullString `json:"spotify_image_url"`
+	SpotifyImageUrl *string        `json:"spotify_image_url"`
 }
 
 func (q *Queries) UserUpdateSpotifyInfo(ctx context.Context, arg UserUpdateSpotifyInfoParams) error {
@@ -2706,19 +2927,34 @@ func (q *Queries) UserUpdateSpotifyInfo(ctx context.Context, arg UserUpdateSpoti
 
 const userUpdateSpotifyTokens = `-- name: UserUpdateSpotifyTokens :exec
 WITH latest_perm_version AS (
-    SELECT id 
-    FROM spotify_permissions_versions 
-    ORDER BY id DESC 
-    LIMIT 1
-)
-INSERT INTO spotify_tokens(user_id, encrypted_access_token, access_token_expiry, encrypted_refresh_token, permissions_version)
-    SELECT $1, $2, $3, $4, id
-    FROM latest_perm_version
-ON CONFLICT ON CONSTRAINT spotify_tokens_user_id_key
+  SELECT
+    id
+  FROM
+    spotify_permissions_versions
+  ORDER BY
+    id DESC
+  LIMIT 1)
+  INSERT INTO spotify_tokens(
+    user_id,
+    encrypted_access_token,
+    access_token_expiry,
+    encrypted_refresh_token,
+    permissions_version)
+  SELECT
+    $1,
+    $2,
+    $3,
+    $4,
+    id
+  FROM
+    latest_perm_version
+  ON CONFLICT ON CONSTRAINT spotify_tokens_user_id_key
     DO UPDATE SET
-        encrypted_access_token = $2, access_token_expiry = $3, encrypted_refresh_token = $4
+      encrypted_access_token = $2,
+      access_token_expiry = $3,
+      encrypted_refresh_token = $4
     WHERE
-        spotify_tokens.user_id = $1
+      spotify_tokens.user_id = $1
 `
 
 type UserUpdateSpotifyTokensParams struct {
@@ -2740,11 +2976,11 @@ func (q *Queries) UserUpdateSpotifyTokens(ctx context.Context, arg UserUpdateSpo
 
 const userValidatePassword = `-- name: UserValidatePassword :one
 SELECT
-    (encrypted_password = crypt($1, encrypted_password))
+  (encrypted_password = crypt($1, encrypted_password))
 FROM
-    user_passwords AS up
-    JOIN users u ON u.id = up.user_id
-        AND UPPER(u.username) = UPPER($2::text)
+  user_passwords AS up
+  JOIN users u ON u.id = up.user_id
+    AND UPPER(u.username) = UPPER($2::text)
 `
 
 type UserValidatePasswordParams struct {
@@ -2757,4 +2993,44 @@ func (q *Queries) UserValidatePassword(ctx context.Context, arg UserValidatePass
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const usersToFetchHistory = `-- name: UsersToFetchHistory :many
+SELECT
+  u.id, u.username, u.display_name, u.spotify_account, u.spotify_name, u.spotify_image_url, u.created
+FROM
+  users u
+  JOIN spotify_tokens st ON u.id = st.user_id
+    AND st.permissions_version >= 3
+`
+
+func (q *Queries) UsersToFetchHistory(ctx context.Context) ([]*User, error) {
+	rows, err := q.db.QueryContext(ctx, usersToFetchHistory)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.DisplayName,
+			&i.SpotifyAccount,
+			&i.SpotifyName,
+			&i.SpotifyImageUrl,
+			&i.Created,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

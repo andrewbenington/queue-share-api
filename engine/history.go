@@ -10,9 +10,10 @@ import (
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/history"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/google/uuid"
-	z_spotify "github.com/zmb3/spotify/v2"
+	"github.com/samber/lo"
+	"github.com/zmb3/spotify/v2"
 )
 
 var (
@@ -20,54 +21,70 @@ var (
 )
 
 func doHistoryCycle(ctx context.Context) {
-	userIDs := []string{
-		"9123cddc-2b54-483b-ad86-119c332654c0", // aab
-		"531f7a17-3e0a-47b3-bb2c-4425f0150363", // al
-		"ba7a624a-3352-4481-aaa5-d89f7c02a876", // ssb
-		"0e868ac1-6e66-4745-9440-390d8241e92a", // mad
-	}
-	for _, userID := range userIDs {
-		cancelCtx, cancel := context.WithTimeout(ctx, time.Second*30)
-		defer cancel()
-		getHistoryForUser(cancelCtx, uuid.MustParse(userID))
-		log.Printf("History fetched for user %s\n", userID)
-	}
-	now := time.Now()
-	LastFetch = &now
-}
-
-func getHistoryForUser(ctx context.Context, userID uuid.UUID) {
-	_, spClient, err := client.ForUser(ctx, userID)
+	users, err := db.New(db.Service().DB).UsersToFetchHistory(ctx)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	var rows *[]z_spotify.RecentlyPlayedItem
+	for _, user := range users {
+		cancelCtx, cancel := context.WithTimeout(ctx, time.Second*30)
+		defer cancel()
+		getHistoryForUser(cancelCtx, user)
+		log.Printf("History fetched for user %s\n", user.Username)
+	}
+	now := time.Now()
+	LastFetch = &now
+}
+
+func getHistoryForUser(ctx context.Context, user *db.User) {
+	_, spClient, err := client.ForUser(ctx, user.ID)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	var rows *[]spotify.RecentlyPlayedItem
 	var before *time.Time
 
 	for rows == nil || len(*rows) > 0 {
-		opts := z_spotify.RecentlyPlayedOptions{Limit: 50}
+		opts := spotify.RecentlyPlayedOptions{Limit: 50}
 		if before != nil {
 			opts.BeforeEpochMs = before.UnixMilli()
 		}
 
-		returnedRows, err := spClient.PlayerRecentlyPlayedOpt(ctx, &opts)
+		recentlyPlayed, err := spClient.PlayerRecentlyPlayedOpt(ctx, &opts)
 		if err != nil {
 			fmt.Println(err)
 			return
 		} else {
-			log.Printf("%d history entries found for %s", len(returnedRows), userID)
+			log.Printf("%d history entries found for %s", len(recentlyPlayed), user.Username)
 		}
 
-		if len(returnedRows) == 0 {
+		// Load URIs
+		trackIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
+			return track.Track.ID.String()
+		})
+		service.GetTracks(ctx, spClient, lo.Uniq(trackIDs))
+
+		albumIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
+			return track.Track.Album.ID.String()
+		})
+		service.GetAlbums(ctx, spClient, lo.Uniq(albumIDs))
+
+		artistIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
+			return track.Track.Artists[0].ID.String()
+		})
+		service.GetArtists(ctx, spClient, lo.Uniq(artistIDs))
+
+		if len(recentlyPlayed) == 0 {
 			break
 		}
 
-		rows = &returnedRows
-		before = &returnedRows[len(returnedRows)-1].PlayedAt
+		rows = &recentlyPlayed
+		before = &recentlyPlayed[len(recentlyPlayed)-1].PlayedAt
 
-		insertParams, err := processHistory(ctx, spClient, returnedRows, userID)
+		insertParams, err := processHistory(ctx, spClient, recentlyPlayed, user.ID)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -83,7 +100,7 @@ func getHistoryForUser(ctx context.Context, userID uuid.UUID) {
 
 }
 
-func processHistory(ctx context.Context, spClient *z_spotify.Client, items []z_spotify.RecentlyPlayedItem, userID uuid.UUID) ([]db.HistoryInsertOneParams, error) {
+func processHistory(ctx context.Context, spClient *spotify.Client, items []spotify.RecentlyPlayedItem, userID uuid.UUID) ([]db.HistoryInsertOneParams, error) {
 	allRows := []db.HistoryInsertOneParams{}
 
 	for i := range items {
@@ -104,7 +121,7 @@ func processHistory(ctx context.Context, spClient *z_spotify.Client, items []z_s
 			durationMS = nowDiffMS
 		}
 
-		trackData, err := spotify.GetTrack(ctx, spClient, item.Track.ID.String())
+		trackData, err := service.GetTrack(ctx, spClient, item.Track.ID.String())
 		if err != nil {
 			log.Printf("error getting track: %s", err)
 			continue

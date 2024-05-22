@@ -1,4 +1,4 @@
-package spotify
+package service
 
 import (
 	"context"
@@ -50,7 +50,7 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 			Name:       queue.CurrentlyPlaying.Name,
 			Artists:    queue.CurrentlyPlaying.Artists,
 			Image:      GetAlbum300Image(queue.CurrentlyPlaying.Album),
-			DurationMS: queue.CurrentlyPlaying.Duration,
+			DurationMS: int(queue.CurrentlyPlaying.Duration),
 		},
 	}
 	for _, entry := range queue.Items {
@@ -59,7 +59,7 @@ func GetUserQueue(ctx context.Context, client *spotify.Client) (*CurrentQueue, e
 			Name:       entry.Name,
 			Artists:    entry.Artists,
 			Image:      GetAlbum300Image(entry.Album),
-			DurationMS: entry.Duration,
+			DurationMS: int(entry.Duration),
 		}
 		cq.Queue = append(cq.Queue, qe)
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/gorilla/mux"
 )
 
@@ -43,14 +43,14 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 		requests.RespondWithError(w, status, err.Error())
 		return
 	}
-	currentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
+	currentQueue, err := service.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		log.Printf("Error getting user queue: %s", err)
 		requests.RespondInternalError(w)
 		return
 	}
 
-	err = spotify.UpdateUserPlayback(r.Context(), spClient, currentQueue)
+	err = service.UpdateUserPlayback(r.Context(), spClient, currentQueue)
 	if err != nil {
 		log.Printf("Error updating user playback: %s", err)
 		requests.RespondInternalError(w)
@@ -97,7 +97,7 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 		requests.RespondWithError(w, status, err.Error())
 		return
 	}
-	err = spotify.PushToUserQueue(r.Context(), spClient, songID)
+	err = service.PushToUserQueue(r.Context(), spClient, songID)
 	if err != nil && strings.Contains(err.Error(), "No active device found") {
 		requests.RespondWithError(w, http.StatusBadRequest, "Host is not playing music")
 		return
@@ -130,13 +130,13 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 
 	time.Sleep(500 * time.Millisecond)
 
-	currentQueue, err := spotify.GetUserQueue(r.Context(), spClient)
+	currentQueue, err := service.GetUserQueue(r.Context(), spClient)
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
 	}
 
-	err = spotify.UpdateUserPlayback(r.Context(), spClient, currentQueue)
+	err = service.UpdateUserPlayback(r.Context(), spClient, currentQueue)
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
@@ -163,7 +163,7 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseBytes)
 }
 
-func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.CurrentQueue) (statusCode int, errMessage string) {
+func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *service.CurrentQueue) (statusCode int, errMessage string) {
 	guestTracks, err := room.GetQueueTrackAddedBy(ctx, db.Service().DB, roomID)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, constants.ErrorNotFound
@@ -172,7 +172,7 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *spotify.
 		return http.StatusInternalServerError, constants.ErrorInternal
 	}
 
-	tracks := make(map[string]*spotify.TrackInfo)
+	tracks := make(map[string]*service.TrackInfo)
 
 	tracks[q.CurrentlyPlaying.ID] = &q.CurrentlyPlaying
 	for i := range q.Queue {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -12,15 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/andrewbenington/queue-share-api/auth"
-	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/engine"
 	"github.com/andrewbenington/queue-share-api/history"
 	"github.com/andrewbenington/queue-share-api/requests"
-	"github.com/andrewbenington/queue-share-api/spotify"
-	"github.com/google/uuid"
-	z_spotify "github.com/zmb3/spotify/v2"
+	"github.com/andrewbenington/queue-share-api/service"
 )
 
 const (
@@ -32,6 +29,7 @@ type HistoryEntry struct {
 	Timestamp       time.Time        `json:"timestamp"`
 	TrackName       string           `json:"track_name"`
 	AlbumName       string           `json:"album_name"`
+	ArtistName      string           `json:"artist_name"`
 	MsPlayed        int32            `json:"ms_played"`
 	SpotifyTrackUri string           `json:"spotify_track_uri"`
 	SpotifyAlbumUri string           `json:"spotify_album_uri"`
@@ -49,18 +47,12 @@ type HistoryResponse struct {
 	LastFetched *time.Time     `json:"last_fetched"`
 }
 
-func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID)
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
 	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
+		requests.RespondWithError(w, 401, err.Error())
 		return
 	}
 
@@ -101,13 +93,14 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 			TrackName:       row.TrackName,
 			SpotifyTrackUri: row.SpotifyTrackUri,
 			AlbumName:       row.AlbumName,
+			ArtistName:      row.ArtistName,
 			SpotifyAlbumUri: row.SpotifyAlbumUri.String,
 			MsPlayed:        row.MsPlayed,
 			Artists: append(
 				[]db.TrackArtist{{
 					Name: row.ArtistName,
 					URI:  row.SpotifyArtistUri.String,
-					ID:   spotify.IDFromURIMust(row.SpotifyArtistUri.String),
+					ID:   service.IDFromURIMust(row.SpotifyArtistUri.String),
 				}},
 				row.OtherArtists...),
 			ImageURL: row.ImageUrl,
@@ -126,18 +119,12 @@ func (c *Controller) GetAllHistory(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (c *Controller) UploadHistory(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID)
+	userUUID, err := userUUIDFromRequest(r)
 	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
+		requests.RespondWithError(w, 401, err.Error())
 		return
 	}
 
@@ -206,6 +193,7 @@ func (c *Controller) UploadHistory(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Printf("Uploaded file %s\n", file.Name)
 	}
+
 	err = transaction.Commit()
 	if err != nil {
 		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
@@ -215,18 +203,18 @@ func (c *Controller) UploadHistory(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (c *Controller) GetTopTracksByYear(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetTopTracksByYear(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
 		return
 	}
 
 	filter := getFilterParams(r)
 
-	results, responseCode, err := history.TrackStreamCountByYear(ctx, db.Service().DB, userID, filter)
+	results, responseCode, err := history.TrackStreamCountByYear(ctx, db.Service().DB, userUUID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}
@@ -234,18 +222,18 @@ func (c *Controller) GetTopTracksByYear(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(results)
 }
 
-func (c *Controller) GetTopAlbumsByYear(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetTopAlbumsByYear(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
 		return
 	}
 
 	filter := getFilterParams(r)
 
-	results, responseCode, err := history.AlbumStreamCountByYear(ctx, db.Service().DB, userID, filter)
+	results, responseCode, err := history.AlbumStreamCountByYear(ctx, db.Service().DB, userUUID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}
@@ -253,18 +241,18 @@ func (c *Controller) GetTopAlbumsByYear(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(results)
 }
 
-func (c *Controller) GetTopArtistsByYear(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetTopArtistsByYear(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
 		return
 	}
 
 	filter := getFilterParams(r)
 
-	results, responseCode, err := history.ArtistStreamCountByYear(ctx, db.Service().DB, userID, filter)
+	results, responseCode, err := history.ArtistStreamCountByYear(ctx, db.Service().DB, userUUID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}
@@ -272,19 +260,19 @@ func (c *Controller) GetTopArtistsByYear(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(results)
 }
 
-func (c *Controller) GetAllStreamsByURI(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetAllStreamsByURI(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
 		return
 	}
 
 	rows, err := history.AllTrackStreamsByURI(
 		ctx,
 		db.Service().DB,
-		userID,
+		userUUID,
 		r.URL.Query().Get("spotify_uri"),
 		getFilterParams(r),
 	)
@@ -297,206 +285,11 @@ func (c *Controller) GetAllStreamsByURI(w http.ResponseWriter, r *http.Request) 
 }
 
 type MonthRanking struct {
-	Year     int `json:"year"`
-	Month    int `json:"month"`
-	Position int `json:"position"`
-}
-
-type Stream struct {
-	Timestamp        time.Time `json:"timestamp"`
-	TrackName        string    `json:"track_name"`
-	ArtistName       string    `json:"artist_name"`
-	AlbumName        string    `json:"album_name"`
-	MsPlayed         int       `json:"ms_played"`
-	SpotifyTrackUri  string    `json:"spotify_track_uri"`
-	SpotifyArtistUri string    `json:"spotify_artist_uri"`
-	SpotifyAlbumUri  string    `json:"spotify_album_uri"`
-}
-type TrackStatsResponse struct {
-	Track    *db.TrackData  `json:"track"`
-	Streams  []*Stream      `json:"streams"`
-	Rankings []MonthRanking `json:"rankings"`
-}
-
-func (c *Controller) GetTrackStatsByURI(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
-		return
-	}
-
-	code, spClient, err := client.ForUser(ctx, userUUID)
-	if err != nil {
-		http.Error(w, err.Error(), code)
-		return
-	}
-
-	trackURI := r.URL.Query().Get("spotify_uri")
-	trackID, err := spotify.IDFromURI(trackURI)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	track, err := spotify.GetTrack(ctx, spClient, trackID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	rows, err := history.AllTrackStreamsByURI(
-		ctx,
-		db.Service().DB,
-		userID,
-		trackURI,
-		getFilterParams(r),
-	)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-
-	streams := []*Stream{}
-	for _, row := range rows {
-		streams = append(streams, &Stream{
-			Timestamp:        row.Timestamp,
-			TrackName:        row.TrackName,
-			ArtistName:       row.ArtistName,
-			AlbumName:        row.AlbumName,
-			MsPlayed:         int(row.MsPlayed),
-			SpotifyTrackUri:  row.SpotifyTrackUri,
-			SpotifyArtistUri: row.SpotifyArtistUri.String,
-			SpotifyAlbumUri:  row.SpotifyAlbumUri.String,
-		})
-	}
-
-	response := TrackStatsResponse{
-		Streams:  streams,
-		Track:    track,
-		Rankings: []MonthRanking{},
-	}
-
-	filter := getFilterParams(r)
-	filter.MaxTracks = 30
-	allRankings, responseCode, err := history.TrackStreamRankingsByMonth(ctx, db.Service().DB, userID, filter)
-	if err != nil {
-		http.Error(w, err.Error(), responseCode)
-	}
-
-	for _, monthRankings := range allRankings {
-		for i, trackPlays := range monthRankings.Tracks {
-			if trackPlays.ID == string(track.ID) {
-				ranking := MonthRanking{
-					Year:     monthRankings.Year,
-					Month:    monthRankings.Month,
-					Position: i + 1,
-				}
-				response.Rankings = append(response.Rankings, ranking)
-			}
-		}
-	}
-
-	json.NewEncoder(w).Encode(response)
-}
-
-type AlbumStatsResponse struct {
-	Album    *z_spotify.FullAlbum `json:"album"`
-	Streams  []*Stream            `json:"streams"`
-	Rankings []MonthRanking       `json:"rankings"`
-}
-
-func (c *Controller) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
-	if !authenticatedAsUser {
-		requests.RespondAuthError(w)
-		return
-	}
-
-	userUUID, err := uuid.Parse(userID)
-	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
-		return
-	}
-
-	code, spClient, err := client.ForUser(ctx, userUUID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("couldn't get client: %s", err), code)
-		return
-	}
-
-	albumURI := r.URL.Query().Get("spotify_uri")
-	albumID, err := spotify.IDFromURI(albumURI)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("bad album uri: %s", err), http.StatusBadRequest)
-		return
-	}
-
-	album, err := spotify.GetAlbum(ctx, spClient, albumID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("couldn't get album: %s", err), http.StatusInternalServerError)
-		return
-	}
-
-	rows, err := history.AllAlbumStreamsByURI(
-		ctx,
-		db.Service().DB,
-		userID,
-		albumURI,
-		getFilterParams(r),
-	)
-	if err != nil {
-		requests.RespondWithDBError(w, err)
-		return
-	}
-	streams := []*Stream{}
-	for _, row := range rows {
-		streams = append(streams, &Stream{
-			Timestamp:        row.Timestamp,
-			TrackName:        row.TrackName,
-			ArtistName:       row.ArtistName,
-			AlbumName:        row.AlbumName,
-			MsPlayed:         int(row.MsPlayed),
-			SpotifyTrackUri:  row.SpotifyTrackUri,
-			SpotifyArtistUri: row.SpotifyArtistUri.String,
-			SpotifyAlbumUri:  row.SpotifyAlbumUri.String,
-		})
-	}
-	response := AlbumStatsResponse{
-		Streams:  streams,
-		Album:    album,
-		Rankings: []MonthRanking{},
-	}
-
-	filter := getFilterParams(r)
-	allRankings, responseCode, err := history.AlbumStreamRankingsByMonth(ctx, db.Service().DB, userID, filter, 30)
-	if err != nil {
-		http.Error(w, err.Error(), responseCode)
-	}
-
-	for _, monthRankings := range allRankings {
-		for i, albumPlays := range monthRankings.Albums {
-			if albumPlays.ID == string(album.ID) {
-				ranking := MonthRanking{
-					Year:     monthRankings.Year,
-					Month:    monthRankings.Month,
-					Position: i + 1,
-				}
-				response.Rankings = append(response.Rankings, ranking)
-			}
-		}
-	}
-
-	json.NewEncoder(w).Encode(response)
+	Year                 int               `json:"year"`
+	Month                int               `json:"month"`
+	Position             int               `json:"position"`
+	StartDateUnixSeconds int64             `json:"start_date_unix_seconds"`
+	Timeframe            history.Timeframe `json:"timeframe"`
 }
 
 func getFilterParams(r *http.Request) history.FilterParams {
@@ -510,10 +303,11 @@ func getFilterParams(r *http.Request) history.FilterParams {
 	includeSkippedParam := r.URL.Query().Get("include_skipped")
 	includeSkipped := strings.EqualFold(includeSkippedParam, "true")
 
-	maxTracksParam := r.URL.Query().Get("max_tracks")
-	maxTracks, err := strconv.Atoi(maxTracksParam)
+	maxParam := r.URL.Query().Get("max")
+	max, err := strconv.Atoi(maxParam)
 	if err != nil {
-		maxTracks = 30
+		log.Printf("Bad max param: '%s'", maxParam)
+		max = 30
 	}
 
 	artistURIParam := r.URL.Query().Get("artist_uri")
@@ -528,11 +322,18 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		albumURI = &albumURIParam
 	}
 
+	timeframeParam := r.URL.Query().Get("timeframe")
+	var timeframe history.Timeframe = "month"
+	if timeframeParam == "day" || timeframeParam == "week" || timeframeParam == "year" {
+		timeframe = history.Timeframe(timeframeParam)
+	}
+
 	return history.FilterParams{
 		MinMSPlayed:    int32(minMSPlayed),
 		IncludeSkipped: includeSkipped,
-		MaxTracks:      int32(maxTracks),
+		Max:            int32(max),
 		ArtistURI:      artistURI,
 		AlbumURI:       albumURI,
+		Timeframe:      timeframe,
 	}
 }

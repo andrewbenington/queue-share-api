@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/db"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/samber/lo"
-	z_spotify "github.com/zmb3/spotify/v2"
+	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
 // func uploadTrackCache(ctx context.Context) error {
-// 	cache := spotify.GetTrackCache()
+// 	cache := service.GetTrackCache()
 
 // 	trackPtrs := lo.Map(
 // 		maps.Values(cache),
@@ -34,7 +34,7 @@ import (
 // 			end = len(trackPtrs)
 // 		}
 
-// 		params := spotify.InsertParamsFromFullTracks(trackPtrs[start:end])
+// 		params := service.InsertParamsFromFullTracks(trackPtrs[start:end])
 
 // 		err = db.New(transaction).TrackCacheInsertBulkNullable(ctx, params)
 // 		if err != nil {
@@ -54,11 +54,11 @@ import (
 // }
 
 func uploadAlbumCache(ctx context.Context) error {
-	cache := spotify.GetAlbumCache()
+	cache := service.GetAlbumCache()
 
 	albumPtrs := lo.Map(
 		maps.Values(cache),
-		func(album z_spotify.FullAlbum, _ int) *z_spotify.FullAlbum { return &album },
+		func(album spotify.FullAlbum, _ int) *spotify.FullAlbum { return &album },
 	)
 
 	log.Printf("There are %d albums in the cache", len(albumPtrs))
@@ -75,7 +75,7 @@ func uploadAlbumCache(ctx context.Context) error {
 			end = len(albumPtrs)
 		}
 
-		params := spotify.InsertParamsFromFullAlbums(albumPtrs[start:end])
+		params := service.InsertParamsFromFullAlbums(albumPtrs[start:end])
 
 		err = db.New(transaction).AlbumCacheInsertBulkNullable(ctx, params)
 		if err != nil {
@@ -95,11 +95,11 @@ func uploadAlbumCache(ctx context.Context) error {
 }
 
 func uploadArtistCache(ctx context.Context) error {
-	cache := spotify.GetArtistCache()
+	cache := service.GetArtistCache()
 
 	artistPtrs := lo.Map(
 		maps.Values(cache),
-		func(artist z_spotify.FullArtist, _ int) *z_spotify.FullArtist { return &artist },
+		func(artist spotify.FullArtist, _ int) *spotify.FullArtist { return &artist },
 	)
 
 	log.Printf("There are %d artists in the cache", len(artistPtrs))
@@ -116,7 +116,7 @@ func uploadArtistCache(ctx context.Context) error {
 			end = len(artistPtrs)
 		}
 
-		params := spotify.InsertParamsFromFullArtists(artistPtrs[start:end])
+		params := service.InsertParamsFromFullArtists(artistPtrs[start:end])
 
 		err = db.New(transaction).ArtistCacheInsertBulkNullable(ctx, params)
 		if err != nil {

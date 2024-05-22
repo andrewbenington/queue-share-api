@@ -1,4 +1,4 @@
-package spotify
+package service
 
 import (
 	"context"
@@ -107,6 +107,7 @@ func InsertParamsFromFullTracks(tracks []*spotify.FullTrack) db.TrackCacheInsert
 	}
 
 	for _, track := range tracks {
+		fmt.Printf("%+v\n", track)
 		album := track.Album
 		artist := track.Artists[0]
 		params.ID = append(params.ID, track.ID.String())
@@ -178,7 +179,7 @@ func trackArtistFromSimple(artist spotify.SimpleArtist, _ int) db.TrackArtist {
 	}
 }
 
-func getTracksFromCache(ctx context.Context, ids []string) (map[string]db.TrackData, error) {
+func GetTracksFromCache(ctx context.Context, ids []string) (map[string]db.TrackData, error) {
 	rows, err := db.New(db.Service().DB).TrackCacheGetByID(ctx, ids)
 	if err != nil {
 		return nil, err
@@ -343,6 +344,10 @@ func GetArtistCache() map[string]spotify.FullArtist {
 	return spotifyArtistCache
 }
 
+func TrackDataFromFullTrackIdx(ft spotify.FullTrack, _ int) db.TrackData {
+	return TrackDataFromFullTrack(ft)
+}
+
 func TrackDataFromFullTrack(ft spotify.FullTrack) db.TrackData {
 	artist := ft.Artists[0]
 
@@ -378,6 +383,28 @@ func TrackDataFromFullTrack(ft spotify.FullTrack) db.TrackData {
 		Type:         ft.Type,
 		ExternalIds:  ft.ExternalIDs,
 		Isrc:         isrc,
+	}
+}
+
+func ArtistDataFromFullArtistIdx(fa spotify.FullArtist, _ int) db.ArtistData {
+	return ArtistDataFromFullArtist(fa)
+}
+
+func ArtistDataFromFullArtist(fa spotify.FullArtist) db.ArtistData {
+	image := GetArtist300Image(fa)
+	var imageURL *string
+	if image != nil {
+		imageURL = &image.URL
+	}
+
+	return db.ArtistData{
+		ID:            fa.ID.String(),
+		URI:           string(fa.URI),
+		Name:          fa.Name,
+		ImageUrl:      imageURL,
+		Genres:        fa.Genres,
+		Popularity:    int(fa.Popularity),
+		FollowerCount: int(fa.Followers.Count),
 	}
 }
 

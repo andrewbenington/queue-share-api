@@ -13,10 +13,10 @@ import (
 	"github.com/andrewbenington/queue-share-api/config"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/andrewbenington/queue-share-api/user"
 	"github.com/google/uuid"
-	spotifyV2 "github.com/zmb3/spotify/v2"
+	"github.com/zmb3/spotify/v2"
 	spotifyauth "github.com/zmb3/spotify/v2/auth"
 )
 
@@ -168,8 +168,8 @@ func (c *Controller) SpotifyAuthRedirect(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	spotifyClient := spotifyV2.New(authenticator.Client(ctx, token))
-	userData, err := spotify.GetUser(ctx, spotifyClient)
+	spotifyClient := spotify.New(authenticator.Client(ctx, token))
+	userData, err := service.GetUser(ctx, spotifyClient)
 	if err != nil {
 		log.Printf("get spotify user: %s\n", err)
 		redirectQuery.Add("error", fmt.Sprintf("Error getting Spotify user: %s", err))

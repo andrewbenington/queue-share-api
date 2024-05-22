@@ -8,7 +8,7 @@ import (
 
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/requests"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 )
 
 func (c *Controller) SuggestedTracks(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +31,7 @@ func (c *Controller) SuggestedTracks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tracks, err := spotify.TopTracks(ctx, client)
+	tracks, err := service.TopTracks(ctx, client)
 	if err != nil {
 		log.Println(err)
 		if strings.Contains(err.Error(), "403") {

@@ -1,0 +1,13 @@
+{
+  "[sql]": {
+    "editor.defaultFormatter": "bradymholt.pgformatter",
+    "typescript.preferences.importModuleSpecifier": "relative"
+  },
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll": "explicit",
+    "source.removeUnusedImports": "explicit"
+  },
+  "pgFormatter.commaBreak": true
+}

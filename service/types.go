@@ -1,4 +1,4 @@
-package spotify
+package service
 
 import "github.com/zmb3/spotify/v2"
 
@@ -28,5 +28,5 @@ type TrackData struct {
 type TrackArtist struct {
 	ID   string `json:"id"`
 	URI  string `json:"uri"`
-	Name string `json:"string"`
+	Name string `json:"name"`
 }

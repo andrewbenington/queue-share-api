@@ -1,4 +1,4 @@
-package spotify
+package service
 
 import (
 	"context"
@@ -6,30 +6,30 @@ import (
 	"log"
 
 	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/util"
+	"github.com/samber/lo"
 	"github.com/zmb3/spotify/v2"
 )
 
-func SearchSongs(ctx context.Context, spClient *spotify.Client, text string) ([]TrackInfo, error) {
+func SearchTracks(ctx context.Context, spClient *spotify.Client, text string) ([]db.TrackData, error) {
 	results, err := spClient.Search(ctx, text, spotify.SearchTypeTrack)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
-	resultsTrunced := []TrackInfo{}
-	for _, entry := range results.Tracks.Tracks {
-		t := TrackInfo{
-			ID:      entry.ID.String(),
-			Name:    entry.Name,
-			Artists: entry.Artists,
-			Image:   GetAlbum300Image(entry.Album),
-		}
-		resultsTrunced = append(resultsTrunced, t)
+	return lo.Map(results.Tracks.Tracks, TrackDataFromFullTrackIdx), nil
+}
+
+func SearchArtists(ctx context.Context, spClient *spotify.Client, text string) ([]db.ArtistData, error) {
+	results, err := spClient.Search(ctx, text, spotify.SearchTypeArtist)
+	if err != nil {
+		return nil, fmt.Errorf("search: %w", err)
 	}
-	return resultsTrunced, nil
+	return lo.Map(results.Artists.Artists, ArtistDataFromFullArtistIdx), nil
 }
 
 func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.TrackData, error) {
 
-	tracks, err := getTracksFromCache(ctx, []string{id})
+	tracks, err := GetTracksFromCache(ctx, []string{id})
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 }
 
 func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.TrackData, error) {
-	tracks, err := getTracksFromCache(ctx, ids)
+	tracks, err := GetTracksFromCache(ctx, ids)
 	if err != nil {
 		log.Printf("error getting tracks from cache: %s", err)
 	} else {
@@ -78,7 +78,14 @@ func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			return nil, err
 		}
 
-		CacheFullTracks(ctx, results)
+		if results == nil {
+			continue
+		}
+		results = lo.Filter(results, util.PointerNotNilIdx)
+
+		if results != nil {
+			CacheFullTracks(ctx, results)
+		}
 
 		for _, track := range results {
 			tracks[track.ID.String()] = TrackDataFromFullTrack(*track)
@@ -107,10 +114,9 @@ func GetArtist(ctx context.Context, spClient *spotify.Client, id string) (*spoti
 }
 
 func GetArtists(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]spotify.FullArtist, error) {
-
 	artists := getArtistsFromCache(ids)
 	idsToGet := []spotify.ID{}
-	fmt.Printf("%d/%d artists already cached\n", len(artists), len(ids))
+	log.Printf("%d/%d artists already cached", len(artists), len(ids))
 
 	for _, id := range ids {
 		if _, ok := artists[id]; !ok {
@@ -160,7 +166,7 @@ func GetAlbum(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]spotify.FullAlbum, error) {
 	albums := getAlbumsFromCache(ids)
 	idsToGet := []spotify.ID{}
-	fmt.Printf("%d/%d albums already cached\n", len(albums), len(ids))
+	log.Printf("%d/%d albums already cached", len(albums), len(ids))
 
 	for _, id := range ids {
 		if _, ok := albums[id]; !ok {

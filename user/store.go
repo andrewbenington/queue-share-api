@@ -8,7 +8,7 @@ import (
 
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/db"
-	"github.com/andrewbenington/queue-share-api/spotify"
+	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
@@ -58,7 +58,7 @@ func UpdateSpotifyToken(ctx context.Context, dbtx db.DBTX, userID string, oauthT
 	})
 }
 
-func UpdateSpotifyInfo(ctx context.Context, dbtx db.DBTX, userID string, info *spotify.SpotifyUser) error {
+func UpdateSpotifyInfo(ctx context.Context, dbtx db.DBTX, userID string, info *service.SpotifyUser) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -71,7 +71,7 @@ func UpdateSpotifyInfo(ctx context.Context, dbtx db.DBTX, userID string, info *s
 		ID:              userUUID,
 		SpotifyAccount:  sql.NullString{String: info.ID, Valid: true},
 		SpotifyName:     sql.NullString{String: info.Display, Valid: true},
-		SpotifyImageUrl: sql.NullString{String: info.ImageURL, Valid: true},
+		SpotifyImageUrl: &info.ImageURL,
 	})
 }
 
@@ -101,7 +101,7 @@ func GetByUsername(ctx context.Context, dbtx db.DBTX, username string) (*User, e
 		Username:     row.Username,
 		DisplayName:  row.DisplayName,
 		SpotifyName:  row.SpotifyName.String,
-		SpotifyImage: row.SpotifyImageUrl.String,
+		SpotifyImage: row.SpotifyImageUrl,
 	}, nil
 }
 
@@ -121,7 +121,7 @@ func GetByID(ctx context.Context, dbtx db.DBTX, userID string) (*User, error) {
 		Username:     row.Username,
 		DisplayName:  row.DisplayName,
 		SpotifyName:  row.SpotifyName.String,
-		SpotifyImage: row.SpotifyImageUrl.String,
+		SpotifyImage: row.SpotifyImageUrl,
 	}, nil
 }
 

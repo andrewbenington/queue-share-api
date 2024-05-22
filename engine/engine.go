@@ -7,12 +7,13 @@ import (
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/config"
+	"github.com/andrewbenington/queue-share-api/history"
 )
 
 const (
 	cycle_period                 = time.Minute * 30
 	cycle_period_history         = time.Minute * 30
-	cycle_period_load_uris       = time.Hour * 3
+	cycle_period_load_uris       = time.Minute * 30
 	cycle_period_spotify_profile = time.Hour * 24
 )
 
@@ -75,6 +76,8 @@ func cycle() {
 	// cacheTracksByPopularity()
 	// fmt.Println("doing album cache cycle")
 	// cacheAlbumsByPopularity()
+
+	history.WriteCachesToFile()
 
 	fmt.Println("engine cycle complete")
 }

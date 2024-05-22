@@ -50,4 +50,16 @@ sql:
           - column: spotify_album_cache.release_date
             go_type:
               type: "*time.Time"
+          - column: spotify_artist_cache.image_url
+            go_type:
+              type: "*string"
+          - column: spotify_artist_cache.popularity
+            go_type:
+              type: "int"
+          - column: spotify_artist_cache.follower_count
+            go_type:
+              type: "int"
+          - column: users.spotify_image_url
+            go_type:
+              type: "*string"
     strict_order_by: false

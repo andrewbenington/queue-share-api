@@ -23,12 +23,23 @@ WHERE (code = $1);
 
 -- name: RoomInsertWithPassword :one
 WITH new_room AS (
-INSERT INTO rooms(name, host_id)
-        VALUES ($1, $2)
-    RETURNING
-        id, name, host_id, code, created
-), new_pass AS (
-INSERT INTO room_passwords(room_id, encrypted_password)
+    INSERT INTO rooms(
+        name,
+        host_id)
+    VALUES (
+        $1,
+        $2)
+RETURNING
+    id,
+    name,
+    host_id,
+    code,
+    created
+),
+new_pass AS (
+    INSERT INTO room_passwords(
+        room_id,
+        encrypted_password)
     SELECT
         id,
         crypt(@room_pass, gen_salt('bf'))
@@ -80,7 +91,9 @@ WHERE
     AND r.code = $1;
 
 -- name: RoomGuestInsert :one
-INSERT INTO room_guests(room_id, name)
+INSERT INTO room_guests(
+    room_id,
+    name)
 SELECT
     r.id,
     $1
@@ -93,7 +106,10 @@ RETURNING
     name;
 
 -- name: RoomGuestInsertWithID :one
-INSERT INTO room_guests(id, room_id, name)
+INSERT INTO room_guests(
+    id,
+    room_id,
+    name)
 SELECT
     @guest_id::uuid,
     r.id,
@@ -138,7 +154,10 @@ WHERE
     rg.room_id = $1;
 
 -- name: RoomSetGuestQueueTrack :exec
-INSERT INTO room_queue_tracks(track_id, guest_id, room_id)
+INSERT INTO room_queue_tracks(
+    track_id,
+    guest_id,
+    room_id)
 SELECT
     $1,
     @guest_id::uuid,
@@ -149,7 +168,10 @@ WHERE
     r.code = @room_code::text;
 
 -- name: RoomSetMemberQueueTrack :exec
-INSERT INTO room_queue_tracks(track_id, user_id, room_id)
+INSERT INTO room_queue_tracks(
+    track_id,
+    user_id,
+    room_id)
 SELECT
     $1,
     @user_id::uuid,
@@ -188,11 +210,18 @@ DELETE FROM rooms r
 WHERE r.code = $1;
 
 -- name: RoomAddMember :exec
-INSERT INTO room_members(user_id, room_id)
-    VALUES ($1, $2);
+INSERT INTO room_members(
+    user_id,
+    room_id)
+VALUES (
+    $1,
+    $2);
 
 -- name: RoomAddMemberByUsername :one
-INSERT INTO room_members(user_id, room_id, is_moderator)
+INSERT INTO room_members(
+    user_id,
+    room_id,
+    is_moderator)
 SELECT
     u.id,
     $1,

@@ -1,6 +1,10 @@
 -- name: TrackCacheGetByID :many
-SELECT * FROM SPOTIFY_TRACK_CACHE
-WHERE id = ANY(@track_ids :: text[]);
+SELECT
+    *
+FROM
+    SPOTIFY_TRACK_CACHE
+WHERE
+    id = ANY(@track_ids :: text []);
 
 -- name: TrackCacheInsertBulk :exec
 INSERT INTO
@@ -86,7 +90,8 @@ VALUES
 
 -- name: ArtistCacheInsertBulk :exec
 INSERT INTO
-    SPOTIFY_ARTIST_CACHE(id,
+    SPOTIFY_ARTIST_CACHE(
+        id,
         uri,
         name,
         image_url,
