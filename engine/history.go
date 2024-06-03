@@ -65,7 +65,7 @@ func getHistoryForUser(ctx context.Context, user *db.User) {
 		trackIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
 			return track.Track.ID.String()
 		})
-		service.GetTracksByID(ctx, spClient, lo.Uniq(trackIDs))
+		service.GetTracks(ctx, spClient, lo.Uniq(trackIDs))
 
 		albumIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
 			return track.Track.Album.ID.String()
