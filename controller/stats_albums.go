@@ -10,16 +10,17 @@ import (
 	"github.com/andrewbenington/queue-share-api/history"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/gorilla/mux"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
 type TopAlbumsResponse struct {
-	Rankings  []*history.MonthTopAlbums    `json:"rankings"`
+	Rankings  []*history.AlbumRankings     `json:"rankings"`
 	AlbumData map[string]spotify.FullAlbum `json:"album_data"`
 }
 
-func (c *StatsController) GetTopAlbumsByMonth(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
@@ -32,7 +33,7 @@ func (c *StatsController) GetTopAlbumsByMonth(w http.ResponseWriter, r *http.Req
 
 	transaction := db.Service().DB
 
-	rankingResults, code, err := history.AlbumStreamRankingsByMonth(ctx, transaction, userUUID, filter, 30)
+	rankingResults, code, err := history.AlbumStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -40,7 +41,7 @@ func (c *StatsController) GetTopAlbumsByMonth(w http.ResponseWriter, r *http.Req
 
 	albumIDs := map[string]bool{}
 	for _, result := range rankingResults {
-		for _, album := range result.Albums {
+		for _, album := range result.AlbumStreams {
 			albumIDs[album.ID] = true
 		}
 	}
@@ -152,7 +153,7 @@ func (c *StatsController) GetAlbumRankingsByURI(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	albumURI := r.URL.Query().Get("spotify_uri")
+	albumURI := mux.Vars(r)["spotify_uri"]
 	albumID, err := service.IDFromURI(albumURI)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("bad album uri: %s", err), http.StatusBadRequest)
@@ -165,21 +166,21 @@ func (c *StatsController) GetAlbumRankingsByURI(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	rankings := []MonthRanking{}
+	rankings := []TimeframeRanking{}
 
 	filter := getFilterParams(r)
-	allRankings, responseCode, err := history.AlbumStreamRankingsByMonth(ctx, db.Service().DB, userUUID, filter, 30)
+	allRankings, responseCode, err := history.AlbumStreamRankingsByTimeframe(ctx, db.Service().DB, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}
 
-	for _, monthRankings := range allRankings {
-		for i, albumPlays := range monthRankings.Albums {
-			if albumPlays.ID == string(album.ID) {
-				ranking := MonthRanking{
-					Year:     monthRankings.Year,
-					Month:    monthRankings.Month,
-					Position: i + 1,
+	for _, timeframeRankings := range allRankings {
+		for _, albumStreams := range timeframeRankings.AlbumStreams {
+			if albumStreams.ID == string(album.ID) {
+				ranking := TimeframeRanking{
+					Position:             int(albumStreams.Rank),
+					Timeframe:            timeframeRankings.Timeframe,
+					StartDateUnixSeconds: timeframeRankings.StartDateUnixSeconds,
 				}
 				rankings = append(rankings, ranking)
 			}

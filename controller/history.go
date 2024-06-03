@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -284,7 +283,7 @@ func (c *StatsController) GetAllStreamsByURI(w http.ResponseWriter, r *http.Requ
 	json.NewEncoder(w).Encode(rows)
 }
 
-type MonthRanking struct {
+type TimeframeRanking struct {
 	Year                 int               `json:"year"`
 	Month                int               `json:"month"`
 	Position             int               `json:"position"`
@@ -306,14 +305,13 @@ func getFilterParams(r *http.Request) history.FilterParams {
 	maxParam := r.URL.Query().Get("max")
 	max, err := strconv.Atoi(maxParam)
 	if err != nil {
-		log.Printf("Bad max param: '%s'", maxParam)
 		max = 30
 	}
 
-	artistURIParam := r.URL.Query().Get("artist_uri")
-	var artistURI *string
-	if artistURIParam != "" {
-		artistURI = &artistURIParam
+	artistURIsParam := r.URL.Query().Get("artist_uris")
+	var artistURIs []string
+	if artistURIsParam != "" {
+		artistURIs = strings.Split(artistURIsParam, ",")
 	}
 
 	albumURIParam := r.URL.Query().Get("album_uri")
@@ -332,7 +330,7 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		MinMSPlayed:    int32(minMSPlayed),
 		IncludeSkipped: includeSkipped,
 		Max:            int32(max),
-		ArtistURI:      artistURI,
+		ArtistURIs:     artistURIs,
 		AlbumURI:       albumURI,
 		Timeframe:      timeframe,
 	}

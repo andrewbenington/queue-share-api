@@ -11,15 +11,16 @@ import (
 	"github.com/andrewbenington/queue-share-api/history"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/gorilla/mux"
 	"golang.org/x/exp/maps"
 )
 
 type TopTracksResponse struct {
-	Rankings  []*history.MonthTopTracks `json:"rankings"`
-	TrackData map[string]db.TrackData   `json:"track_data"`
+	Rankings  []*history.TrackRankings `json:"rankings"`
+	TrackData map[string]db.TrackData  `json:"track_data"`
 }
 
-func (c *StatsController) GetTopTracksByMonth(w http.ResponseWriter, r *http.Request) {
+func (c *StatsController) GetTopTracksByTimeframe(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
@@ -28,14 +29,11 @@ func (c *StatsController) GetTopTracksByMonth(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	fmt.Println(userUUID)
-
 	filter := getFilterParams(r)
-	filter.Max = 30
 
 	transaction := db.Service().DB
 
-	rankingResults, code, err := history.TrackStreamRankingsByMonth(ctx, transaction, userUUID, filter)
+	rankingResults, code, err := history.TrackStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -81,7 +79,7 @@ func GetTopItemsByMonth(w http.ResponseWriter, r *http.Request) {
 
 	transaction := db.Service().DB
 
-	rankingResults, code, err := history.TrackStreamRankingsByMonth(ctx, transaction, userUUID, filter)
+	rankingResults, code, err := history.TrackStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -203,10 +201,10 @@ func (c *StatsController) GetTrackRankingsByURI(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	trackURI := r.URL.Query().Get("spotify_uri")
+	trackURI := mux.Vars(r)["spotify_uri"]
 	trackID, err := service.IDFromURI(trackURI)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("bad track uri: %s", err), http.StatusBadRequest)
 		return
 	}
 
@@ -218,20 +216,20 @@ func (c *StatsController) GetTrackRankingsByURI(w http.ResponseWriter, r *http.R
 
 	filter := getFilterParams(r)
 	filter.Max = 30
-	allRankings, responseCode, err := history.TrackStreamRankingsByMonth(ctx, db.Service().DB, userUUID, filter)
+	allRankings, responseCode, err := history.TrackStreamRankingsByTimeframe(ctx, db.Service().DB, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}
 
-	rankings := []MonthRanking{}
+	rankings := []TimeframeRanking{}
 
-	for _, monthRankings := range allRankings {
-		for i, trackPlays := range monthRankings.Tracks {
+	for _, timeframeRankings := range allRankings {
+		for _, trackPlays := range timeframeRankings.Tracks {
 			if trackPlays.ID == string(track.ID) {
-				ranking := MonthRanking{
-					Year:     monthRankings.Year,
-					Month:    monthRankings.Month,
-					Position: i + 1,
+				ranking := TimeframeRanking{
+					Position:             int(trackPlays.Rank),
+					Timeframe:            timeframeRankings.Timeframe,
+					StartDateUnixSeconds: timeframeRankings.StartDateUnixSeconds,
 				}
 				rankings = append(rankings, ranking)
 			}

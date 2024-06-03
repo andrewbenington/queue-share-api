@@ -63,7 +63,7 @@ func loadURIsByPopularity() {
 			trackIDs = append(trackIDs, id)
 		}
 
-		tracks, err := service.GetTracks(ctx, spClient, trackIDs)
+		tracks, err := service.GetTracksByID(ctx, spClient, trackIDs)
 		if err != nil {
 			fmt.Printf("Could not get track IDs %s\n", err)
 			continue
@@ -113,7 +113,7 @@ func cacheTracksByPopularity() {
 			trackIDs = append(trackIDs, id)
 		}
 
-		tracks, err := service.GetTracks(ctx, spClient, trackIDs)
+		tracks, err := service.GetTracksByID(ctx, spClient, trackIDs)
 		if err != nil {
 			fmt.Printf("Could not get track IDs %s\n", err)
 			continue

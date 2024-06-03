@@ -641,7 +641,7 @@ type HistoryGetTopAlbumsInTimeframeParams struct {
 	StartDate    time.Time      `json:"start_date"`
 	EndDate      time.Time      `json:"end_date"`
 	ArtistURI    sql.NullString `json:"artist_uri"`
-	MaxTracks    int32          `json:"max_tracks"`
+	Max          int32          `json:"max"`
 }
 
 type HistoryGetTopAlbumsInTimeframeRow struct {
@@ -658,7 +658,7 @@ func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg Histor
 		arg.StartDate,
 		arg.EndDate,
 		arg.ArtistURI,
-		arg.MaxTracks,
+		arg.Max,
 	)
 	if err != nil {
 		return nil, err
@@ -802,8 +802,8 @@ WHERE
     AND (skipped != TRUE
         OR $3::boolean)
     AND timestamp BETWEEN $4::timestamp AND $5::timestamp
-    AND ($6::text IS NULL
-        OR spotify_artist_uri = $6::text)
+    AND ($6::text[] IS NULL
+        OR spotify_artist_uri = ANY ($6::text[]))
     AND ($7::text IS NULL
         OR spotify_album_uri = $7::text)
 GROUP BY
@@ -819,7 +819,7 @@ type HistoryGetTopTracksInTimeframeParams struct {
 	IncludeSkips bool           `json:"include_skips"`
 	StartDate    time.Time      `json:"start_date"`
 	EndDate      time.Time      `json:"end_date"`
-	ArtistURI    sql.NullString `json:"artist_uri"`
+	ArtistUris   []string       `json:"artist_uris"`
 	AlbumURI     sql.NullString `json:"album_uri"`
 	MaxTracks    int32          `json:"max_tracks"`
 }
@@ -836,7 +836,7 @@ func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg Histor
 		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
-		arg.ArtistURI,
+		pq.Array(arg.ArtistUris),
 		arg.AlbumURI,
 		arg.MaxTracks,
 	)
@@ -876,8 +876,8 @@ WITH top_isrcs AS (
         AND (skipped != TRUE
             OR $3::boolean)
         AND timestamp BETWEEN $4::timestamp AND $5::timestamp
-        AND ($6::text IS NULL
-            OR spotify_artist_uri = $6::text)
+        AND ($6::text[] IS NULL
+            OR spotify_artist_uri = ANY ($6::text[]))
         AND ($7::text IS NULL
             OR spotify_album_uri = $7::text)
     GROUP BY
@@ -921,7 +921,7 @@ type HistoryGetTopTracksInTimeframeDedupParams struct {
 	IncludeSkips bool           `json:"include_skips"`
 	StartDate    time.Time      `json:"start_date"`
 	EndDate      time.Time      `json:"end_date"`
-	ArtistURI    sql.NullString `json:"artist_uri"`
+	ArtistUris   []string       `json:"artist_uris"`
 	AlbumURI     sql.NullString `json:"album_uri"`
 	MaxTracks    int32          `json:"max_tracks"`
 }
@@ -940,7 +940,7 @@ func (q *Queries) HistoryGetTopTracksInTimeframeDedup(ctx context.Context, arg H
 		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
-		arg.ArtistURI,
+		pq.Array(arg.ArtistUris),
 		arg.AlbumURI,
 		arg.MaxTracks,
 	)

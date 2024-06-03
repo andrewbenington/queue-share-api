@@ -107,7 +107,6 @@ func InsertParamsFromFullTracks(tracks []*spotify.FullTrack) db.TrackCacheInsert
 	}
 
 	for _, track := range tracks {
-		fmt.Printf("%+v\n", track)
 		album := track.Album
 		artist := track.Artists[0]
 		params.ID = append(params.ID, track.ID.String())

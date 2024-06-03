@@ -10,12 +10,13 @@ import (
 	"github.com/andrewbenington/queue-share-api/history"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/gorilla/mux"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
 type TopArtistsResponse struct {
-	Rankings   []*history.MonthTopArtists    `json:"rankings"`
+	Rankings   []*history.ArtistRankings     `json:"rankings"`
 	ArtistData map[string]spotify.FullArtist `json:"artist_data"`
 }
 
@@ -162,7 +163,7 @@ func (c *StatsController) GetArtistRankingsByURI(w http.ResponseWriter, r *http.
 		return
 	}
 
-	artistURI := r.URL.Query().Get("spotify_uri")
+	artistURI := mux.Vars(r)["spotify_uri"]
 	artistID, err := service.IDFromURI(artistURI)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("bad artist uri: %s", err), http.StatusBadRequest)
@@ -175,7 +176,7 @@ func (c *StatsController) GetArtistRankingsByURI(w http.ResponseWriter, r *http.
 		return
 	}
 
-	rankings := []MonthRanking{}
+	rankings := []TimeframeRanking{}
 
 	filter := getFilterParams(r)
 	allRankings, responseCode, err := history.ArtistStreamRankingsByTimeframe(ctx, db.Service().DB, userUUID, filter, nil, nil)
@@ -183,15 +184,13 @@ func (c *StatsController) GetArtistRankingsByURI(w http.ResponseWriter, r *http.
 		http.Error(w, err.Error(), responseCode)
 	}
 
-	for _, monthRankings := range allRankings {
-		for i, artistPlays := range monthRankings.Artists {
+	for _, timeframeRankings := range allRankings {
+		for _, artistPlays := range timeframeRankings.Artists {
 			if artistPlays.ID == string(artist.ID) {
-				ranking := MonthRanking{
-					Year:                 monthRankings.Year,
-					Month:                monthRankings.Month,
-					Position:             i + 1,
-					Timeframe:            monthRankings.Timeframe,
-					StartDateUnixSeconds: monthRankings.StartDateUnixSeconds,
+				ranking := TimeframeRanking{
+					Position:             int(artistPlays.Rank),
+					Timeframe:            timeframeRankings.Timeframe,
+					StartDateUnixSeconds: timeframeRankings.StartDateUnixSeconds,
 				}
 				rankings = append(rankings, ranking)
 			}

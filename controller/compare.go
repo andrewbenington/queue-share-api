@@ -2,9 +2,9 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/auth"
@@ -61,8 +61,6 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 		return
 	}
 
-	fmt.Println(start, end)
-
 	streamsByURI := map[string]map[uuid.UUID]int64{}
 	ranksByURI := map[string]map[uuid.UUID]int64{}
 
@@ -110,16 +108,18 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 
 	trackIDs := map[string]bool{}
 
-	// Only include tracks with stats from at least 1 friend
-	for uri, streams := range streamsByURI {
-		if len(streams) > 1 {
-			resp.StreamsByURI[uri] = streams
+	// Only include tracks with stats from at least 1 friend if true
+	sharedOnly := strings.EqualFold(r.URL.Query().Get("shared_only"), "true")
+
+	for uri, streamsByUser := range streamsByURI {
+		if !sharedOnly || len(streamsByUser) > 1 {
+			resp.StreamsByURI[uri] = streamsByUser
 			trackIDs[service.IDFromURIMust(uri)] = true
 		}
 	}
-	for uri, streams := range ranksByURI {
-		if len(streams) > 1 {
-			resp.RanksByURI[uri] = streams
+	for uri, ranksByUser := range ranksByURI {
+		if !sharedOnly || len(ranksByUser) > 1 {
+			resp.RanksByURI[uri] = ranksByUser
 		}
 	}
 
@@ -234,6 +234,7 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 			artistIDs[service.IDFromURIMust(uri)] = true
 		}
 	}
+
 	for uri, streams := range ranksByURI {
 		if len(streams) > 1 {
 			resp.RanksByURI[uri] = streams
@@ -267,8 +268,6 @@ func getStartAndEndTimes(r *http.Request) (time.Time, time.Time) {
 	if err == nil {
 		end = time.Unix(endUnix, 0)
 	}
-
-	fmt.Println(start, end)
 
 	return start, end
 }

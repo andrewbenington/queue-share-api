@@ -22,9 +22,12 @@ import (
 
 var (
 	trackRankingsCache  map[string][]*db.HistoryGetTopTracksInTimeframeDedupRow = make(map[string][]*db.HistoryGetTopTracksInTimeframeDedupRow)
+	albumRankingsCache  map[string][]*db.HistoryGetTopAlbumsInTimeframeRow      = make(map[string][]*db.HistoryGetTopAlbumsInTimeframeRow)
 	artistRankingsCache map[string][]*db.HistoryGetTopArtistsInTimeframeRow     = make(map[string][]*db.HistoryGetTopArtistsInTimeframeRow)
-	trackCacheLock      sync.Mutex
-	artistCacheLock     sync.Mutex
+
+	trackCacheLock  sync.Mutex
+	albumCacheLock  sync.Mutex
+	artistCacheLock sync.Mutex
 )
 
 func init() {
@@ -246,7 +249,7 @@ type FilterParams struct {
 	MinMSPlayed    int32
 	IncludeSkipped bool
 	Max            int32
-	ArtistURI      *string
+	ArtistURIs     []string
 	AlbumURI       *string
 	Timeframe      Timeframe
 }
@@ -336,63 +339,6 @@ func TrackStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID u
 	return results, http.StatusOK, nil
 }
 
-type MonthTopTracks struct {
-	Year   int             `json:"year"`
-	Month  int             `json:"month"`
-	Tracks []*TrackStreams `json:"tracks,omitempty"`
-}
-
-type TrackStreams struct {
-	ID            string `json:"spotify_id"`
-	Streams       int    `json:"stream_count"`
-	StreamsChange *int64 `json:"streams_change,omitempty"`
-	RankChange    *int64 `json:"rank_change,omitempty"`
-}
-
-func TrackStreamRankingsByMonth(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]*MonthTopTracks, int, error) {
-
-	minYear, maxYear, err := FullHistoryTimeRange(ctx, transaction, userUUID)
-	if err != nil {
-		return nil, http.StatusNotFound, err
-	}
-
-	results := []*MonthTopTracks{}
-
-	lastMonthStreams := map[string]int64{}
-	var thisMonthStreams map[string]int64
-
-	lastMonthRanks := map[string]int64{}
-	var thisMonthRanks map[string]int64
-
-	for year := minYear; year <= maxYear; year++ {
-		for month := 1; month <= 12; month++ {
-			start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local)
-			end := time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.Local)
-
-			if start.After(time.Now()) {
-				break
-			}
-
-			var rankingList []*TrackStreams
-			thisMonthStreams, thisMonthRanks, rankingList, err = CalcTrackStreamsAndRanks(ctx, userUUID, filter, start, end, lastMonthStreams, lastMonthRanks)
-			if err != nil {
-				return nil, http.StatusNotFound, err
-			}
-
-			results = append(results, &MonthTopTracks{
-				Year:   year,
-				Month:  month,
-				Tracks: rankingList,
-			})
-
-			lastMonthStreams = thisMonthStreams
-			lastMonthRanks = thisMonthRanks
-		}
-	}
-
-	return results, 0, nil
-}
-
 func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
@@ -404,12 +350,12 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 
 	var rows []*db.HistoryGetTopTracksInTimeframeDedupRow
 
-	cacheIdentifier := fmt.Sprintf("%s-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli())
+	cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
 	if filter.AlbumURI != nil {
 		cacheIdentifier += "-" + *filter.AlbumURI
 	}
-	if filter.ArtistURI != nil {
-		cacheIdentifier += "-" + *filter.ArtistURI
+	if filter.ArtistURIs != nil {
+		cacheIdentifier += "-" + strings.Join(filter.ArtistURIs, ",")
 	}
 
 	trackCacheLock.Lock()
@@ -425,8 +371,8 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 			IncludeSkips: filter.IncludeSkipped,
 			StartDate:    start.UTC(),
 			EndDate:      end.UTC(),
-			MaxTracks:    filter.Max,
-			ArtistURI:    NullStringFromPtr(filter.ArtistURI),
+			MaxTracks:    filter.Max + 20,
+			ArtistUris:   filter.ArtistURIs,
 			AlbumURI:     NullStringFromPtr(filter.AlbumURI),
 		})
 		if err != nil {
@@ -437,14 +383,22 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 		trackCacheLock.Unlock()
 	}
 
-	for rankMinusOne, row := range rows {
+	var prevCount int64 = 0
+	var currentRank int64 = 0
+	for _, row := range rows {
+		if row.Occurrences != prevCount {
+			currentRank++
+			prevCount = row.Occurrences
+		}
+
 		trackStreams := TrackStreams{
 			ID:      service.IDFromURIMust(row.SpotifyTrackUri),
 			Streams: int(row.Occurrences),
+			Rank:    currentRank,
 		}
 
 		streamsByURI[row.SpotifyTrackUri] = row.Occurrences
-		ranksByURI[row.SpotifyTrackUri] = int64(rankMinusOne) + 1
+		ranksByURI[row.SpotifyTrackUri] = currentRank
 
 		if lastStreams != nil {
 			if lastStreams, ok := lastStreams[row.SpotifyTrackUri]; ok {
@@ -456,7 +410,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 
 		if lastRanks != nil {
 			if lastRank, ok := lastRanks[row.SpotifyTrackUri]; ok {
-				diff := lastRank - (int64(rankMinusOne) + 1)
+				diff := lastRank - currentRank
 				trackStreams.RankChange = &diff
 			}
 		}
@@ -464,9 +418,90 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 		rankingList = append(rankingList, &trackStreams)
 	}
 
+	if len(rankingList) > int(filter.Max) {
+		rankingList = rankingList[:filter.Max]
+	}
+
 	return
 }
 
+func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
+	streamsByURI map[string]int64,
+	ranksByURI map[string]int64,
+	rankingList []*AlbumStreams,
+	err error,
+) {
+	streamsByURI = map[string]int64{}
+	ranksByURI = map[string]int64{}
+
+	var rows []*db.HistoryGetTopAlbumsInTimeframeRow
+
+	cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
+	albumCacheLock.Lock()
+	cachedRows, ok := albumRankingsCache[cacheIdentifier]
+	albumCacheLock.Unlock()
+
+	if ok && time.Since(end) >= time.Hour*24 {
+		rows = cachedRows
+	} else {
+		rows, err = db.New(db.Service().DB).HistoryGetTopAlbumsInTimeframe(ctx, db.HistoryGetTopAlbumsInTimeframeParams{
+			UserID:       userUUID,
+			MinMsPlayed:  filter.MinMSPlayed,
+			IncludeSkips: filter.IncludeSkipped,
+			StartDate:    start.UTC(),
+			EndDate:      end.UTC(),
+			Max:          filter.Max + 20,
+		})
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		albumCacheLock.Lock()
+		albumRankingsCache[cacheIdentifier] = rows
+		albumCacheLock.Unlock()
+	}
+
+	var prevCount int64 = 0
+	var currentRank int64 = 0
+	for _, row := range rows {
+		if row.Occurrences != prevCount {
+			currentRank++
+			prevCount = row.Occurrences
+		}
+
+		albumStreams := AlbumStreams{
+			ID:      service.IDFromURIMust(row.SpotifyAlbumUri.String),
+			Streams: row.Occurrences,
+			Tracks:  strings.Split(row.Tracks, "|~|"),
+			Rank:    currentRank,
+		}
+
+		streamsByURI[row.SpotifyAlbumUri.String] = row.Occurrences
+		ranksByURI[row.SpotifyAlbumUri.String] = currentRank
+
+		if lastStreams != nil {
+			if lastStreams, ok := lastStreams[row.SpotifyAlbumUri.String]; ok {
+				diff := row.Occurrences - lastStreams
+				albumStreams.StreamsChange = &diff
+			}
+
+		}
+
+		if lastRanks != nil {
+			if lastRank, ok := lastRanks[row.SpotifyAlbumUri.String]; ok {
+				diff := lastRank - currentRank
+				albumStreams.RankChange = &diff
+			}
+		}
+
+		rankingList = append(rankingList, &albumStreams)
+	}
+	if len(rankingList) > int(filter.Max) {
+		rankingList = rankingList[:filter.Max]
+	}
+
+	return
+}
 func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
@@ -503,15 +538,23 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		artistCacheLock.Unlock()
 	}
 
-	for rankMinusOne, row := range rows {
+	var prevCount int64 = 0
+	var currentRank int64 = 0
+	for _, row := range rows {
+		if row.Occurrences != prevCount {
+			currentRank++
+			prevCount = row.Occurrences
+		}
+
 		artistStreams := ArtistStreams{
 			ID:      service.IDFromURIMust(row.SpotifyArtistUri.String),
 			Streams: row.Occurrences,
+			Rank:    currentRank,
 			Tracks:  strings.Split(row.Tracks, "|~|"),
 		}
 
 		streamsByURI[row.SpotifyArtistUri.String] = row.Occurrences
-		ranksByURI[row.SpotifyArtistUri.String] = int64(rankMinusOne) + 1
+		ranksByURI[row.SpotifyArtistUri.String] = currentRank
 
 		if lastStreams != nil {
 			if lastStreams, ok := lastStreams[row.SpotifyArtistUri.String]; ok {
@@ -523,13 +566,14 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 
 		if lastRanks != nil {
 			if lastRank, ok := lastRanks[row.SpotifyArtistUri.String]; ok {
-				diff := lastRank - (int64(rankMinusOne) + 1)
+				diff := lastRank - currentRank
 				artistStreams.RankChange = &diff
 			}
 		}
 
 		rankingList = append(rankingList, &artistStreams)
 	}
+
 	if len(rankingList) > int(filter.Max) {
 		rankingList = rankingList[:filter.Max]
 	}
@@ -537,9 +581,70 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 	return
 }
 
-type MonthTopArtists struct {
-	Year                 int              `json:"year"`
-	Month                int              `json:"month"`
+type TrackRankings struct {
+	Tracks               []*TrackStreams `json:"tracks,omitempty"`
+	StartDateUnixSeconds int64           `json:"start_date_unix_seconds"`
+	Timeframe            Timeframe       `json:"timeframe"`
+}
+
+type TrackStreams struct {
+	ID            string `json:"spotify_id"`
+	Streams       int    `json:"stream_count"`
+	StreamsChange *int64 `json:"streams_change,omitempty"`
+	Rank          int64  `json:"rank"`
+	RankChange    *int64 `json:"rank_change,omitempty"`
+}
+
+func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, start *time.Time, end *time.Time) ([]*TrackRankings, int, error) {
+	var firstStart time.Time
+	endTime := time.Now()
+	if end != nil {
+		endTime = *end
+	}
+
+	if start != nil {
+		firstStart = *start
+	} else if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
+		firstStart = *defaultFirstStart
+	} else {
+		minYear, _, err := FullHistoryTimeRange(ctx, transaction, userUUID)
+		if err != nil {
+			return nil, http.StatusNotFound, err
+		}
+		firstStart = time.Date(minYear, 0, 1, 0, 0, 0, 0, time.Local)
+	}
+
+	results := []*TrackRankings{}
+
+	lastMonthStreams := map[string]int64{}
+	lastMonthRanks := map[string]int64{}
+
+	current := firstStart
+	for current.Before(endTime) {
+		nextStart := filter.Timeframe.GetNextStartTime(current)
+
+		var rankingList []*TrackStreams
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcTrackStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
+		if err != nil {
+			return nil, http.StatusNotFound, err
+		}
+
+		results = append(results, &TrackRankings{
+			Tracks:               rankingList,
+			StartDateUnixSeconds: current.Unix(),
+			Timeframe:            filter.Timeframe,
+		})
+
+		lastMonthStreams = thisMonthStreams
+		lastMonthRanks = thisMonthRanks
+
+		current = nextStart
+	}
+
+	return results, 0, nil
+}
+
+type ArtistRankings struct {
 	Artists              []*ArtistStreams `json:"artists"`
 	StartDateUnixSeconds int64            `json:"start_date_unix_seconds"`
 	Timeframe            Timeframe        `json:"timeframe"`
@@ -549,12 +654,78 @@ type ArtistStreams struct {
 	ID            string              `json:"spotify_id"`
 	Streams       int64               `json:"stream_count"`
 	StreamsChange *int64              `json:"streams_change,omitempty"`
+	Rank          int64               `json:"rank"`
 	RankChange    *int64              `json:"rank_change,omitempty"`
 	Artist        *spotify.FullArtist `json:"artist,omitempty"`
 	Tracks        []string            `json:"tracks"`
 }
 
-func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, start *time.Time, end *time.Time) ([]*MonthTopArtists, int, error) {
+func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, start *time.Time, end *time.Time) ([]*ArtistRankings, int, error) {
+	var firstStart time.Time
+	endTime := time.Now()
+	if end != nil {
+		endTime = *end
+	}
+
+	if start != nil {
+		firstStart = *start
+	} else if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
+		firstStart = *defaultFirstStart
+	} else {
+		minYear, _, err := FullHistoryTimeRange(ctx, transaction, userUUID)
+		if err != nil {
+			return nil, http.StatusNotFound, err
+		}
+		firstStart = time.Date(minYear, 0, 1, 0, 0, 0, 0, time.Local)
+	}
+
+	results := []*ArtistRankings{}
+
+	lastMonthStreams := map[string]int64{}
+	lastMonthRanks := map[string]int64{}
+
+	current := firstStart
+	for current.Before(endTime) {
+		nextStart := filter.Timeframe.GetNextStartTime(current)
+
+		var rankingList []*ArtistStreams
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
+		if err != nil {
+			return nil, http.StatusNotFound, err
+		}
+
+		results = append(results, &ArtistRankings{
+			Artists:              rankingList,
+			StartDateUnixSeconds: current.Unix(),
+			Timeframe:            filter.Timeframe,
+		})
+
+		lastMonthStreams = thisMonthStreams
+		lastMonthRanks = thisMonthRanks
+
+		current = nextStart
+	}
+
+	return results, 0, nil
+}
+
+type AlbumRankings struct {
+	AlbumStreams         []*AlbumStreams `json:"albums"`
+	StartDateUnixSeconds int64           `json:"start_date_unix_seconds"`
+	Timeframe            Timeframe       `json:"timeframe"`
+}
+
+type AlbumStreams struct {
+	ID            string             `json:"spotify_id"`
+	Streams       int64              `json:"stream_count"`
+	StreamsChange *int64             `json:"streams_change,omitempty"`
+	Rank          int64              `json:"rank"`
+	RankChange    *int64             `json:"rank_change,omitempty"`
+	Album         *spotify.FullAlbum `json:"album,omitempty"`
+	Tracks        []string           `json:"tracks"`
+}
+
+func AlbumStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, start *time.Time, end *time.Time) ([]*AlbumRankings, int, error) {
 
 	var firstStart time.Time
 	endTime := time.Now()
@@ -571,32 +742,26 @@ func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, u
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
-		firstStart = time.Date(minYear, 0, 0, 0, 0, 0, 0, time.Local)
-
+		firstStart = time.Date(minYear, 0, 1, 0, 0, 0, 0, time.Local)
 	}
 
-	results := []*MonthTopArtists{}
+	results := []*AlbumRankings{}
 
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
 	current := firstStart
-	fmt.Println("END:", endTime.Format(time.ANSIC))
 	for current.Before(endTime) {
-		fmt.Println(current.Format(time.ANSIC))
 		nextStart := filter.Timeframe.GetNextStartTime(current)
 
-		var rankingList []*ArtistStreams
-		thisMonthStreams, thisMonthRanks, rankingList, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
+		var rankingList []*AlbumStreams
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcAlbumStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
-		fmt.Println("List", len(rankingList))
 
-		results = append(results, &MonthTopArtists{
-			Year:                 current.Year(),
-			Month:                int(current.Month()),
-			Artists:              rankingList,
+		results = append(results, &AlbumRankings{
+			AlbumStreams:         rankingList,
 			StartDateUnixSeconds: current.Unix(),
 			Timeframe:            filter.Timeframe,
 		})
@@ -605,95 +770,6 @@ func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, u
 		lastMonthRanks = thisMonthRanks
 
 		current = nextStart
-	}
-
-	return results, 0, nil
-}
-
-type MonthTopAlbums struct {
-	Year   int             `json:"year"`
-	Month  int             `json:"month"`
-	Albums []*AlbumStreams `json:"albums"`
-}
-
-type AlbumStreams struct {
-	ID            string             `json:"spotify_id"`
-	Streams       int                `json:"stream_count"`
-	StreamsChange *int64             `json:"streams_change,omitempty"`
-	RankChange    *int64             `json:"rank_change,omitempty"`
-	Album         *spotify.FullAlbum `json:"album,omitempty"`
-	Tracks        []string           `json:"tracks"`
-}
-
-func AlbumStreamRankingsByMonth(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, maxAlbums int32) ([]*MonthTopAlbums, int, error) {
-	minYear, maxYear, err := FullHistoryTimeRange(ctx, transaction, userUUID)
-	if err != nil {
-		return nil, http.StatusNotFound, err
-	}
-
-	results := []*MonthTopAlbums{}
-
-	lastMonthStreams := map[string]int64{}
-	thisMonthStreams := map[string]int64{}
-
-	lastMonthRanks := map[string]int64{}
-	thisMonthRanks := map[string]int64{}
-
-	for year := minYear; year <= maxYear; year++ {
-		for month := 1; month <= 12; month++ {
-			rows, err := db.New(db.Service().DB).HistoryGetTopAlbumsInTimeframe(ctx, db.HistoryGetTopAlbumsInTimeframeParams{
-				UserID:       userUUID,
-				MinMsPlayed:  filter.MinMSPlayed,
-				IncludeSkips: filter.IncludeSkipped,
-				StartDate:    time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.Local),
-				EndDate:      time.Date(year, time.Month(month+1), 1, 0, 0, 0, 0, time.Local),
-				MaxTracks:    maxAlbums,
-				ArtistURI:    NullStringFromPtr(filter.ArtistURI),
-			})
-
-			if err != nil {
-				return nil, http.StatusNotFound, err
-			}
-
-			rankingList := []*AlbumStreams{}
-			for rankMinusOne, row := range rows {
-				if !row.SpotifyAlbumUri.Valid {
-					continue
-				}
-				albumStreams := AlbumStreams{
-					ID:      service.IDFromURIMust(row.SpotifyAlbumUri.String),
-					Streams: int(row.Occurrences),
-					Tracks:  strings.Split(row.Tracks, "|~|"),
-				}
-
-				thisMonthStreams[row.SpotifyAlbumUri.String] = row.Occurrences
-				thisMonthRanks[row.SpotifyAlbumUri.String] = int64(rankMinusOne) + 1
-
-				if lastStreams, ok := lastMonthStreams[row.SpotifyAlbumUri.String]; ok {
-					diff := row.Occurrences - lastStreams
-					albumStreams.StreamsChange = &diff
-				}
-
-				if lastRank, ok := lastMonthRanks[row.SpotifyAlbumUri.String]; ok {
-					diff := lastRank - (int64(rankMinusOne) + 1)
-					albumStreams.RankChange = &diff
-				}
-
-				rankingList = append(rankingList, &albumStreams)
-			}
-
-			results = append(results, &MonthTopAlbums{
-				Year:   year,
-				Month:  month,
-				Albums: rankingList,
-			})
-
-			lastMonthStreams = thisMonthStreams
-			thisMonthStreams = map[string]int64{}
-
-			lastMonthRanks = thisMonthRanks
-			thisMonthRanks = map[string]int64{}
-		}
 	}
 
 	return results, 0, nil

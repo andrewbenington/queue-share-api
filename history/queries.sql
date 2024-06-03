@@ -277,8 +277,8 @@ WHERE
     AND (skipped != TRUE
         OR @include_skips::boolean)
     AND timestamp BETWEEN @start_date::timestamp AND @end_date::timestamp
-    AND (sqlc.narg(artist_uri)::text IS NULL
-        OR spotify_artist_uri = sqlc.narg(artist_uri)::text)
+    AND (sqlc.narg(artist_uris)::text[] IS NULL
+        OR spotify_artist_uri = ANY (sqlc.narg(artist_uris)::text[]))
     AND (sqlc.narg(album_uri)::text IS NULL
         OR spotify_album_uri = sqlc.narg(album_uri)::text)
 GROUP BY
@@ -302,8 +302,8 @@ WITH top_isrcs AS (
         AND (skipped != TRUE
             OR @include_skips::boolean)
         AND timestamp BETWEEN @start_date::timestamp AND @end_date::timestamp
-        AND (sqlc.narg(artist_uri)::text IS NULL
-            OR spotify_artist_uri = sqlc.narg(artist_uri)::text)
+        AND (sqlc.narg(artist_uris)::text[] IS NULL
+            OR spotify_artist_uri = ANY (sqlc.narg(artist_uris)::text[]))
         AND (sqlc.narg(album_uri)::text IS NULL
             OR spotify_album_uri = sqlc.narg(album_uri)::text)
     GROUP BY
@@ -378,7 +378,7 @@ GROUP BY
     spotify_album_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT @max_tracks;
+LIMIT @max;
 
 -- name: HistoryGetTrackURIForAlbum :one
 SELECT

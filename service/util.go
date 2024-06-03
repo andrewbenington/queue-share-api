@@ -20,3 +20,11 @@ func IDFromURIMust(uri string) string {
 	}
 	return segments[2]
 }
+
+func IDFromURIMustIdx(uri string, _ int) string {
+	segments := strings.Split(uri, ":")
+	if len(segments) != 3 {
+		return ""
+	}
+	return segments[2]
+}

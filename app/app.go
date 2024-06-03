@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/controller"
@@ -78,10 +80,6 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/stats/upload", a.StatsController.UploadHistory).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/stats/history", a.StatsController.GetAllHistory).Methods("GET", "OPTIONS")
 
-	a.Router.HandleFunc("/stats/songs-by-month", a.StatsController.GetTopTracksByMonth).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/artists-by-month", a.StatsController.GetTopArtistsByTimeframe).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/albums-by-month", a.StatsController.GetTopAlbumsByMonth).Methods("GET", "OPTIONS")
-
 	a.Router.HandleFunc("/stats/tracks-by-year", a.StatsController.GetTopTracksByYear).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/stats/albums-by-year", a.StatsController.GetTopAlbumsByYear).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/stats/artists-by-year", a.StatsController.GetTopArtistsByYear).Methods("GET", "OPTIONS")
@@ -96,12 +94,17 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/stats/compare-tracks", a.StatsController.UserCompareFriendTopTracks).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/stats/compare-artists", a.StatsController.UserCompareFriendTopArtists).Methods("GET", "OPTIONS")
 
-	a.Router.HandleFunc("/rankings/track", a.StatsController.GetTrackRankingsByURI).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/rankings/album", a.StatsController.GetAlbumRankingsByURI).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/rankings/artist", a.StatsController.GetArtistRankingsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/track/{spotify_uri}", a.StatsController.GetTrackRankingsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/album/{spotify_uri}", a.StatsController.GetAlbumRankingsByURI).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/artist/{spotify_uri}", a.StatsController.GetArtistRankingsByURI).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/rankings/track", a.StatsController.GetTopTracksByTimeframe).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/artist", a.StatsController.GetTopArtistsByTimeframe).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/rankings/album", a.StatsController.GetTopAlbumsByTimeframe).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/spotify/search-tracks", a.Controller.SearchTracksByUser).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/spotify/search-artists", a.Controller.SearchArtistsByUser).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/spotify/artists-by-uri", a.Controller.GetArtistsByURIs).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")
@@ -112,7 +115,7 @@ func (a *App) initRouter() {
 
 func (a *App) Run(addr string) {
 	log.Printf("serving on %s...", addr)
-	log.Fatalf("server error: %s", http.ListenAndServe(addr, corsMW(authMW(logMW(a.Router)))))
+	log.Fatalf("server error: %s", http.ListenAndServe(addr, timeoutMW(corsMW(authMW(logMW(a.Router))))))
 }
 
 func logMW(next http.Handler) http.Handler {
@@ -159,7 +162,16 @@ func authMW(next http.Handler) http.Handler {
 			json.NewEncoder(w).Encode(ErrorResponse{err.Error()})
 			return
 		}
+		fmt.Printf("User %s\n", id)
 		ctx := context.WithValue(r.Context(), auth.UserContextKey, id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func timeoutMW(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+		defer cancel()
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
