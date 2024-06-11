@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	cycle_period                 = time.Minute * 30
+	cycle_period                 = time.Second * 10
 	cycle_period_history         = time.Minute * 30
 	cycle_period_load_uris       = time.Minute * 30
 	cycle_period_spotify_profile = time.Hour * 24

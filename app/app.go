@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -93,6 +92,7 @@ func (a *App) initRouter() {
 
 	a.Router.HandleFunc("/stats/compare-tracks", a.StatsController.UserCompareFriendTopTracks).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/stats/compare-artists", a.StatsController.UserCompareFriendTopArtists).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/compare-albums", a.StatsController.UserCompareFriendTopAlbums).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/rankings/track/{spotify_uri}", a.StatsController.GetTrackRankingsByURI).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/rankings/album/{spotify_uri}", a.StatsController.GetAlbumRankingsByURI).Methods("GET", "OPTIONS")
@@ -105,6 +105,7 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/spotify/search-tracks", a.Controller.SearchTracksByUser).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/spotify/search-artists", a.Controller.SearchArtistsByUser).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/spotify/artists-by-uri", a.Controller.GetArtistsByURIs).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/spotify/tracks-by-uri", a.Controller.GetTracksByURIs).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")
@@ -162,7 +163,7 @@ func authMW(next http.Handler) http.Handler {
 			json.NewEncoder(w).Encode(ErrorResponse{err.Error()})
 			return
 		}
-		fmt.Printf("User %s\n", id)
+		log.Printf("Endpoint,%s,User,%s\n", r.RequestURI, id)
 		ctx := context.WithValue(r.Context(), auth.UserContextKey, id)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -170,7 +171,7 @@ func authMW(next http.Handler) http.Handler {
 
 func timeoutMW(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*30)
 		defer cancel()
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

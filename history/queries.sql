@@ -292,7 +292,7 @@ WITH top_isrcs AS (
     SELECT
         tc.isrc,
         COUNT(*) AS occurrences,
-(array_agg(DISTINCT h.spotify_track_uri)) AS spotify_track_uris
+(json_agg(DISTINCT h.spotify_track_uri)) AS spotify_track_uris
     FROM
         spotify_history h
         JOIN spotify_track_cache tc ON tc.uri = h.spotify_track_uri
@@ -331,7 +331,7 @@ pref_albums AS (
         ELSE
             4
         END,
-        release_date DESC
+        release_date ASC
 )
 SELECT
     *
@@ -344,7 +344,7 @@ ORDER BY
 SELECT
     spotify_artist_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|')::text AS TRACKS
+    json_agg(spotify_track_uri) AS TRACKS
 FROM
     spotify_history
 WHERE
@@ -363,7 +363,7 @@ LIMIT @max;
 SELECT
     spotify_album_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|')::text AS TRACKS
+    json_agg(spotify_track_uri) AS TRACKS
 FROM
     spotify_history
 WHERE

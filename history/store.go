@@ -339,7 +339,7 @@ func TrackStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID u
 	return results, http.StatusOK, nil
 }
 
-func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
+func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
 	rankingList []*TrackStreams,
@@ -365,7 +365,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 	if ok && time.Since(end) >= time.Hour*24 {
 		rows = cachedRows
 	} else {
-		rows, err = db.New(db.Service().DB).HistoryGetTopTracksInTimeframeDedup(ctx, db.HistoryGetTopTracksInTimeframeDedupParams{
+		rows, err = db.New(transaction).HistoryGetTopTracksInTimeframeDedup(ctx, db.HistoryGetTopTracksInTimeframeDedupParams{
 			UserID:       userUUID,
 			MinMsPlayed:  filter.MinMSPlayed,
 			IncludeSkips: filter.IncludeSkipped,
@@ -425,7 +425,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 	return
 }
 
-func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
+func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
 	rankingList []*AlbumStreams,
@@ -469,10 +469,16 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 			prevCount = row.Occurrences
 		}
 
+		trackURIs := []string{}
+		err = json.Unmarshal(row.Tracks, &trackURIs)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
 		albumStreams := AlbumStreams{
 			ID:      service.IDFromURIMust(row.SpotifyAlbumUri.String),
 			Streams: row.Occurrences,
-			Tracks:  strings.Split(row.Tracks, "|~|"),
+			Tracks:  trackURIs,
 			Rank:    currentRank,
 		}
 
@@ -502,7 +508,7 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 
 	return
 }
-func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
+func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
 	rankingList []*ArtistStreams,
@@ -521,7 +527,7 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 	if ok && time.Since(end) >= time.Hour*24 {
 		rows = cachedRows
 	} else {
-		rows, err = db.New(db.Service().DB).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
+		rows, err = db.New(transaction).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
 			UserID:       userUUID,
 			MinMsPlayed:  filter.MinMSPlayed,
 			IncludeSkips: filter.IncludeSkipped,
@@ -546,11 +552,22 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 			prevCount = row.Occurrences
 		}
 
+		trackURIs := []string{}
+		err = json.Unmarshal(row.Tracks, &trackURIs)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		// primaryURICounts, err := getPrimaryURICounts(ctx, transaction, trackURIs)
+		// if err != nil {
+		// 	return nil, nil, nil, err
+		// }
+
 		artistStreams := ArtistStreams{
 			ID:      service.IDFromURIMust(row.SpotifyArtistUri.String),
 			Streams: row.Occurrences,
 			Rank:    currentRank,
-			Tracks:  strings.Split(row.Tracks, "|~|"),
+			Tracks:  trackURIs,
 		}
 
 		streamsByURI[row.SpotifyArtistUri.String] = row.Occurrences
@@ -579,6 +596,40 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 	}
 
 	return
+}
+
+func getPrimaryURICounts(ctx context.Context, transaction db.DBTX, uris []string) (map[string]int, error) {
+	rows, err := db.New(transaction).TracksGetPrimaryURIs(ctx, uris)
+	if err != nil {
+		return nil, err
+	}
+
+	uriToPrimary := map[string]string{}
+
+	for _, row := range rows {
+		originalURIs := []string{}
+		err = json.Unmarshal(row.OriginalUris, &originalURIs)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, uri := range originalURIs {
+			uriToPrimary[uri] = row.PrimaryUri
+		}
+	}
+
+	primaryURICounts := map[string]int{}
+	for _, uri := range uris {
+		if primary, ok := uriToPrimary[uri]; ok {
+			if count, ok := primaryURICounts[primary]; ok {
+				primaryURICounts[primary] = count + 1
+			} else {
+				primaryURICounts[primary] = 1
+			}
+		}
+	}
+
+	return primaryURICounts, nil
 }
 
 type TrackRankings struct {
@@ -611,7 +662,7 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
-		firstStart = time.Date(minYear, 0, 1, 0, 0, 0, 0, time.Local)
+		firstStart = time.Date(minYear, 1, 1, 0, 0, 0, 0, time.Local)
 	}
 
 	results := []*TrackRankings{}
@@ -619,12 +670,18 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
+	tx, err := db.Service().DB.Begin()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	defer tx.Commit()
+
 	current := firstStart
 	for current.Before(endTime) {
 		nextStart := filter.Timeframe.GetNextStartTime(current)
 
 		var rankingList []*TrackStreams
-		thisMonthStreams, thisMonthRanks, rankingList, err := CalcTrackStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, current, nextStart, lastMonthStreams, lastMonthRanks)
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
@@ -676,7 +733,7 @@ func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, u
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
-		firstStart = time.Date(minYear, 0, 1, 0, 0, 0, 0, time.Local)
+		firstStart = time.Date(minYear, 1, 1, 0, 0, 0, 0, time.Local)
 	}
 
 	results := []*ArtistRankings{}
@@ -684,12 +741,18 @@ func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, u
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
+	tx, err := db.Service().DB.Begin()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	defer tx.Commit()
+
 	current := firstStart
 	for current.Before(endTime) {
 		nextStart := filter.Timeframe.GetNextStartTime(current)
 
 		var rankingList []*ArtistStreams
-		thisMonthStreams, thisMonthRanks, rankingList, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, tx, current, nextStart, lastMonthStreams, lastMonthRanks)
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
@@ -742,7 +805,7 @@ func AlbumStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
-		firstStart = time.Date(minYear, 0, 1, 0, 0, 0, 0, time.Local)
+		firstStart = time.Date(minYear, 1, 1, 0, 0, 0, 0, time.Local)
 	}
 
 	results := []*AlbumRankings{}
@@ -750,12 +813,18 @@ func AlbumStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
+	tx, err := db.Service().DB.Begin()
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	defer tx.Commit()
+
 	current := firstStart
 	for current.Before(endTime) {
 		nextStart := filter.Timeframe.GetNextStartTime(current)
 
 		var rankingList []*AlbumStreams
-		thisMonthStreams, thisMonthRanks, rankingList, err := CalcAlbumStreamsAndRanks(ctx, userUUID, filter, current, nextStart, lastMonthStreams, lastMonthRanks)
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcAlbumStreamsAndRanks(ctx, userUUID, filter, tx, current, nextStart, lastMonthStreams, lastMonthRanks)
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}

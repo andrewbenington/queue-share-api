@@ -177,3 +177,42 @@ func (c *Controller) GetArtistsByURIs(w http.ResponseWriter, r *http.Request) {
 	})
 	json.NewEncoder(w).Encode(artistData)
 }
+
+func (c *Controller) GetTracksByURIs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userID, authenticatedAsUser := ctx.Value(auth.UserContextKey).(string)
+	if !authenticatedAsUser {
+		requests.RespondAuthError(w)
+		return
+	}
+
+	userUUID, err := uuid.Parse(userID)
+	if err != nil {
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
+		return
+	}
+
+	code, spClient, err := client.ForUser(ctx, userUUID)
+	if err != nil {
+		requests.RespondWithError(w, code, err.Error())
+		return
+	}
+
+	urisParam := r.URL.Query().Get("uris")
+	if urisParam == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write(SearchMissingError)
+	}
+
+	uris := strings.Split(urisParam, ",")
+	ids := lo.Map(uris, service.IDFromURIMustIdx)
+	ids = lo.Uniq(ids)
+	tracks, err := service.GetTracks(ctx, spClient, ids)
+	if err != nil {
+		requests.RespondWithError(w, code, err.Error())
+		return
+	}
+
+	json.NewEncoder(w).Encode(tracks)
+}

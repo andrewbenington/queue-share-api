@@ -18,6 +18,7 @@ import (
 type TopArtistsResponse struct {
 	Rankings   []*history.ArtistRankings     `json:"rankings"`
 	ArtistData map[string]spotify.FullArtist `json:"artist_data"`
+	TrackData  map[string]db.TrackData       `json:"track_data"`
 }
 
 func (c *StatsController) GetTopArtistsByTimeframe(w http.ResponseWriter, r *http.Request) {
@@ -32,23 +33,43 @@ func (c *StatsController) GetTopArtistsByTimeframe(w http.ResponseWriter, r *htt
 
 	transaction := db.Service().DB
 
+	// trackIDs := map[string]bool{}
 	rankingResults, code, err := history.ArtistStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
 	}
 
+	code, spClient, err := client.ForUser(ctx, userUUID)
+	if err != nil {
+		http.Error(w, err.Error(), code)
+		return
+	}
+
+	// for _, result := range rankingResults {
+	// 	for _, artistData := range result.Artists {
+	// 		for _, trackURI := range artistData.Tracks {
+	// 			id, err := service.IDFromURI(trackURI)
+	// 			if err != nil {
+	// 				fmt.Println(err)
+	// 				continue
+	// 			}
+	// 			trackIDs[id] = true
+	// 		}
+	// 	}
+	// }
+
+	// tracks, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	// if err != nil {
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
+
 	artistIDs := map[string]bool{}
 	for _, result := range rankingResults {
 		for _, artist := range result.Artists {
 			artistIDs[artist.ID] = true
 		}
-	}
-
-	code, spClient, err := client.ForUser(ctx, userUUID)
-	if err != nil {
-		http.Error(w, err.Error(), code)
-		return
 	}
 
 	artistResults, err := service.GetArtists(ctx, spClient, maps.Keys(artistIDs))
@@ -60,6 +81,7 @@ func (c *StatsController) GetTopArtistsByTimeframe(w http.ResponseWriter, r *htt
 	response := TopArtistsResponse{
 		Rankings:   rankingResults,
 		ArtistData: artistResults,
+		// TrackData:  tracks,
 	}
 
 	json.NewEncoder(w).Encode(response)

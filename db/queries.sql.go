@@ -16,38 +16,49 @@ import (
 )
 
 const albumCacheInsertBulk = `-- name: AlbumCacheInsertBulk :exec
-INSERT INTO
-    SPOTIFY_ALBUM_CACHE(
-        id,
-        uri,
-        name,
-        artist_id,
-        artist_uri,
-        artist_name,
-        album_group,
-        album_type,
-        image_url,
-        release_date,
-        release_date_precision,
-        genres,
-        popularity
-    )
-VALUES
-    (
-        unnest($1 :: text []),
-        unnest($2 :: TEXT []),
-        unnest($3 :: TEXT []),
-        unnest($4 :: TEXT []),
-        unnest($5 :: TEXT []),
-        unnest($6 :: TEXT []),
-        unnest($7 :: TEXT []),
-        unnest($8 :: TEXT []),
-        unnest($9 :: TEXT []),
-        unnest($10 :: date []),
-        unnest($11 :: TEXT []),
-        unnest($12 :: jsonb []),
-        unnest($13 :: int [])
-    ) ON CONFLICT DO NOTHING
+INSERT INTO SPOTIFY_ALBUM_CACHE(
+    id,
+    uri,
+    name,
+    artist_id,
+    artist_uri,
+    artist_name,
+    album_group,
+    album_type,
+    image_url,
+    release_date,
+    release_date_precision,
+    genres,
+    popularity)
+VALUES (
+    unnest(
+        $1 ::text[]),
+    unnest(
+        $2 ::text[]),
+    unnest(
+        $3 ::text[]),
+    unnest(
+        $4 ::text[]),
+    unnest(
+        $5 ::text[]),
+    unnest(
+        $6 ::text[]),
+    unnest(
+        $7 ::text[]),
+    unnest(
+        $8 ::text[]),
+    unnest(
+        $9 ::text[]),
+    unnest(
+        $10 ::date[]),
+    unnest(
+        $11 ::text[]),
+    unnest(
+        $12 ::jsonb[]),
+    unnest(
+        $13 ::int[]))
+ON CONFLICT
+    DO NOTHING
 `
 
 type AlbumCacheInsertBulkParams struct {
@@ -86,26 +97,31 @@ func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsert
 }
 
 const artistCacheInsertBulk = `-- name: ArtistCacheInsertBulk :exec
-INSERT INTO
-    SPOTIFY_ARTIST_CACHE(
-        id,
-        uri,
-        name,
-        image_url,
-        genres,
-        popularity,
-        follower_count
-    )
-VALUES
-    (
-        unnest($1 :: text []),
-        unnest($2 :: TEXT []),
-        unnest($3 :: TEXT []),
-        unnest($4 :: TEXT []),
-        unnest($5 :: jsonb []),
-        unnest($6 :: int []),
-        unnest($7 :: int [])
-    ) ON CONFLICT DO NOTHING
+INSERT INTO SPOTIFY_ARTIST_CACHE(
+    id,
+    uri,
+    name,
+    image_url,
+    genres,
+    popularity,
+    follower_count)
+VALUES (
+    unnest(
+        $1 ::text[]),
+    unnest(
+        $2 ::text[]),
+    unnest(
+        $3 ::text[]),
+    unnest(
+        $4 ::text[]),
+    unnest(
+        $5 ::jsonb[]),
+    unnest(
+        $6 ::int[]),
+    unnest(
+        $7 ::int[]))
+ON CONFLICT
+    DO NOTHING
 `
 
 type ArtistCacheInsertBulkParams struct {
@@ -616,7 +632,7 @@ const historyGetTopAlbumsInTimeframe = `-- name: HistoryGetTopAlbumsInTimeframe 
 SELECT
     spotify_album_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|')::text AS TRACKS
+    json_agg(spotify_track_uri) AS TRACKS
 FROM
     spotify_history
 WHERE
@@ -645,9 +661,9 @@ type HistoryGetTopAlbumsInTimeframeParams struct {
 }
 
 type HistoryGetTopAlbumsInTimeframeRow struct {
-	SpotifyAlbumUri sql.NullString `json:"spotify_album_uri"`
-	Occurrences     int64          `json:"occurrences"`
-	Tracks          string         `json:"tracks"`
+	SpotifyAlbumUri sql.NullString  `json:"spotify_album_uri"`
+	Occurrences     int64           `json:"occurrences"`
+	Tracks          json.RawMessage `json:"tracks"`
 }
 
 func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg HistoryGetTopAlbumsInTimeframeParams) ([]*HistoryGetTopAlbumsInTimeframeRow, error) {
@@ -729,7 +745,7 @@ const historyGetTopArtistsInTimeframe = `-- name: HistoryGetTopArtistsInTimefram
 SELECT
     spotify_artist_uri,
     COUNT(*) AS occurrences,
-    string_agg(track_name, '|~|')::text AS TRACKS
+    json_agg(spotify_track_uri) AS TRACKS
 FROM
     spotify_history
 WHERE
@@ -755,9 +771,9 @@ type HistoryGetTopArtistsInTimeframeParams struct {
 }
 
 type HistoryGetTopArtistsInTimeframeRow struct {
-	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
-	Occurrences      int64          `json:"occurrences"`
-	Tracks           string         `json:"tracks"`
+	SpotifyArtistUri sql.NullString  `json:"spotify_artist_uri"`
+	Occurrences      int64           `json:"occurrences"`
+	Tracks           json.RawMessage `json:"tracks"`
 }
 
 func (q *Queries) HistoryGetTopArtistsInTimeframe(ctx context.Context, arg HistoryGetTopArtistsInTimeframeParams) ([]*HistoryGetTopArtistsInTimeframeRow, error) {
@@ -866,7 +882,7 @@ WITH top_isrcs AS (
     SELECT
         tc.isrc,
         COUNT(*) AS occurrences,
-(array_agg(DISTINCT h.spotify_track_uri)) AS spotify_track_uris
+(json_agg(DISTINCT h.spotify_track_uri)) AS spotify_track_uris
     FROM
         spotify_history h
         JOIN spotify_track_cache tc ON tc.uri = h.spotify_track_uri
@@ -905,7 +921,7 @@ pref_albums AS (
         ELSE
             4
         END,
-        release_date DESC
+        release_date ASC
 )
 SELECT
     isrc, occurrences, spotify_track_uris, spotify_track_uri
@@ -927,10 +943,10 @@ type HistoryGetTopTracksInTimeframeDedupParams struct {
 }
 
 type HistoryGetTopTracksInTimeframeDedupRow struct {
-	Isrc             sql.NullString `json:"isrc"`
-	Occurrences      int64          `json:"occurrences"`
-	SpotifyTrackUris interface{}    `json:"spotify_track_uris"`
-	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	Isrc             sql.NullString  `json:"isrc"`
+	Occurrences      int64           `json:"occurrences"`
+	SpotifyTrackUris json.RawMessage `json:"spotify_track_uris"`
+	SpotifyTrackUri  string          `json:"spotify_track_uri"`
 }
 
 func (q *Queries) HistoryGetTopTracksInTimeframeDedup(ctx context.Context, arg HistoryGetTopTracksInTimeframeDedupParams) ([]*HistoryGetTopTracksInTimeframeDedupRow, error) {
@@ -2065,7 +2081,7 @@ SELECT
 FROM
     SPOTIFY_TRACK_CACHE
 WHERE
-    id = ANY($1 :: text [])
+    id = ANY ($1::text[])
 `
 
 func (q *Queries) TrackCacheGetByID(ctx context.Context, trackIds []string) ([]*TrackData, error) {
@@ -2113,52 +2129,70 @@ func (q *Queries) TrackCacheGetByID(ctx context.Context, trackIds []string) ([]*
 }
 
 const trackCacheInsertBulk = `-- name: TrackCacheInsertBulk :exec
-INSERT INTO
-    SPOTIFY_TRACK_CACHE(
-        id,
-        uri,
-        name,
-        album_id,
-        album_uri,
-        album_name,
-        artist_id,
-        artist_uri,
-        artist_name,
-        image_url,
-        other_artists,
-        duration_ms,
-        popularity,
-        explicit,
-        preview_url,
-        disc_number,
-        track_number,
-        type,
-        external_ids,
-        isrc
-    )
-VALUES
-    (
-        unnest($1 :: text []),
-        unnest($2 :: TEXT []),
-        unnest($3 :: TEXT []),
-        unnest($4 :: TEXT []),
-        unnest($5 :: TEXT []),
-        unnest($6 :: TEXT []),
-        unnest($7 :: TEXT []),
-        unnest($8 :: TEXT []),
-        unnest($9 :: TEXT []),
-        unnest($10 :: TEXT []),
-        unnest($11 :: JSONB []),
-        unnest($12 :: int []),
-        unnest($13 :: int []),
-        unnest($14 :: bool []),
-        unnest($15 :: TEXT []),
-        unnest($16 :: int []),
-        unnest($17 :: int []),
-        unnest($18 :: TEXT []),
-        unnest($19 :: jsonb []),
-        unnest($20 :: text [])
-    ) ON CONFLICT DO NOTHING
+INSERT INTO SPOTIFY_TRACK_CACHE(
+    id,
+    uri,
+    name,
+    album_id,
+    album_uri,
+    album_name,
+    artist_id,
+    artist_uri,
+    artist_name,
+    image_url,
+    other_artists,
+    duration_ms,
+    popularity,
+    explicit,
+    preview_url,
+    disc_number,
+    track_number,
+    type,
+    external_ids,
+    isrc)
+VALUES (
+    unnest(
+        $1 ::text[]),
+    unnest(
+        $2 ::text[]),
+    unnest(
+        $3 ::text[]),
+    unnest(
+        $4 ::text[]),
+    unnest(
+        $5 ::text[]),
+    unnest(
+        $6 ::text[]),
+    unnest(
+        $7 ::text[]),
+    unnest(
+        $8 ::text[]),
+    unnest(
+        $9 ::text[]),
+    unnest(
+        $10 ::text[]),
+    unnest(
+        $11 ::jsonb[]),
+    unnest(
+        $12 ::int[]),
+    unnest(
+        $13 ::int[]),
+    unnest(
+        $14 ::bool[]),
+    unnest(
+        $15 ::text[]),
+    unnest(
+        $16 ::int[]),
+    unnest(
+        $17 ::int[]),
+    unnest(
+        $18 ::text[]),
+    unnest(
+        $19 ::jsonb[]),
+    unnest(
+        $20 ::text[]))
+ON CONFLICT
+    DO NOTHING
 `
 
 type TrackCacheInsertBulkParams struct {
@@ -2208,6 +2242,74 @@ func (q *Queries) TrackCacheInsertBulk(ctx context.Context, arg TrackCacheInsert
 		pq.Array(arg.Isrc),
 	)
 	return err
+}
+
+const tracksGetPrimaryURIs = `-- name: TracksGetPrimaryURIs :many
+WITH top_isrcs AS (
+    SELECT
+        tc.isrc,
+(json_agg(DISTINCT tc.uri)) AS original_uris
+    FROM
+        spotify_track_cache tc
+    WHERE
+        tc.uri = ANY ($1::text[])
+    GROUP BY
+        tc.isrc
+),
+pref_albums AS (
+    SELECT DISTINCT ON (top_isrcs.isrc)
+        top_isrcs.isrc, top_isrcs.original_uris,
+        tc.uri AS primary_uri
+    FROM
+        top_isrcs
+        JOIN spotify_track_cache tc ON tc.isrc = top_isrcs.isrc
+        JOIN spotify_album_cache ac ON ac.id = tc.album_id
+    ORDER BY
+        top_isrcs.isrc,
+        CASE WHEN ac.album_type = 'album' THEN
+            1
+        WHEN ac.album_type = 'single' THEN
+            2
+        WHEN ac.album_type = 'compilation' THEN
+            3
+        ELSE
+            4
+        END,
+        release_date DESC
+)
+SELECT
+    isrc, original_uris, primary_uri
+FROM
+    pref_albums
+`
+
+type TracksGetPrimaryURIsRow struct {
+	Isrc         sql.NullString  `json:"isrc"`
+	OriginalUris json.RawMessage `json:"original_uris"`
+	PrimaryUri   string          `json:"primary_uri"`
+}
+
+func (q *Queries) TracksGetPrimaryURIs(ctx context.Context, uris []string) ([]*TracksGetPrimaryURIsRow, error) {
+	rows, err := q.db.QueryContext(ctx, tracksGetPrimaryURIs, pq.Array(uris))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TracksGetPrimaryURIsRow
+	for rows.Next() {
+		var i TracksGetPrimaryURIsRow
+		if err := rows.Scan(&i.Isrc, &i.OriginalUris, &i.PrimaryUri); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const userDeleteFriendRequest = `-- name: UserDeleteFriendRequest :exec
