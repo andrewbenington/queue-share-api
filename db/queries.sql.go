@@ -241,7 +241,8 @@ SELECT
     spotify_album_uri,
     spotify_artist_uri,
     image_url,
-    other_artists
+    other_artists,
+    h.isrc
 FROM
     SPOTIFY_HISTORY h
     JOIN SPOTIFY_TRACK_CACHE ON URI = spotify_track_uri
@@ -250,16 +251,21 @@ WHERE
     AND ms_played >= $2
     AND (skipped != TRUE
         OR $3::boolean)
+    AND ($4::timestamp IS NULL
+        OR $5::timestamp IS NULL
+        OR timestamp BETWEEN $4::timestamp AND $5::timestamp)
 ORDER BY
     timestamp DESC
-LIMIT $4
+LIMIT $6
 `
 
 type HistoryGetAllParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	MaxCount     int32     `json:"max_count"`
+	UserID       uuid.UUID    `json:"user_id"`
+	MinMsPlayed  int32        `json:"min_ms_played"`
+	IncludeSkips bool         `json:"include_skips"`
+	StartDate    sql.NullTime `json:"start_date"`
+	EndDate      sql.NullTime `json:"end_date"`
+	MaxCount     int32        `json:"max_count"`
 }
 
 type HistoryGetAllRow struct {
@@ -273,6 +279,7 @@ type HistoryGetAllRow struct {
 	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
 	ImageUrl         *string        `json:"image_url"`
 	OtherArtists     TrackArtists   `json:"other_artists"`
+	Isrc             sql.NullString `json:"isrc"`
 }
 
 func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([]*HistoryGetAllRow, error) {
@@ -280,6 +287,8 @@ func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([
 		arg.UserID,
 		arg.MinMsPlayed,
 		arg.IncludeSkips,
+		arg.StartDate,
+		arg.EndDate,
 		arg.MaxCount,
 	)
 	if err != nil {
@@ -300,6 +309,7 @@ func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([
 			&i.SpotifyArtistUri,
 			&i.ImageUrl,
 			&i.OtherArtists,
+			&i.Isrc,
 		); err != nil {
 			return nil, err
 		}
@@ -895,7 +905,7 @@ WITH top_isrcs AS (
         AND ($6::text[] IS NULL
             OR spotify_artist_uri = ANY ($6::text[]))
         AND ($7::text IS NULL
-            OR spotify_album_uri = $7::text)
+            OR h.spotify_album_uri = $7::text)
     GROUP BY
         tc.isrc
     ORDER BY
@@ -1177,7 +1187,8 @@ INSERT INTO SPOTIFY_HISTORY(
     offline,
     offline_timestamp,
     incognito_mode,
-    from_history)
+    from_history,
+    isrc)
 VALUES (
     unnest(
         $1::uuid[]),
@@ -1220,7 +1231,9 @@ VALUES (
     unnest(
         $20::boolean[]),
     unnest(
-        $21::boolean[]))
+        $21::boolean[]),
+    unnest(
+        $22::text[]))
 ON CONFLICT
     DO NOTHING
 `
@@ -1247,6 +1260,7 @@ type HistoryInsertBulkParams struct {
 	OfflineTimestamp []time.Time `json:"offline_timestamp"`
 	IncognitoMode    []bool      `json:"incognito_mode"`
 	FromHistory      []bool      `json:"from_history"`
+	Isrc             []string    `json:"isrc"`
 }
 
 func (q *Queries) HistoryInsertBulk(ctx context.Context, arg HistoryInsertBulkParams) error {
@@ -1272,6 +1286,7 @@ func (q *Queries) HistoryInsertBulk(ctx context.Context, arg HistoryInsertBulkPa
 		pq.Array(arg.OfflineTimestamp),
 		pq.Array(arg.IncognitoMode),
 		pq.Array(arg.FromHistory),
+		pq.Array(arg.Isrc),
 	)
 	return err
 }
@@ -1298,7 +1313,8 @@ INSERT INTO SPOTIFY_HISTORY(
     offline,
     offline_timestamp,
     incognito_mode,
-    from_history)
+    from_history,
+    isrc)
 VALUES (
     $1,
     $2,
@@ -1320,7 +1336,8 @@ VALUES (
     $18,
     $19,
     $20,
-    $21)
+    $21,
+    $22)
 `
 
 type HistoryInsertOneParams struct {
@@ -1345,6 +1362,7 @@ type HistoryInsertOneParams struct {
 	OfflineTimestamp sql.NullTime   `json:"offline_timestamp"`
 	IncognitoMode    bool           `json:"incognito_mode"`
 	FromHistory      bool           `json:"from_history"`
+	Isrc             sql.NullString `json:"isrc"`
 }
 
 func (q *Queries) HistoryInsertOne(ctx context.Context, arg HistoryInsertOneParams) error {
@@ -1370,6 +1388,7 @@ func (q *Queries) HistoryInsertOne(ctx context.Context, arg HistoryInsertOnePara
 		arg.OfflineTimestamp,
 		arg.IncognitoMode,
 		arg.FromHistory,
+		arg.Isrc,
 	)
 	return err
 }
@@ -1393,6 +1412,146 @@ type HistorySetURIsForTrackParams struct {
 func (q *Queries) HistorySetURIsForTrack(ctx context.Context, arg HistorySetURIsForTrackParams) error {
 	_, err := q.db.ExecContext(ctx, historySetURIsForTrack, arg.SpotifyArtistUri, arg.SpotifyAlbumUri, arg.SpotifyTrackUri)
 	return err
+}
+
+const missingArtistURIs = `-- name: MissingArtistURIs :many
+SELECT
+  SPOTIFY_TRACK_URI,
+  COUNT(SPOTIFY_TRACK_URI),
+(array_agg(track_name))[1] AS track_name,
+(array_agg(artist_name))[1] AS artist_name,
+(array_agg(DISTINCT user_id))::text[] AS user_ids
+FROM
+  spotify_history
+WHERE
+  spotify_artist_uri IS NULL
+GROUP BY
+  SPOTIFY_TRACK_URI
+ORDER BY
+  COUNT DESC
+`
+
+type MissingArtistURIsRow struct {
+	SpotifyTrackUri string      `json:"spotify_track_uri"`
+	Count           int64       `json:"count"`
+	TrackName       interface{} `json:"track_name"`
+	ArtistName      interface{} `json:"artist_name"`
+	UserIds         []string    `json:"user_ids"`
+}
+
+func (q *Queries) MissingArtistURIs(ctx context.Context) ([]*MissingArtistURIsRow, error) {
+	rows, err := q.db.QueryContext(ctx, missingArtistURIs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*MissingArtistURIsRow
+	for rows.Next() {
+		var i MissingArtistURIsRow
+		if err := rows.Scan(
+			&i.SpotifyTrackUri,
+			&i.Count,
+			&i.TrackName,
+			&i.ArtistName,
+			pq.Array(&i.UserIds),
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const missingISRCNumbers = `-- name: MissingISRCNumbers :many
+SELECT
+  h.user_id, h.timestamp, h.platform, h.ms_played, h.conn_country, h.ip_addr, h.user_agent, h.track_name, h.artist_name, h.album_name, h.spotify_track_uri, h.reason_start, h.reason_end, h.shuffle, h.skipped, h.offline, h.offline_timestamp, h.incognito_mode, h.spotify_artist_uri, h.spotify_album_uri, h.from_history, h.isrc,
+  tc.isrc
+FROM
+  SPOTIFY_HISTORY h
+  JOIN spotify_track_cache tc ON h.ISRC IS NULL
+    AND tc.isrc IS NOT NULL
+    AND tc.uri = h.spotify_track_uri
+  ORDER BY
+    TIMESTAMP DESC
+`
+
+type MissingISRCNumbersRow struct {
+	UserID           uuid.UUID      `json:"user_id"`
+	Timestamp        time.Time      `json:"timestamp"`
+	Platform         string         `json:"platform"`
+	MsPlayed         int32          `json:"ms_played"`
+	ConnCountry      string         `json:"conn_country"`
+	IpAddr           sql.NullString `json:"ip_addr"`
+	UserAgent        sql.NullString `json:"user_agent"`
+	TrackName        string         `json:"track_name"`
+	ArtistName       string         `json:"artist_name"`
+	AlbumName        string         `json:"album_name"`
+	SpotifyTrackUri  string         `json:"spotify_track_uri"`
+	ReasonStart      sql.NullString `json:"reason_start"`
+	ReasonEnd        sql.NullString `json:"reason_end"`
+	Shuffle          bool           `json:"shuffle"`
+	Skipped          sql.NullBool   `json:"skipped"`
+	Offline          bool           `json:"offline"`
+	OfflineTimestamp sql.NullTime   `json:"offline_timestamp"`
+	IncognitoMode    bool           `json:"incognito_mode"`
+	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
+	FromHistory      bool           `json:"from_history"`
+	Isrc             sql.NullString `json:"isrc"`
+	Isrc_2           *string        `json:"isrc_2"`
+}
+
+func (q *Queries) MissingISRCNumbers(ctx context.Context) ([]*MissingISRCNumbersRow, error) {
+	rows, err := q.db.QueryContext(ctx, missingISRCNumbers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*MissingISRCNumbersRow
+	for rows.Next() {
+		var i MissingISRCNumbersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Timestamp,
+			&i.Platform,
+			&i.MsPlayed,
+			&i.ConnCountry,
+			&i.IpAddr,
+			&i.UserAgent,
+			&i.TrackName,
+			&i.ArtistName,
+			&i.AlbumName,
+			&i.SpotifyTrackUri,
+			&i.ReasonStart,
+			&i.ReasonEnd,
+			&i.Shuffle,
+			&i.Skipped,
+			&i.Offline,
+			&i.OfflineTimestamp,
+			&i.IncognitoMode,
+			&i.SpotifyArtistUri,
+			&i.SpotifyAlbumUri,
+			&i.FromHistory,
+			&i.Isrc,
+			&i.Isrc_2,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const roomAddMember = `-- name: RoomAddMember :exec
@@ -2075,6 +2234,63 @@ func (q *Queries) RoomValidatePassword(ctx context.Context, arg RoomValidatePass
 	return column_1, err
 }
 
+const tableSizesAndRows = `-- name: TableSizesAndRows :many
+SELECT
+  nspname AS schema,
+  relname AS table,
+  reltuples AS rows_estimate,
+  pg_relation_size(c.oid) AS rel_size_bytes,
+  pg_indexes_size(c.oid) AS index_size_bytes,
+  pg_total_relation_size(c.oid) AS total_size_bytes
+FROM
+  pg_catalog.pg_class c
+  JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE
+  relkind = 'r'
+  AND nspname = 'public'
+ORDER BY
+  total_size_bytes DESC
+`
+
+type TableSizesAndRowsRow struct {
+	Schema         string  `json:"schema"`
+	Table          string  `json:"table"`
+	RowsEstimate   float32 `json:"rows_estimate"`
+	RelSizeBytes   int64   `json:"rel_size_bytes"`
+	IndexSizeBytes int64   `json:"index_size_bytes"`
+	TotalSizeBytes int64   `json:"total_size_bytes"`
+}
+
+func (q *Queries) TableSizesAndRows(ctx context.Context) ([]*TableSizesAndRowsRow, error) {
+	rows, err := q.db.QueryContext(ctx, tableSizesAndRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TableSizesAndRowsRow
+	for rows.Next() {
+		var i TableSizesAndRowsRow
+		if err := rows.Scan(
+			&i.Schema,
+			&i.Table,
+			&i.RowsEstimate,
+			&i.RelSizeBytes,
+			&i.IndexSizeBytes,
+			&i.TotalSizeBytes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const trackCacheGetByID = `-- name: TrackCacheGetByID :many
 SELECT
     id, uri, name, album_id, album_uri, album_name, artist_id, artist_uri, artist_name, image_url, other_artists, duration_ms, popularity, explicit, preview_url, disc_number, track_number, type, external_ids, isrc
@@ -2299,6 +2515,60 @@ func (q *Queries) TracksGetPrimaryURIs(ctx context.Context, uris []string) ([]*T
 	for rows.Next() {
 		var i TracksGetPrimaryURIsRow
 		if err := rows.Scan(&i.Isrc, &i.OriginalUris, &i.PrimaryUri); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const uncachedTracks = `-- name: UncachedTracks :many
+SELECT
+  SPOTIFY_TRACK_URI,
+  COUNT(SPOTIFY_TRACK_URI),
+  TRACK_NAME,
+  h.artist_name
+FROM
+  spotify_history h
+  LEFT JOIN spotify_track_cache tc ON h.spotify_track_uri = tc.uri
+WHERE
+  tc.uri IS NULL
+GROUP BY
+  SPOTIFY_TRACK_URI,
+  TRACK_NAME,
+  h.ARTIST_NAME
+ORDER BY
+  COUNT DESC
+`
+
+type UncachedTracksRow struct {
+	SpotifyTrackUri string `json:"spotify_track_uri"`
+	Count           int64  `json:"count"`
+	TrackName       string `json:"track_name"`
+	ArtistName      string `json:"artist_name"`
+}
+
+func (q *Queries) UncachedTracks(ctx context.Context) ([]*UncachedTracksRow, error) {
+	rows, err := q.db.QueryContext(ctx, uncachedTracks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*UncachedTracksRow
+	for rows.Next() {
+		var i UncachedTracksRow
+		if err := rows.Scan(
+			&i.SpotifyTrackUri,
+			&i.Count,
+			&i.TrackName,
+			&i.ArtistName,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)
@@ -2862,7 +3132,7 @@ const userHasSpotifyHistory = `-- name: UserHasSpotifyHistory :one
 SELECT
   EXISTS (
     SELECT
-      user_id, timestamp, platform, ms_played, conn_country, ip_addr, user_agent, track_name, artist_name, album_name, spotify_track_uri, reason_start, reason_end, shuffle, skipped, offline, offline_timestamp, incognito_mode, spotify_artist_uri, spotify_album_uri, from_history
+      user_id, timestamp, platform, ms_played, conn_country, ip_addr, user_agent, track_name, artist_name, album_name, spotify_track_uri, reason_start, reason_end, shuffle, skipped, offline, offline_timestamp, incognito_mode, spotify_artist_uri, spotify_album_uri, from_history, isrc
     FROM
       SPOTIFY_HISTORY
     WHERE

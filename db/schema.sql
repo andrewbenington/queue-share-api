@@ -226,7 +226,8 @@ CREATE TABLE public.spotify_history (
     incognito_mode boolean NOT NULL,
     spotify_artist_uri text,
     spotify_album_uri text,
-    from_history boolean DEFAULT false NOT NULL
+    from_history boolean DEFAULT false NOT NULL,
+    isrc text
 );
 
 

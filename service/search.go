@@ -28,8 +28,13 @@ func SearchArtists(ctx context.Context, spClient *spotify.Client, text string) (
 }
 
 func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.TrackData, error) {
+	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit()
 
-	tracks, err := GetTracksFromCache(ctx, []string{id})
+	tracks, err := GetTracksFromCache(ctx, tx, []string{id})
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +49,7 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 	}
 	fmt.Printf("Cache miss: %s\n", track.Name)
 
-	CacheFullTracks(ctx, []*spotify.FullTrack{track})
+	CacheFullTracks(ctx, tx, []*spotify.FullTrack{track})
 
 	trackData := TrackDataFromFullTrack(*track)
 
@@ -52,7 +57,13 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 }
 
 func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.TrackData, error) {
-	tracks, err := GetTracksFromCache(ctx, ids)
+	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit()
+
+	tracks, err := GetTracksFromCache(ctx, tx, ids)
 	if err != nil {
 		log.Printf("error getting tracks from cache: %s", err)
 	} else {
@@ -84,7 +95,7 @@ func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map
 		results = lo.Filter(results, util.PointerNotNilIdx)
 
 		if results != nil {
-			CacheFullTracks(ctx, results)
+			CacheFullTracks(ctx, tx, results)
 		}
 
 		for _, track := range results {
@@ -158,7 +169,13 @@ func GetAlbum(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 		return nil, err
 	}
 
-	cacheFullAlbums(ctx, []*spotify.FullAlbum{album})
+	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit()
+
+	cacheFullAlbums(ctx, tx, []*spotify.FullAlbum{album})
 
 	return album, nil
 }
@@ -174,6 +191,12 @@ func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map
 		}
 	}
 
+	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit()
+
 	for start := 0; start < len(idsToGet); start += 20 {
 		end := start + 20
 		if end > len(idsToGet) {
@@ -188,7 +211,7 @@ func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map
 			result.Tracks = spotify.SimpleTrackPage{}
 		}
 
-		cacheFullAlbums(ctx, results)
+		cacheFullAlbums(ctx, tx, results)
 
 		for _, album := range results {
 			albums[album.ID.String()] = *album

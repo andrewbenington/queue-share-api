@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/db"
@@ -20,77 +17,77 @@ import (
 	"github.com/zmb3/spotify/v2"
 )
 
-var (
-	trackRankingsCache  map[string][]*db.HistoryGetTopTracksInTimeframeDedupRow = make(map[string][]*db.HistoryGetTopTracksInTimeframeDedupRow)
-	albumRankingsCache  map[string][]*db.HistoryGetTopAlbumsInTimeframeRow      = make(map[string][]*db.HistoryGetTopAlbumsInTimeframeRow)
-	artistRankingsCache map[string][]*db.HistoryGetTopArtistsInTimeframeRow     = make(map[string][]*db.HistoryGetTopArtistsInTimeframeRow)
+// var (
+// 	trackRankingsCache  map[string][]*db.HistoryGetTopTracksInTimeframeDedupRow = make(map[string][]*db.HistoryGetTopTracksInTimeframeDedupRow)
+// 	albumRankingsCache  map[string][]*db.HistoryGetTopAlbumsInTimeframeRow      = make(map[string][]*db.HistoryGetTopAlbumsInTimeframeRow)
+// 	artistRankingsCache map[string][]*db.HistoryGetTopArtistsInTimeframeRow     = make(map[string][]*db.HistoryGetTopArtistsInTimeframeRow)
 
-	trackCacheLock  sync.Mutex
-	albumCacheLock  sync.Mutex
-	artistCacheLock sync.Mutex
-)
+// 	trackCacheLock  sync.Mutex
+// 	albumCacheLock  sync.Mutex
+// 	artistCacheLock sync.Mutex
+// )
 
-func init() {
-	// load track rankings cache
-	filePath := path.Join("temp", "track_rank_cache.json")
-	if _, err := os.Stat(filePath); err != nil {
-		return
-	}
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		fmt.Printf("Error loading track rank cache: %s\n", err)
-		return
-	}
-	err = json.Unmarshal(bytes, &trackRankingsCache)
-	if err != nil {
-		fmt.Printf("Error parsing track rank cache: %s\n", err)
-	} else {
-		fmt.Println("Track rank cache loaded successfully")
-	}
+// func init() {
+// 	// load track rankings cache
+// 	filePath := path.Join("temp", "track_rank_cache.json")
+// 	if _, err := os.Stat(filePath); err != nil {
+// 		return
+// 	}
+// 	bytes, err := os.ReadFile(filePath)
+// 	if err != nil {
+// 		fmt.Printf("Error loading track rank cache: %s\n", err)
+// 		return
+// 	}
+// 	err = json.Unmarshal(bytes, &trackRankingsCache)
+// 	if err != nil {
+// 		fmt.Printf("Error parsing track rank cache: %s\n", err)
+// 	} else {
+// 		fmt.Println("Track rank cache loaded successfully")
+// 	}
 
-	// load artist rankings cache
-	filePath = path.Join("temp", "artist_rank_cache.json")
-	if _, err := os.Stat(filePath); err != nil {
-		return
-	}
-	bytes, err = os.ReadFile(filePath)
-	if err != nil {
-		fmt.Printf("Error loading artist rank cache: %s\n", err)
-		return
-	}
-	err = json.Unmarshal(bytes, &artistRankingsCache)
-	if err != nil {
-		fmt.Printf("Error parsing artist rank cache: %s\n", err)
-	} else {
-		fmt.Println("Artist rank cache loaded successfully")
-	}
-}
+// 	// load artist rankings cache
+// 	filePath = path.Join("temp", "artist_rank_cache.json")
+// 	if _, err := os.Stat(filePath); err != nil {
+// 		return
+// 	}
+// 	bytes, err = os.ReadFile(filePath)
+// 	if err != nil {
+// 		fmt.Printf("Error loading artist rank cache: %s\n", err)
+// 		return
+// 	}
+// 	err = json.Unmarshal(bytes, &artistRankingsCache)
+// 	if err != nil {
+// 		fmt.Printf("Error parsing artist rank cache: %s\n", err)
+// 	} else {
+// 		fmt.Println("Artist rank cache loaded successfully")
+// 	}
+// }
 
-func WriteCachesToFile() {
-	trackCacheLock.Lock()
-	bytes, err := json.Marshal(trackRankingsCache)
-	if err != nil {
-		fmt.Printf("Error serializing track ranking cache: %s", err)
-		return
-	}
-	err = os.WriteFile(path.Join("temp", "track_rank_cache.json"), bytes, 0644)
-	if err != nil {
-		fmt.Printf("Error serializing track ranking cache: %s", err)
-	}
-	trackCacheLock.Unlock()
+// func WriteCachesToFile() {
+// 	trackCacheLock.Lock()
+// 	bytes, err := json.Marshal(trackRankingsCache)
+// 	if err != nil {
+// 		fmt.Printf("Error serializing track ranking cache: %s", err)
+// 		return
+// 	}
+// 	err = os.WriteFile(path.Join("temp", "track_rank_cache.json"), bytes, 0644)
+// 	if err != nil {
+// 		fmt.Printf("Error serializing track ranking cache: %s", err)
+// 	}
+// 	trackCacheLock.Unlock()
 
-	artistCacheLock.Lock()
-	bytes, err = json.Marshal(artistRankingsCache)
-	if err != nil {
-		fmt.Printf("Error serializing artist ranking cache: %s", err)
-		return
-	}
-	err = os.WriteFile(path.Join("temp", "artist_rank_cache.json"), bytes, 0644)
-	if err != nil {
-		fmt.Printf("Error serializing artist ranking cache: %s", err)
-	}
-	artistCacheLock.Unlock()
-}
+// 	artistCacheLock.Lock()
+// 	bytes, err = json.Marshal(artistRankingsCache)
+// 	if err != nil {
+// 		fmt.Printf("Error serializing artist ranking cache: %s", err)
+// 		return
+// 	}
+// 	err = os.WriteFile(path.Join("temp", "artist_rank_cache.json"), bytes, 0644)
+// 	if err != nil {
+// 		fmt.Printf("Error serializing artist ranking cache: %s", err)
+// 	}
+// 	artistCacheLock.Unlock()
+// }
 
 type StreamingEntry struct {
 	Timestamp        string  `json:"ts"`
@@ -118,7 +115,7 @@ func InsertEntry(ctx context.Context, transaction db.DBTX, entry db.HistoryInser
 }
 
 func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.HistoryInsertOneParams) error {
-	params := db.HistoryInsertBulkParams{
+	params := db.HistoryInsertBulkNullableParams{
 		UserIds:          []uuid.UUID{},
 		Timestamp:        []time.Time{},
 		Platform:         []string{},
@@ -138,6 +135,7 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 		IncognitoMode:    []bool{},
 		OfflineTimestamp: []time.Time{},
 		FromHistory:      []bool{},
+		ISRC:             []*string{},
 	}
 
 	for _, entry := range entries {
@@ -157,8 +155,8 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 		params.ArtistName = append(params.ArtistName, entry.ArtistName)
 		params.AlbumName = append(params.AlbumName, entry.AlbumName)
 		params.SpotifyTrackUri = append(params.SpotifyTrackUri, entry.SpotifyTrackUri)
-		params.SpotifyArtistUri = append(params.SpotifyArtistUri, entry.SpotifyArtistUri.String)
-		params.SpotifyAlbumUri = append(params.SpotifyAlbumUri, entry.SpotifyAlbumUri.String)
+		params.SpotifyArtistUri = append(params.SpotifyArtistUri, StringPtrFromNullString(entry.SpotifyArtistUri))
+		params.SpotifyAlbumUri = append(params.SpotifyAlbumUri, StringPtrFromNullString(entry.SpotifyAlbumUri))
 		params.ReasonStart = append(params.ReasonStart, entry.ReasonStart.String)
 		params.ReasonEnd = append(params.ReasonEnd, entry.ReasonEnd.String)
 		params.Shuffle = append(params.Shuffle, entry.Shuffle)
@@ -167,15 +165,16 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 		params.IncognitoMode = append(params.IncognitoMode, entry.IncognitoMode)
 		params.OfflineTimestamp = append(params.OfflineTimestamp, entry.OfflineTimestamp.Time)
 		params.FromHistory = append(params.FromHistory, entry.FromHistory)
+		params.ISRC = append(params.ISRC, StringPtrFromNullString(entry.Isrc))
 	}
-	return db.New(transaction).HistoryInsertBulk(ctx, params)
+	return db.New(transaction).HistoryInsertBulkNullable(ctx, params)
 }
 
 func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID uuid.UUID, entries []StreamingEntry) error {
 	trackIDs := lo.Map(entries, func(entry StreamingEntry, _ int) string {
 		return service.IDFromURIMust(entry.SpotifyTrackUri)
 	})
-	cachedTracks, err := service.GetTracksFromCache(ctx, trackIDs)
+	cachedTracks, err := service.GetTracksFromCache(ctx, transaction, trackIDs)
 	if err != nil {
 		log.Printf("error getting tracks from cache: %s", err)
 	}
@@ -202,6 +201,7 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 		IncognitoMode:    []bool{},
 		OfflineTimestamp: []time.Time{},
 		FromHistory:      []bool{},
+		ISRC:             []*string{},
 	}
 
 	for _, entry := range entries {
@@ -229,9 +229,11 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 		if cachedTrack, ok := cachedTracks[service.IDFromURIMust(entry.SpotifyTrackUri)]; ok {
 			params.SpotifyAlbumUri = append(params.SpotifyAlbumUri, &cachedTrack.AlbumURI)
 			params.SpotifyArtistUri = append(params.SpotifyArtistUri, &cachedTrack.ArtistURI)
+			params.ISRC = append(params.ISRC, cachedTrack.Isrc)
 		} else {
 			params.SpotifyAlbumUri = append(params.SpotifyAlbumUri, nil)
 			params.SpotifyArtistUri = append(params.SpotifyArtistUri, nil)
+			params.ISRC = append(params.ISRC, nil)
 		}
 		params.ReasonStart = append(params.ReasonStart, NullStringFromPtr(entry.ReasonStart).String)
 		params.ReasonEnd = append(params.ReasonEnd, NullStringFromPtr(entry.ReasonEnd).String)
@@ -252,11 +254,19 @@ type FilterParams struct {
 	ArtistURIs     []string
 	AlbumURI       *string
 	Timeframe      Timeframe
+	Start          time.Time
+	End            time.Time
 }
 
 func (f *FilterParams) ensureMinimum() {
 	if f.MinMSPlayed == 0 {
 		f.MinMSPlayed = 30000
+	}
+}
+
+func (f *FilterParams) minStart(min time.Time) {
+	if f.Start.Before(min) {
+		f.Start = min
 	}
 }
 
@@ -318,7 +328,7 @@ func TrackStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID u
 	results := map[int][]StreamCount{}
 
 	for year := minYear; year <= maxYear; year++ {
-		rows, err := db.New(db.Service().DB).HistoryGetTrackStreamCountByYear(ctx, db.HistoryGetTrackStreamCountByYearParams{
+		rows, err := db.New(transaction).HistoryGetTrackStreamCountByYear(ctx, db.HistoryGetTrackStreamCountByYearParams{
 			UserID:       userUUID,
 			MinMsPlayed:  filter.MinMSPlayed,
 			IncludeSkips: filter.IncludeSkipped,
@@ -339,7 +349,7 @@ func TrackStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID u
 	return results, http.StatusOK, nil
 }
 
-func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
+func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
 	rankingList []*TrackStreams,
@@ -350,7 +360,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 
 	var rows []*db.HistoryGetTopTracksInTimeframeDedupRow
 
-	cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
+	cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, filter.Start.UnixMilli(), filter.End.UnixMilli(), filter.Max)
 	if filter.AlbumURI != nil {
 		cacheIdentifier += "-" + *filter.AlbumURI
 	}
@@ -358,30 +368,30 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 		cacheIdentifier += "-" + strings.Join(filter.ArtistURIs, ",")
 	}
 
-	trackCacheLock.Lock()
-	cachedRows, ok := trackRankingsCache[cacheIdentifier]
-	trackCacheLock.Unlock()
+	// trackCacheLock.Lock()
+	// cachedRows, ok := trackRankingsCache[cacheIdentifier]
+	// trackCacheLock.Unlock()
 
-	if ok && time.Since(end) >= time.Hour*24 {
-		rows = cachedRows
-	} else {
-		rows, err = db.New(transaction).HistoryGetTopTracksInTimeframeDedup(ctx, db.HistoryGetTopTracksInTimeframeDedupParams{
-			UserID:       userUUID,
-			MinMsPlayed:  filter.MinMSPlayed,
-			IncludeSkips: filter.IncludeSkipped,
-			StartDate:    start.UTC(),
-			EndDate:      end.UTC(),
-			MaxTracks:    filter.Max + 20,
-			ArtistUris:   filter.ArtistURIs,
-			AlbumURI:     NullStringFromPtr(filter.AlbumURI),
-		})
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		trackCacheLock.Lock()
-		trackRankingsCache[cacheIdentifier] = rows
-		trackCacheLock.Unlock()
+	// if ok && time.Since(end) >= time.Hour*24 {
+	// 	rows = cachedRows
+	// } else {
+	rows, err = db.New(transaction).HistoryGetTopTracksInTimeframeDedup(ctx, db.HistoryGetTopTracksInTimeframeDedupParams{
+		UserID:       userUUID,
+		MinMsPlayed:  filter.MinMSPlayed,
+		IncludeSkips: filter.IncludeSkipped,
+		StartDate:    filter.Start.UTC(),
+		EndDate:      filter.End.UTC(),
+		MaxTracks:    filter.Max + 20,
+		ArtistUris:   filter.ArtistURIs,
+		AlbumURI:     NullStringFromPtr(filter.AlbumURI),
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
+	// 	trackCacheLock.Lock()
+	// 	trackRankingsCache[cacheIdentifier] = rows
+	// 	trackCacheLock.Unlock()
+	// }
 
 	var prevCount int64 = 0
 	var currentRank int64 = 0
@@ -395,6 +405,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 			ID:      service.IDFromURIMust(row.SpotifyTrackUri),
 			Streams: int(row.Occurrences),
 			Rank:    currentRank,
+			ISRC:    row.Isrc.String,
 		}
 
 		streamsByURI[row.SpotifyTrackUri] = row.Occurrences
@@ -436,30 +447,30 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 
 	var rows []*db.HistoryGetTopAlbumsInTimeframeRow
 
-	cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
-	albumCacheLock.Lock()
-	cachedRows, ok := albumRankingsCache[cacheIdentifier]
-	albumCacheLock.Unlock()
+	// cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
+	// albumCacheLock.Lock()
+	// cachedRows, ok := albumRankingsCache[cacheIdentifier]
+	// albumCacheLock.Unlock()
 
-	if ok && time.Since(end) >= time.Hour*24 {
-		rows = cachedRows
-	} else {
-		rows, err = db.New(db.Service().DB).HistoryGetTopAlbumsInTimeframe(ctx, db.HistoryGetTopAlbumsInTimeframeParams{
-			UserID:       userUUID,
-			MinMsPlayed:  filter.MinMSPlayed,
-			IncludeSkips: filter.IncludeSkipped,
-			StartDate:    start.UTC(),
-			EndDate:      end.UTC(),
-			Max:          filter.Max + 20,
-		})
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		albumCacheLock.Lock()
-		albumRankingsCache[cacheIdentifier] = rows
-		albumCacheLock.Unlock()
+	// if ok && time.Since(end) >= time.Hour*24 {
+	// 	rows = cachedRows
+	// } else {
+	rows, err = db.New(transaction).HistoryGetTopAlbumsInTimeframe(ctx, db.HistoryGetTopAlbumsInTimeframeParams{
+		UserID:       userUUID,
+		MinMsPlayed:  filter.MinMSPlayed,
+		IncludeSkips: filter.IncludeSkipped,
+		StartDate:    start.UTC(),
+		EndDate:      end.UTC(),
+		Max:          filter.Max + 20,
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
+
+	// 	albumCacheLock.Lock()
+	// 	albumRankingsCache[cacheIdentifier] = rows
+	// 	albumCacheLock.Unlock()
+	// }
 
 	var prevCount int64 = 0
 	var currentRank int64 = 0
@@ -519,30 +530,32 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 
 	var rows []*db.HistoryGetTopArtistsInTimeframeRow
 
-	cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
-	artistCacheLock.Lock()
-	cachedRows, ok := artistRankingsCache[cacheIdentifier]
-	artistCacheLock.Unlock()
+	// cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
+	// artistCacheLock.Lock()
+	// cachedRows, ok := artistRankingsCache[cacheIdentifier]
+	// artistCacheLock.Unlock()
 
-	if ok && time.Since(end) >= time.Hour*24 {
-		rows = cachedRows
-	} else {
-		rows, err = db.New(transaction).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
-			UserID:       userUUID,
-			MinMsPlayed:  filter.MinMSPlayed,
-			IncludeSkips: filter.IncludeSkipped,
-			StartDate:    start.UTC(),
-			EndDate:      end.UTC(),
-			Max:          filter.Max + 20,
-		})
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		artistCacheLock.Lock()
-		artistRankingsCache[cacheIdentifier] = rows
-		artistCacheLock.Unlock()
+	// if ok && time.Since(end) >= time.Hour*24 {
+	// 	rows = cachedRows
+	// } else {
+	rows, err = db.New(transaction).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
+		UserID:       userUUID,
+		MinMsPlayed:  filter.MinMSPlayed,
+		IncludeSkips: filter.IncludeSkipped,
+		StartDate:    start.UTC(),
+		EndDate:      end.UTC(),
+		Max:          filter.Max + 20,
+	})
+	if err != nil {
+		return nil, nil, nil, err
 	}
+
+	// if start.Minute() == 0 && end.Minute() == 0 {
+	// 	artistCacheLock.Lock()
+	// 	artistRankingsCache[cacheIdentifier] = rows
+	// 	artistCacheLock.Unlock()
+	// }
+	// }
 
 	var prevCount int64 = 0
 	var currentRank int64 = 0
@@ -644,18 +657,14 @@ type TrackStreams struct {
 	StreamsChange *int64 `json:"streams_change,omitempty"`
 	Rank          int64  `json:"rank"`
 	RankChange    *int64 `json:"rank_change,omitempty"`
+	ISRC          string `json:"isrc"`
 }
 
-func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, start *time.Time, end *time.Time) ([]*TrackRankings, int, error) {
+func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]*TrackRankings, int, error) {
 	var firstStart time.Time
-	endTime := time.Now()
-	if end != nil {
-		endTime = *end
-	}
+	end := filter.End
 
-	if start != nil {
-		firstStart = *start
-	} else if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
+	if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
 		firstStart = *defaultFirstStart
 	} else {
 		minYear, _, err := FullHistoryTimeRange(ctx, transaction, userUUID)
@@ -664,6 +673,8 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 		}
 		firstStart = time.Date(minYear, 1, 1, 0, 0, 0, 0, time.Local)
 	}
+
+	log.Printf("TrackStreamRankingsByTimeframe: %s - %s, %s", filter.Start.Format(time.ANSIC), filter.End.Format(time.ANSIC), filter.Timeframe)
 
 	results := []*TrackRankings{}
 
@@ -677,11 +688,16 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 	defer tx.Commit()
 
 	current := firstStart
-	for current.Before(endTime) {
+	// log.Printf("current: %s", firstStart.Format(time.ANSIC))
+	// log.Printf("end: %s", filter.End.Format(time.ANSIC))
+
+	for current.Before(end) {
 		nextStart := filter.Timeframe.GetNextStartTime(current)
+		filter.Start = current
+		filter.End = nextStart
 
 		var rankingList []*TrackStreams
-		thisMonthStreams, thisMonthRanks, rankingList, err := CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, current, nextStart, lastMonthStreams, lastMonthRanks)
+		thisMonthStreams, thisMonthRanks, rankingList, err := CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, lastMonthStreams, lastMonthRanks)
 		if err != nil {
 			return nil, http.StatusNotFound, err
 		}
@@ -696,7 +712,11 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 		lastMonthRanks = thisMonthRanks
 
 		current = nextStart
+		// log.Printf("current: %s", current.Format(time.ANSIC))
+		// log.Printf("end: %s", filter.End.Format(time.ANSIC))
+		// log.Println(current.Before(filter.End))
 	}
+	// log.Printf("last current: %s", firstStart.Format(time.ANSIC))
 
 	return results, 0, nil
 }
@@ -855,7 +875,7 @@ func AlbumStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID u
 	results := map[int][]StreamCount{}
 
 	for year := minYear; year <= maxYear; year++ {
-		rows, err := db.New(db.Service().DB).HistoryGetAlbumStreamCountByYear(ctx, db.HistoryGetAlbumStreamCountByYearParams{
+		rows, err := db.New(transaction).HistoryGetAlbumStreamCountByYear(ctx, db.HistoryGetAlbumStreamCountByYearParams{
 			UserID:       userUUID,
 			MinMsPlayed:  filter.MinMSPlayed,
 			IncludeSkips: filter.IncludeSkipped,
@@ -888,7 +908,7 @@ func ArtistStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID 
 	results := map[int][]StreamCount{}
 
 	for year := minYear; year <= maxYear; year++ {
-		rows, err := db.New(db.Service().DB).HistoryGetArtistStreamCountByYear(ctx, db.HistoryGetArtistStreamCountByYearParams{
+		rows, err := db.New(transaction).HistoryGetArtistStreamCountByYear(ctx, db.HistoryGetArtistStreamCountByYearParams{
 			UserID:       userUUID,
 			MinMsPlayed:  filter.MinMSPlayed,
 			IncludeSkips: filter.IncludeSkipped,
@@ -915,6 +935,13 @@ func NullStringFromPtr(ptr *string) sql.NullString {
 		return sql.NullString{}
 	}
 	return sql.NullString{Valid: true, String: *ptr}
+}
+
+func StringPtrFromNullString(nstr sql.NullString) *string {
+	if nstr.Valid {
+		return &nstr.String
+	}
+	return nil
 }
 
 func NullBoolFromPtr(ptr *bool) sql.NullBool {

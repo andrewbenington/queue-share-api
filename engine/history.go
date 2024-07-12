@@ -61,6 +61,12 @@ func getHistoryForUser(ctx context.Context, user *db.User) {
 			log.Printf("%d history entries found for %s", len(recentlyPlayed), user.Username)
 		}
 
+		// if user.Username == "andrewb57" {
+		// 	for _, track := range recentlyPlayed {
+		// 		fmt.Printf("%s - %s", track.Track.Name, track.PlayedAt.Format(time.RFC1123))
+		// 	}
+		// }
+
 		// Load URIs
 		trackIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
 			return track.Track.ID.String()
@@ -137,6 +143,11 @@ func processHistory(ctx context.Context, spClient *spotify.Client, items []spoti
 			SpotifyTrackUri:  string(item.Track.URI),
 			SpotifyArtistUri: sql.NullString{Valid: true, String: string(trackData.ArtistURI)},
 			SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(trackData.AlbumURI)},
+		}
+		if trackData.Isrc != nil {
+			row.Isrc = sql.NullString{Valid: true, String: *trackData.Isrc}
+		} else {
+			row.Isrc = sql.NullString{}
 		}
 
 		allRows = append(allRows, row)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -71,7 +72,7 @@ func (c *Controller) GetQueue(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(responseBytes)
 }
 
-func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
+func (c *Controller) PushToRoomQueue(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	reqCtx, err := getRoomRequestContext(ctx, r)
@@ -161,6 +162,42 @@ func (c *Controller) PushToQueue(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _ = w.Write(responseBytes)
+}
+
+func (c *Controller) PushToUserQueue(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, err.Error())
+		return
+	}
+
+	trackURI := r.URL.Query().Get("track")
+	trackID, err := service.IDFromURI(trackURI)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("bad track uri: %s", err), http.StatusBadRequest)
+		return
+	}
+
+	code, spClient, err := client.ForUser(ctx, userUUID)
+	if err != nil {
+		http.Error(w, err.Error(), code)
+		return
+	}
+
+	err = service.PushToUserQueue(r.Context(), spClient, trackID)
+	if err != nil && strings.Contains(err.Error(), "No active device found") {
+		requests.RespondWithError(w, http.StatusBadRequest, "Host is not playing music")
+		return
+	}
+	if err != nil {
+		log.Printf("Error pushing to user queue: %s", err)
+		requests.RespondInternalError(w)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *service.CurrentQueue) (statusCode int, errMessage string) {

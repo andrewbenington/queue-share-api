@@ -31,13 +31,40 @@ import (
 // 	}
 // }
 
-func loadURIsByPopularity() {
+var missingURICountByUser = map[string]int{}
+
+func loadURIsByPopularity() int {
 	ctx := context.Background()
+	total := 0
+
+	tx, err := db.Service().DB.Begin()
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return 0
+	}
+	defer tx.Commit()
+
+	rows, err := db.New(tx).MissingArtistURIs(ctx)
+	if err != nil {
+		fmt.Printf("Could not get missing artist URIs %s\n", err)
+		return 0
+	}
+	missingURICountByUser = map[string]int{}
+	for _, row := range rows {
+		for _, userID := range row.UserIds {
+			if count, ok := missingURICountByUser[userID]; ok {
+				missingURICountByUser[userID] = count + 1
+			} else {
+				missingURICountByUser[userID] = 1
+			}
+		}
+	}
+
 	for range 5 {
 		rows, err := db.New(db.Service().DB).HistoryGetTopTracksWithoutURIs(ctx)
 		if err != nil {
 			fmt.Printf("Could not get tracks without URIs: %s\n", err)
-			return
+			return 0
 		}
 
 		var userID string
@@ -50,7 +77,7 @@ func loadURIsByPopularity() {
 		_, spClient, err := client.ForUser(ctx, uuid.MustParse(userID))
 		if err != nil {
 			fmt.Printf("Could not get service client: %s\n", err)
-			return
+			return 0
 		}
 
 		trackIDs := []string{}
@@ -68,6 +95,7 @@ func loadURIsByPopularity() {
 			fmt.Printf("Could not get track IDs %s\n", err)
 			continue
 		}
+		total += len(tracks)
 
 		for _, track := range tracks {
 			db.New(db.Service().DB).HistorySetURIsForTrack(ctx, db.HistorySetURIsForTrackParams{
@@ -79,6 +107,27 @@ func loadURIsByPopularity() {
 		}
 
 	}
+
+	rows, err = db.New(tx).MissingArtistURIs(ctx)
+	if err != nil {
+		fmt.Printf("Could not get missing artist URIs %s\n", err)
+		return 0
+	}
+	missingURICountByUser = map[string]int{}
+	for _, row := range rows {
+		for _, userID := range row.UserIds {
+			if count, ok := missingURICountByUser[userID]; ok {
+				missingURICountByUser[userID] = count + 1
+			} else {
+				missingURICountByUser[userID] = 1
+			}
+		}
+	}
+	return total
+}
+
+func GetMissingURIsByUser() map[string]int {
+	return missingURICountByUser
 }
 
 func cacheTracksByPopularity() {

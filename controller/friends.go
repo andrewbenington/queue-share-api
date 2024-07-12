@@ -20,6 +20,8 @@ type FriendRequestData struct {
 }
 
 func (c *Controller) UserFriendRequestData(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	_, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
@@ -32,19 +34,25 @@ func (c *Controller) UserFriendRequestData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	suggestions, err := db.New(db.Service().DB).UserGetFriendSuggestions(r.Context(), userUUID)
+	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit()
+
+	suggestions, err := db.New(tx).UserGetFriendSuggestions(ctx, userUUID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
 	}
 
-	sent, err := db.New(db.Service().DB).UserGetSentFriendRequests(r.Context(), userUUID)
+	sent, err := db.New(tx).UserGetSentFriendRequests(ctx, userUUID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
 	}
 
-	received, err := db.New(db.Service().DB).UserGetReceivedFriendRequests(r.Context(), userUUID)
+	received, err := db.New(tx).UserGetReceivedFriendRequests(ctx, userUUID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -77,7 +85,13 @@ func (c *Controller) UserSendFriendRequest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = db.New(db.Service().DB).UserSendFriendRequest(r.Context(), db.UserSendFriendRequestParams{
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit()
+
+	err = db.New(tx).UserSendFriendRequest(r.Context(), db.UserSendFriendRequestParams{
 		UserID:   userUUID,
 		FriendID: friendUUID,
 	})
@@ -230,7 +244,14 @@ func (c *Controller) UserGetFriends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	friends, err := db.New(db.Service().DB).UserGetFriends(r.Context(), userUUID)
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Commit()
+
+	friends, err := db.New(tx).UserGetFriends(r.Context(), userUUID)
 	if err == sql.ErrNoRows {
 		friends = []*db.User{}
 	} else if err != nil {
@@ -267,7 +288,13 @@ func userOrFriendUUIDFromRequest(ctx context.Context, r *http.Request) (uuid.UUI
 		return userUUID, nil
 	}
 
-	isFriend, err := db.New(db.Service().DB).UserIsFriends(ctx, db.UserIsFriendsParams{
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	defer tx.Commit()
+
+	isFriend, err := db.New(tx).UserIsFriends(ctx, db.UserIsFriendsParams{
 		UserID:   userUUID,
 		FriendID: friendUUID,
 	})

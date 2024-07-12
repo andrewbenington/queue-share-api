@@ -65,7 +65,12 @@ func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.
 }
 
 func ForUser(ctx context.Context, userID uuid.UUID) (statusCode int, client *spotify.Client, err error) {
-	tx := db.Service().DB
+	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	defer tx.Commit()
+
 	row, err := db.New(tx).UserGetSpotifyTokens(ctx, userID)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, nil, fmt.Errorf("room credentials not found for user %s", userID)

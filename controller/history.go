@@ -70,7 +70,14 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 	includeSkippedParam := r.URL.Query().Get("include_skipped")
 	includeSkipped := strings.EqualFold(includeSkippedParam, "true")
 
-	rows, err := db.New(db.Service().DB).HistoryGetAll(ctx, db.HistoryGetAllParams{
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Commit()
+
+	rows, err := db.New(tx).HistoryGetAll(ctx, db.HistoryGetAllParams{
 		UserID:       userUUID,
 		MinMsPlayed:  int32(minMSPlayed),
 		IncludeSkips: includeSkipped,
@@ -87,6 +94,10 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 
 	entries := []HistoryEntry{}
 	for _, row := range rows {
+		artistID, err := service.IDFromURI(row.SpotifyArtistUri.String)
+		if err != nil {
+			continue
+		}
 		entry := HistoryEntry{
 			Timestamp:       row.Timestamp,
 			TrackName:       row.TrackName,
@@ -99,7 +110,7 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 				[]db.TrackArtist{{
 					Name: row.ArtistName,
 					URI:  row.SpotifyArtistUri.String,
-					ID:   service.IDFromURIMust(row.SpotifyArtistUri.String),
+					ID:   artistID,
 				}},
 				row.OtherArtists...),
 			ImageURL: row.ImageUrl,
@@ -202,63 +213,6 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusAccepted)
 }
 
-func (c *StatsController) GetTopTracksByYear(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
-	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
-		return
-	}
-
-	filter := getFilterParams(r)
-
-	results, responseCode, err := history.TrackStreamCountByYear(ctx, db.Service().DB, userUUID, filter)
-	if err != nil {
-		http.Error(w, err.Error(), responseCode)
-	}
-
-	json.NewEncoder(w).Encode(results)
-}
-
-func (c *StatsController) GetTopAlbumsByYear(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
-	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
-		return
-	}
-
-	filter := getFilterParams(r)
-
-	results, responseCode, err := history.AlbumStreamCountByYear(ctx, db.Service().DB, userUUID, filter)
-	if err != nil {
-		http.Error(w, err.Error(), responseCode)
-	}
-
-	json.NewEncoder(w).Encode(results)
-}
-
-func (c *StatsController) GetTopArtistsByYear(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
-	if err != nil {
-		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
-		return
-	}
-
-	filter := getFilterParams(r)
-
-	results, responseCode, err := history.ArtistStreamCountByYear(ctx, db.Service().DB, userUUID, filter)
-	if err != nil {
-		http.Error(w, err.Error(), responseCode)
-	}
-
-	json.NewEncoder(w).Encode(results)
-}
-
 func (c *StatsController) GetAllStreamsByURI(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -322,8 +276,22 @@ func getFilterParams(r *http.Request) history.FilterParams {
 
 	timeframeParam := r.URL.Query().Get("timeframe")
 	var timeframe history.Timeframe = "month"
-	if timeframeParam == "day" || timeframeParam == "week" || timeframeParam == "year" {
+	if timeframeParam == "day" || timeframeParam == "week" || timeframeParam == "year" || timeframeParam == "all_time" {
 		timeframe = history.Timeframe(timeframeParam)
+	}
+
+	startParam := r.URL.Query().Get("start_unix")
+	startUnix, err := strconv.Atoi(startParam)
+	if err != nil {
+		startUnix = 0
+	}
+	start := time.Unix(int64(startUnix), 0)
+
+	end := time.Now()
+	endParam := r.URL.Query().Get("end_unix")
+	endUnix, err := strconv.Atoi(endParam)
+	if err == nil {
+		end = time.Unix(int64(endUnix), 0)
 	}
 
 	return history.FilterParams{
@@ -332,6 +300,8 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		Max:            int32(max),
 		ArtistURIs:     artistURIs,
 		AlbumURI:       albumURI,
+		Start:          start,
+		End:            end,
 		Timeframe:      timeframe,
 	}
 }

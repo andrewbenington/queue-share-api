@@ -5,10 +5,11 @@ import "time"
 type Timeframe string
 
 const (
-	TimeframeDay   Timeframe = "day"
-	TimeframeWeek  Timeframe = "week"
-	TimeframeMonth Timeframe = "month"
-	TimeframeYear  Timeframe = "year"
+	TimeframeDay     Timeframe = "day"
+	TimeframeWeek    Timeframe = "week"
+	TimeframeMonth   Timeframe = "month"
+	TimeframeYear    Timeframe = "year"
+	TimeframeAllTime Timeframe = "all_time"
 )
 
 func (t Timeframe) GetNextStartTime(current time.Time) time.Time {

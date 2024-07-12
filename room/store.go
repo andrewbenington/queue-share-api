@@ -165,7 +165,7 @@ type Member struct {
 	Username     string `json:"username"`
 	DisplayName  string `json:"display_name"`
 	SpotifyName  string `json:"spotify_name"`
-	SpotifyImage string `json:"spotify_image"`
+	SpotifyImage string `json:"spotify_image_url"`
 	IsModerator  bool   `json:"is_moderator"`
 	QueuedTracks int    `json:"queued_tracks"`
 }

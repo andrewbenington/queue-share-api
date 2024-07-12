@@ -104,6 +104,7 @@ type SpotifyHistory struct {
 	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
 	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
 	FromHistory      bool           `json:"from_history"`
+	Isrc             sql.NullString `json:"isrc"`
 }
 
 type SpotifyPermissionsVersion struct {

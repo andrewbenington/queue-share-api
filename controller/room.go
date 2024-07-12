@@ -64,7 +64,7 @@ func (c *Controller) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := user.GetByID(ctx, db.Service().DB, userID)
+	user, err := user.GetByID(ctx, transaction, userID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "get room host after create: %s", err)
 	} else {

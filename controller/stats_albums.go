@@ -31,7 +31,12 @@ func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http
 
 	filter := getFilterParams(r)
 
-	transaction := db.Service().DB
+	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+	defer transaction.Commit()
 
 	rankingResults, code, err := history.AlbumStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
@@ -66,9 +71,10 @@ func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http
 }
 
 type AlbumStatsResponse struct {
-	Album   *spotify.FullAlbum      `json:"album"`
-	Streams []*Stream               `json:"streams"`
-	Tracks  map[string]db.TrackData `json:"tracks"`
+	Album      *spotify.FullAlbum      `json:"album"`
+	Streams    []*Stream               `json:"streams"`
+	Tracks     map[string]db.TrackData `json:"tracks"`
+	TrackRanks []*history.TrackStreams `json:"track_ranks"`
 }
 
 func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Request) {
@@ -99,20 +105,40 @@ func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	filter := getFilterParams(r)
+
+	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+	defer transaction.Commit()
+
 	rows, err := history.AllAlbumStreamsByURI(
-		ctx,
-		db.Service().DB,
-		userUUID,
-		albumURI,
-		getFilterParams(r),
+		ctx, transaction, userUUID, albumURI, filter,
 	)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
 	}
 
-	streams := []*Stream{}
+	filter.AlbumURI = &albumURI
+	_, _, trackRanks, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, transaction, nil, nil)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("couldn't get track counts: %s", err), http.StatusInternalServerError)
+		return
+	}
+
+	if trackRanks == nil {
+		trackRanks = []*history.TrackStreams{}
+	}
+
 	trackIDs := map[string]bool{}
+	for _, stream := range trackRanks {
+		trackIDs[stream.ID] = true
+	}
+
+	streams := []*Stream{}
 	for _, row := range rows {
 		streams = append(streams, &Stream{
 			Timestamp:       row.Timestamp,
@@ -121,7 +147,11 @@ func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Requ
 			MsPlayed:        int(row.MsPlayed),
 			SpotifyTrackUri: row.SpotifyTrackUri,
 		})
-		trackIDs[service.IDFromURIMust(row.SpotifyTrackUri)] = true
+		id, err := service.IDFromURI(row.SpotifyTrackUri)
+		if err != nil {
+			continue
+		}
+		trackIDs[id] = true
 	}
 
 	tracks, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
@@ -131,9 +161,10 @@ func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Requ
 	}
 
 	response := AlbumStatsResponse{
-		Streams: streams,
-		Album:   album,
-		Tracks:  tracks,
+		Streams:    streams,
+		Album:      album,
+		Tracks:     tracks,
+		TrackRanks: trackRanks,
 	}
 
 	json.NewEncoder(w).Encode(response)
@@ -168,8 +199,15 @@ func (c *StatsController) GetAlbumRankingsByURI(w http.ResponseWriter, r *http.R
 
 	rankings := []TimeframeRanking{}
 
+	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	if err != nil {
+		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		return
+	}
+	defer transaction.Commit()
+
 	filter := getFilterParams(r)
-	allRankings, responseCode, err := history.AlbumStreamRankingsByTimeframe(ctx, db.Service().DB, userUUID, filter, nil, nil)
+	allRankings, responseCode, err := history.AlbumStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}

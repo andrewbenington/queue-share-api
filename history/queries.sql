@@ -20,7 +20,8 @@ INSERT INTO SPOTIFY_HISTORY(
     offline,
     offline_timestamp,
     incognito_mode,
-    from_history)
+    from_history,
+    isrc)
 VALUES (
     @user_id,
     @timestamp,
@@ -42,7 +43,8 @@ VALUES (
     @offline,
     @offline_timestamp,
     @incognito_mode,
-    @from_history);
+    @from_history,
+    @isrc);
 
 -- name: HistoryInsertBulk :exec
 INSERT INTO SPOTIFY_HISTORY(
@@ -66,7 +68,8 @@ INSERT INTO SPOTIFY_HISTORY(
     offline,
     offline_timestamp,
     incognito_mode,
-    from_history)
+    from_history,
+    isrc)
 VALUES (
     unnest(
         @user_ids::uuid[]),
@@ -109,7 +112,9 @@ VALUES (
     unnest(
         @incognito_mode::boolean[]),
     unnest(
-        @from_history::boolean[]))
+        @from_history::boolean[]),
+    unnest(
+        @isrc::text[]))
 ON CONFLICT
     DO NOTHING;
 
@@ -124,7 +129,8 @@ SELECT
     spotify_album_uri,
     spotify_artist_uri,
     image_url,
-    other_artists
+    other_artists,
+    h.isrc
 FROM
     SPOTIFY_HISTORY h
     JOIN SPOTIFY_TRACK_CACHE ON URI = spotify_track_uri
@@ -133,6 +139,9 @@ WHERE
     AND ms_played >= @min_ms_played
     AND (skipped != TRUE
         OR @include_skips::boolean)
+    AND (sqlc.narg(start_date)::timestamp IS NULL
+        OR sqlc.narg(end_date)::timestamp IS NULL
+        OR timestamp BETWEEN sqlc.narg(start_date)::timestamp AND sqlc.narg(end_date)::timestamp)
 ORDER BY
     timestamp DESC
 LIMIT @max_count;
@@ -305,7 +314,7 @@ WITH top_isrcs AS (
         AND (sqlc.narg(artist_uris)::text[] IS NULL
             OR spotify_artist_uri = ANY (sqlc.narg(artist_uris)::text[]))
         AND (sqlc.narg(album_uri)::text IS NULL
-            OR spotify_album_uri = sqlc.narg(album_uri)::text)
+            OR h.spotify_album_uri = sqlc.narg(album_uri)::text)
     GROUP BY
         tc.isrc
     ORDER BY

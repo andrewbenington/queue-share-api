@@ -10,6 +10,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/constants"
 	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/andrewbenington/queue-share-api/engine"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/room"
 	"github.com/andrewbenington/queue-share-api/user"
@@ -93,7 +94,14 @@ func (c *Controller) CurrentUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, err := user.GetByID(r.Context(), db.Service().DB, userID)
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+	defer tx.Commit()
+
+	u, err := user.GetByID(r.Context(), tx, userID)
 
 	if err == sql.ErrNoRows {
 		requests.RespondAuthError(w)
@@ -120,7 +128,14 @@ func (c *Controller) GetUserHostedRooms(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rooms, err := room.GetUserHostedRooms(r.Context(), db.Service().DB, userID, true)
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+	defer tx.Commit()
+
+	rooms, err := room.GetUserHostedRooms(r.Context(), tx, userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -138,7 +153,14 @@ func (c *Controller) GetUserJoinedRooms(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	rooms, err := room.GetUserJoinedRooms(r.Context(), db.Service().DB, userID, true)
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+	defer tx.Commit()
+
+	rooms, err := room.GetUserJoinedRooms(r.Context(), tx, userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -156,7 +178,14 @@ func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := user.UnlinkSpotify(r.Context(), db.Service().DB, userID)
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+	defer tx.Commit()
+
+	err = user.UnlinkSpotify(r.Context(), tx, userID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 	}
@@ -171,7 +200,14 @@ func (c *Controller) UserHasSpotifyHistory(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	result, err := db.New((db.Service().DB)).UserHasSpotifyHistory(r.Context(), userUUID)
+	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	if err != nil {
+		requests.RespondInternalError(w)
+		return
+	}
+	defer tx.Commit()
+
+	result, err := db.New(tx).UserHasSpotifyHistory(r.Context(), userUUID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -179,4 +215,15 @@ func (c *Controller) UserHasSpotifyHistory(w http.ResponseWriter, r *http.Reques
 
 	response := map[string]bool{"user_has_history": result}
 	json.NewEncoder(w).Encode(response)
+}
+
+func (c *Controller) TracksLeftToProcess(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(auth.UserContextKey).(string)
+	if !ok {
+		requests.RespondAuthError(w)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	missingByUser := engine.GetMissingURIsByUser()
+	json.NewEncoder(w).Encode(missingByUser[userID])
 }

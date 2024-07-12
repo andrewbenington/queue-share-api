@@ -40,16 +40,9 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 		return
 	}
 
-	start, end := getStartAndEndTimes(r)
 	code, spClient, err := client.ForUser(ctx, userUUID)
 	if err != nil {
 		http.Error(w, err.Error(), code)
-		return
-	}
-
-	friends, err := db.New(db.Service().DB).UserGetFriends(ctx, userUUID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -59,9 +52,15 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 	}
 	defer tx.Commit()
 
+	friends, err := db.New(tx).UserGetFriends(ctx, userUUID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	filter := getFilterParams(r)
 	filter.Max = 50
-	userStreamsByURI, userRanksByURI, _, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, start, end, nil, nil)
+	userStreamsByURI, userRanksByURI, _, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -91,7 +90,7 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 	}
 
 	for _, friend := range friends {
-		friendStreamsByURI, friendRanksByURI, _, err := history.CalcTrackStreamsAndRanks(ctx, friend.ID, filter, tx, start, end, nil, nil)
+		friendStreamsByURI, friendRanksByURI, _, err := history.CalcTrackStreamsAndRanks(ctx, friend.ID, filter, tx, nil, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -118,9 +117,13 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 	sharedOnly := strings.EqualFold(r.URL.Query().Get("shared_only"), "true")
 
 	for uri, streamsByUser := range streamsByURI {
+		id, err := service.IDFromURI(uri)
+		if err != nil {
+			continue
+		}
 		if !sharedOnly || len(streamsByUser) > 1 {
 			resp.StreamsByURI[uri] = streamsByUser
-			trackIDs[service.IDFromURIMust(uri)] = true
+			trackIDs[id] = true
 		}
 	}
 	for uri, ranksByUser := range ranksByURI {
@@ -168,7 +171,14 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 		return
 	}
 
-	friends, err := db.New(db.Service().DB).UserGetFriends(ctx, userUUID)
+	tx, err := db.Service().DB.Begin()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Commit()
+
+	friends, err := db.New(tx).UserGetFriends(ctx, userUUID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -177,13 +187,6 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 	start, end := getStartAndEndTimes(r)
 	filter := getFilterParams(r)
 	filter.Max = 50
-
-	tx, err := db.Service().DB.Begin()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer tx.Commit()
 
 	userStreamsByURI, userRanksByURI, _, err := history.CalcArtistStreamsAndRanks(ctx, userUUID, filter, tx, start, end, nil, nil)
 	if err != nil {
@@ -244,9 +247,13 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 
 	sharedOnly := strings.EqualFold(r.URL.Query().Get("shared_only"), "true")
 	for uri, streams := range streamsByURI {
+		id, err := service.IDFromURI(uri)
+		if err != nil {
+			continue
+		}
 		if !sharedOnly || len(streams) > 1 {
 			resp.StreamsByURI[uri] = streams
-			artistIDs[service.IDFromURIMust(uri)] = true
+			artistIDs[id] = true
 		}
 	}
 	for uri, streams := range ranksByURI {
@@ -294,7 +301,14 @@ func (c *StatsController) UserCompareFriendTopAlbums(w http.ResponseWriter, r *h
 		return
 	}
 
-	friends, err := db.New(db.Service().DB).UserGetFriends(ctx, userUUID)
+	tx, err := db.Service().DB.Begin()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Commit()
+
+	friends, err := db.New(tx).UserGetFriends(ctx, userUUID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -303,13 +317,6 @@ func (c *StatsController) UserCompareFriendTopAlbums(w http.ResponseWriter, r *h
 	start, end := getStartAndEndTimes(r)
 	filter := getFilterParams(r)
 	filter.Max = 50
-
-	tx, err := db.Service().DB.Begin()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer tx.Commit()
 
 	userStreamsByURI, userRanksByURI, _, err := history.CalcAlbumStreamsAndRanks(ctx, userUUID, filter, tx, start, end, nil, nil)
 	if err != nil {
@@ -370,9 +377,13 @@ func (c *StatsController) UserCompareFriendTopAlbums(w http.ResponseWriter, r *h
 
 	sharedOnly := strings.EqualFold(r.URL.Query().Get("shared_only"), "true")
 	for uri, streams := range streamsByURI {
+		id, err := service.IDFromURI(uri)
+		if err != nil {
+			continue
+		}
 		if !sharedOnly || len(streams) > 1 {
 			resp.StreamsByURI[uri] = streams
-			albumIDs[service.IDFromURIMust(uri)] = true
+			albumIDs[id] = true
 		}
 	}
 	for uri, streams := range ranksByURI {

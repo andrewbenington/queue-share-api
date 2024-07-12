@@ -137,6 +137,7 @@ type HistoryInsertBulkNullableParams struct {
 	OfflineTimestamp []time.Time `json:"offline_timestamp"`
 	IncognitoMode    []bool      `json:"incognito_mode"`
 	FromHistory      []bool      `json:"from_history"`
+	ISRC             []*string   `json:"isrc"`
 }
 
 func (q *Queries) HistoryInsertBulkNullable(ctx context.Context, arg HistoryInsertBulkNullableParams) error {
@@ -162,6 +163,7 @@ func (q *Queries) HistoryInsertBulkNullable(ctx context.Context, arg HistoryInse
 		pq.Array(arg.OfflineTimestamp),
 		pq.Array(arg.IncognitoMode),
 		pq.Array(arg.FromHistory),
+		pq.Array(arg.ISRC),
 	)
 	return err
 }

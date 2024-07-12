@@ -73,9 +73,10 @@ func init() {
 	}
 }
 
-func CacheFullTracks(ctx context.Context, tracks []*spotify.FullTrack) {
+func CacheFullTracks(ctx context.Context, tx db.DBTX, tracks []*spotify.FullTrack) {
 	params := InsertParamsFromFullTracks(tracks)
-	err := db.New(db.Service().DB).TrackCacheInsertBulkNullable(ctx, params)
+
+	err := db.New(tx).TrackCacheInsertBulkNullable(ctx, params)
 	if err != nil {
 		fmt.Printf("Error inserting into track cache: %s", err)
 		return
@@ -178,8 +179,8 @@ func trackArtistFromSimple(artist spotify.SimpleArtist, _ int) db.TrackArtist {
 	}
 }
 
-func GetTracksFromCache(ctx context.Context, ids []string) (map[string]db.TrackData, error) {
-	rows, err := db.New(db.Service().DB).TrackCacheGetByID(ctx, ids)
+func GetTracksFromCache(ctx context.Context, tx db.DBTX, ids []string) (map[string]db.TrackData, error) {
+	rows, err := db.New(tx).TrackCacheGetByID(ctx, ids)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +254,7 @@ func getArtistsFromCache(ids []string) map[string]spotify.FullArtist {
 	return cacheHits
 }
 
-func cacheFullAlbums(ctx context.Context, albums []*spotify.FullAlbum) {
+func cacheFullAlbums(ctx context.Context, tx db.DBTX, albums []*spotify.FullAlbum) {
 	for _, album := range albums {
 		spotifyAlbumCache[string(album.ID)] = *album
 	}
@@ -267,7 +268,7 @@ func cacheFullAlbums(ctx context.Context, albums []*spotify.FullAlbum) {
 		fmt.Printf("Error serializing Spotify album cache: %s", err)
 	}
 	params := InsertParamsFromFullAlbums(albums)
-	err = db.New(db.Service().DB).AlbumCacheInsertBulkNullable(ctx, params)
+	err = db.New(tx).AlbumCacheInsertBulkNullable(ctx, params)
 	if err != nil {
 		fmt.Printf("Error inserting into album cache: %s", err)
 		return
