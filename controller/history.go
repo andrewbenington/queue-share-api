@@ -300,8 +300,8 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		Max:            int32(max),
 		ArtistURIs:     artistURIs,
 		AlbumURI:       albumURI,
-		Start:          start,
-		End:            end,
+		Start:          &start,
+		End:            &end,
 		Timeframe:      timeframe,
 	}
 }

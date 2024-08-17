@@ -254,8 +254,8 @@ type FilterParams struct {
 	ArtistURIs     []string
 	AlbumURI       *string
 	Timeframe      Timeframe
-	Start          time.Time
-	End            time.Time
+	Start          *time.Time
+	End            *time.Time
 }
 
 func (f *FilterParams) ensureMinimum() {
@@ -266,7 +266,25 @@ func (f *FilterParams) ensureMinimum() {
 
 func (f *FilterParams) minStart(min time.Time) {
 	if f.Start.Before(min) {
-		f.Start = min
+		f.Start = &min
+	}
+}
+
+func (f *FilterParams) ensureStartAndEnd() {
+	f.ensureStart()
+	f.ensureEnd()
+}
+
+func (f *FilterParams) ensureStart() {
+	if f.Start == nil {
+		f.Start = &time.Time{}
+	}
+}
+
+func (f *FilterParams) ensureEnd() {
+	if f.End == nil {
+		now := time.Now()
+		f.End = &now
 	}
 }
 
@@ -315,38 +333,6 @@ func AllAlbumStreamsByURI(ctx context.Context, transaction db.DBTX, userUUID uui
 type StreamCount struct {
 	Name  string `json:"name"`
 	Count int64  `json:"count"`
-}
-
-func TrackStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) (map[int][]StreamCount, int, error) {
-	filter.ensureMinimum()
-
-	minYear, maxYear, err := FullHistoryTimeRange(ctx, transaction, userUUID)
-	if err != nil {
-		return nil, http.StatusNotFound, err
-	}
-
-	results := map[int][]StreamCount{}
-
-	for year := minYear; year <= maxYear; year++ {
-		rows, err := db.New(transaction).HistoryGetTrackStreamCountByYear(ctx, db.HistoryGetTrackStreamCountByYearParams{
-			UserID:       userUUID,
-			MinMsPlayed:  filter.MinMSPlayed,
-			IncludeSkips: filter.IncludeSkipped,
-			Year:         int32(year),
-		})
-
-		if err != nil {
-			fmt.Println("Error getting")
-		}
-
-		counts := []StreamCount{}
-		for _, row := range rows {
-			counts = append(counts, StreamCount{row.TrackName, row.Occurrences})
-		}
-		results[year] = counts
-	}
-
-	return results, http.StatusOK, nil
 }
 
 func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, lastStreams map[string]int64, lastRanks map[string]int64) (
@@ -661,10 +647,12 @@ type TrackStreams struct {
 }
 
 func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]*TrackRankings, int, error) {
+	filter.ensureEnd()
 	var firstStart time.Time
-	end := filter.End
-
-	if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
+	end := *filter.End
+	if filter.Start != nil {
+		firstStart = *filter.Start
+	} else if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
 		firstStart = *defaultFirstStart
 	} else {
 		minYear, _, err := FullHistoryTimeRange(ctx, transaction, userUUID)
@@ -693,8 +681,8 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 
 	for current.Before(end) {
 		nextStart := filter.Timeframe.GetNextStartTime(current)
-		filter.Start = current
-		filter.End = nextStart
+		filter.Start = &current
+		filter.End = &nextStart
 
 		var rankingList []*TrackStreams
 		thisMonthStreams, thisMonthRanks, rankingList, err := CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, lastMonthStreams, lastMonthRanks)
