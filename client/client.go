@@ -20,7 +20,13 @@ import (
 )
 
 func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.Client, err error) {
-	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := room.GetEncryptedRoomTokens(ctx, db.Service().DB, code)
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+	defer tx.Commit(ctx)
+
+	encrytpedAccessToken, accessTokenExpiry, encryptedRefreshToken, err := room.GetEncryptedRoomTokens(ctx, tx, code)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, nil, fmt.Errorf("room credentials not found")
 	}
@@ -55,7 +61,7 @@ func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("get refreshed token: %w", err)
 		}
-		err = room.UpdateSpotifyToken(ctx, db.Service().DB, code, newToken)
+		err = room.UpdateSpotifyToken(ctx, tx, code, newToken)
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("update room tokens: %w", err)
 		}
@@ -65,11 +71,11 @@ func ForRoom(ctx context.Context, code string) (statusCode int, client *spotify.
 }
 
 func ForUser(ctx context.Context, userID uuid.UUID) (statusCode int, client *spotify.Client, err error) {
-	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return http.StatusInternalServerError, nil, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	row, err := db.New(tx).UserGetSpotifyTokens(ctx, userID)
 	if err == sql.ErrNoRows {
@@ -104,7 +110,7 @@ func ForUser(ctx context.Context, userID uuid.UUID) (statusCode int, client *spo
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("get refreshed token: %w", err)
 		}
-		err = user.UpdateSpotifyToken(ctx, db.Service().DB, userID.String(), newToken)
+		err = user.UpdateSpotifyToken(ctx, tx, userID.String(), newToken)
 		if err != nil {
 			return http.StatusInternalServerError, nil, fmt.Errorf("update room tokens: %w", err)
 		}

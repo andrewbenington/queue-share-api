@@ -28,11 +28,11 @@ func SearchArtists(ctx context.Context, spClient *spotify.Client, text string) (
 }
 
 func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.TrackData, error) {
-	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	tracks, err := GetTracksFromCache(ctx, tx, []string{id})
 	if err != nil {
@@ -57,11 +57,11 @@ func GetTrack(ctx context.Context, spClient *spotify.Client, id string) (*db.Tra
 }
 
 func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.TrackData, error) {
-	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	tracks, err := GetTracksFromCache(ctx, tx, ids)
 	if err != nil {
@@ -169,11 +169,11 @@ func GetAlbum(ctx context.Context, spClient *spotify.Client, id string) (*spotif
 		return nil, err
 	}
 
-	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	cacheFullAlbums(ctx, tx, []*spotify.FullAlbum{album})
 
@@ -191,11 +191,11 @@ func GetAlbums(ctx context.Context, spClient *spotify.Client, ids []string) (map
 		}
 	}
 
-	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	for start := 0; start < len(idsToGet); start += 20 {
 		end := start + 20

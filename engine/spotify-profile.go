@@ -2,16 +2,21 @@ package engine
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/db"
 )
 
-func doSpotifyProfileCycle() {
-	ctx := context.Background()
-	users, err := db.New(db.Service().DB).UserGetAllWithSpotify(ctx)
+func doSpotifyProfileCycle(ctx context.Context) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return
+	}
+	defer tx.Commit(ctx)
+
+	users, err := db.New(tx).UserGetAllWithSpotify(ctx)
 	if err != nil {
 		fmt.Printf("Could not get users with Spotify profiles: %s\n", err)
 		return
@@ -29,11 +34,13 @@ func doSpotifyProfileCycle() {
 			continue
 		}
 
-		if user.SpotifyAccount.String != userData.ID || user.SpotifyName.String != userData.User.DisplayName || (len(userData.Images) > 0 && user.SpotifyImageUrl != nil && *user.SpotifyImageUrl != userData.Images[0].URL) {
-			err = db.New(db.Service().DB).UserUpdateSpotifyInfo(ctx, db.UserUpdateSpotifyInfoParams{
+		if (user.SpotifyAccount != nil && *user.SpotifyAccount != userData.ID) ||
+			(user.SpotifyName != nil && *user.SpotifyName != userData.User.DisplayName) ||
+			(len(userData.Images) > 0 && user.SpotifyImageUrl != nil && *user.SpotifyImageUrl != userData.Images[0].URL) {
+			err = db.New(tx).UserUpdateSpotifyInfo(ctx, db.UserUpdateSpotifyInfoParams{
 				ID:              user.ID,
-				SpotifyAccount:  sql.NullString{Valid: true, String: userData.ID},
-				SpotifyName:     sql.NullString{Valid: true, String: userData.User.DisplayName},
+				SpotifyAccount:  &userData.ID,
+				SpotifyName:     &userData.User.DisplayName,
 				SpotifyImageUrl: &userData.Images[0].URL,
 			})
 			if err != nil {

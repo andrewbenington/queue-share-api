@@ -5,26 +5,26 @@
 package db
 
 import (
-	"database/sql"
 	"time"
 
-	"github.com/google/uuid"
+	uuid "github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AlbumData struct {
-	ID                   string         `json:"id"`
-	URI                  string         `json:"uri"`
-	Name                 string         `json:"name"`
-	ArtistID             string         `json:"artist_id"`
-	ArtistURI            string         `json:"artist_uri"`
-	ArtistName           string         `json:"artist_name"`
-	AlbumGroup           *string        `json:"album_group"`
-	AlbumType            *string        `json:"album_type"`
-	ImageUrl             *string        `json:"image_url"`
-	ReleaseDate          *time.Time     `json:"release_date"`
-	ReleaseDatePrecision sql.NullString `json:"release_date_precision"`
-	Genres               []string       `json:"genres"`
-	Popularity           sql.NullInt32  `json:"popularity"`
+	ID                   string      `json:"id"`
+	URI                  string      `json:"uri"`
+	Name                 string      `json:"name"`
+	ArtistID             string      `json:"artist_id"`
+	ArtistURI            string      `json:"artist_uri"`
+	ArtistName           string      `json:"artist_name"`
+	AlbumGroup           *string     `json:"album_group"`
+	AlbumType            *string     `json:"album_type"`
+	ImageUrl             *string     `json:"image_url"`
+	ReleaseDate          pgtype.Date `json:"release_date"`
+	ReleaseDatePrecision *string     `json:"release_date_precision"`
+	Genres               []string    `json:"genres"`
+	Popularity           *int32      `json:"popularity"`
 }
 
 type ArtistData struct {
@@ -33,19 +33,19 @@ type ArtistData struct {
 	Name          string   `json:"name"`
 	ImageUrl      *string  `json:"image_url"`
 	Genres        []string `json:"genres"`
-	Popularity    int      `json:"popularity"`
-	FollowerCount int      `json:"follower_count"`
+	Popularity    *int32   `json:"popularity"`
+	FollowerCount *int32   `json:"follower_count"`
 }
 
 type Room struct {
-	ID                uuid.UUID    `json:"id"`
-	Name              string       `json:"name"`
-	Code              string       `json:"code"`
-	Created           time.Time    `json:"created"`
-	HostID            uuid.UUID    `json:"host_id"`
-	PasswordProtected bool         `json:"password_protected"`
-	Updated           sql.NullTime `json:"updated"`
-	IsOpen            bool         `json:"is_open"`
+	ID                uuid.UUID  `json:"id"`
+	Name              string     `json:"name"`
+	Code              string     `json:"code"`
+	Created           time.Time  `json:"created"`
+	HostID            uuid.UUID  `json:"host_id"`
+	PasswordProtected bool       `json:"password_protected"`
+	Updated           *time.Time `json:"updated"`
+	IsOpen            bool       `json:"is_open"`
 }
 
 type RoomGuest struct {
@@ -62,19 +62,19 @@ type RoomMember struct {
 }
 
 type RoomPassword struct {
-	ID                uuid.UUID      `json:"id"`
-	RoomID            uuid.UUID      `json:"room_id"`
-	EncryptedPassword sql.NullString `json:"encrypted_password"`
+	ID                uuid.UUID `json:"id"`
+	RoomID            uuid.UUID `json:"room_id"`
+	EncryptedPassword *string   `json:"encrypted_password"`
 }
 
 type RoomQueueTrack struct {
-	ID        uuid.UUID     `json:"id"`
-	TrackID   string        `json:"track_id"`
-	GuestID   uuid.NullUUID `json:"guest_id"`
-	RoomID    uuid.UUID     `json:"room_id"`
-	Timestamp time.Time     `json:"timestamp"`
-	UserID    uuid.NullUUID `json:"user_id"`
-	Played    bool          `json:"played"`
+	ID        uuid.UUID  `json:"id"`
+	TrackID   string     `json:"track_id"`
+	GuestID   *uuid.UUID `json:"guest_id"`
+	RoomID    uuid.UUID  `json:"room_id"`
+	Timestamp time.Time  `json:"timestamp"`
+	UserID    *uuid.UUID `json:"user_id"`
+	Played    bool       `json:"played"`
 }
 
 type SchemaMigration struct {
@@ -83,28 +83,28 @@ type SchemaMigration struct {
 }
 
 type SpotifyHistory struct {
-	UserID           uuid.UUID      `json:"user_id"`
-	Timestamp        time.Time      `json:"timestamp"`
-	Platform         string         `json:"platform"`
-	MsPlayed         int32          `json:"ms_played"`
-	ConnCountry      string         `json:"conn_country"`
-	IpAddr           sql.NullString `json:"ip_addr"`
-	UserAgent        sql.NullString `json:"user_agent"`
-	TrackName        string         `json:"track_name"`
-	ArtistName       string         `json:"artist_name"`
-	AlbumName        string         `json:"album_name"`
-	SpotifyTrackUri  string         `json:"spotify_track_uri"`
-	ReasonStart      sql.NullString `json:"reason_start"`
-	ReasonEnd        sql.NullString `json:"reason_end"`
-	Shuffle          bool           `json:"shuffle"`
-	Skipped          sql.NullBool   `json:"skipped"`
-	Offline          bool           `json:"offline"`
-	OfflineTimestamp sql.NullTime   `json:"offline_timestamp"`
-	IncognitoMode    bool           `json:"incognito_mode"`
-	SpotifyArtistUri sql.NullString `json:"spotify_artist_uri"`
-	SpotifyAlbumUri  sql.NullString `json:"spotify_album_uri"`
-	FromHistory      bool           `json:"from_history"`
-	Isrc             sql.NullString `json:"isrc"`
+	UserID           uuid.UUID  `json:"user_id"`
+	Timestamp        time.Time  `json:"timestamp"`
+	Platform         string     `json:"platform"`
+	MsPlayed         int32      `json:"ms_played"`
+	ConnCountry      string     `json:"conn_country"`
+	IpAddr           *string    `json:"ip_addr"`
+	UserAgent        *string    `json:"user_agent"`
+	TrackName        string     `json:"track_name"`
+	ArtistName       string     `json:"artist_name"`
+	AlbumName        string     `json:"album_name"`
+	SpotifyTrackUri  string     `json:"spotify_track_uri"`
+	ReasonStart      *string    `json:"reason_start"`
+	ReasonEnd        *string    `json:"reason_end"`
+	Shuffle          bool       `json:"shuffle"`
+	Skipped          *bool      `json:"skipped"`
+	Offline          bool       `json:"offline"`
+	OfflineTimestamp *time.Time `json:"offline_timestamp"`
+	IncognitoMode    bool       `json:"incognito_mode"`
+	SpotifyArtistUri *string    `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  *string    `json:"spotify_album_uri"`
+	FromHistory      bool       `json:"from_history"`
+	Isrc             *string    `json:"isrc"`
 }
 
 type SpotifyPermissionsVersion struct {
@@ -145,13 +145,13 @@ type TrackData struct {
 }
 
 type User struct {
-	ID              uuid.UUID      `json:"id"`
-	Username        string         `json:"username"`
-	DisplayName     string         `json:"display_name"`
-	SpotifyAccount  sql.NullString `json:"spotify_account"`
-	SpotifyName     sql.NullString `json:"spotify_name"`
-	SpotifyImageUrl *string        `json:"spotify_image_url"`
-	Created         time.Time      `json:"created"`
+	ID              uuid.UUID `json:"id"`
+	Username        string    `json:"username"`
+	DisplayName     string    `json:"display_name"`
+	SpotifyAccount  *string   `json:"spotify_account"`
+	SpotifyName     *string   `json:"spotify_name"`
+	SpotifyImageUrl *string   `json:"spotify_image_url"`
+	Created         time.Time `json:"created"`
 }
 
 type UserFriend struct {
@@ -167,7 +167,7 @@ type UserFriendRequest struct {
 }
 
 type UserPassword struct {
-	ID                uuid.UUID     `json:"id"`
-	UserID            uuid.NullUUID `json:"user_id"`
-	EncryptedPassword string        `json:"encrypted_password"`
+	ID                uuid.UUID  `json:"id"`
+	UserID            *uuid.UUID `json:"user_id"`
+	EncryptedPassword string     `json:"encrypted_password"`
 }

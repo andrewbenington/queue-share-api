@@ -63,7 +63,7 @@ func uploadAlbumCache(ctx context.Context) error {
 
 	log.Printf("There are %d albums in the cache", len(albumPtrs))
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func uploadAlbumCache(ctx context.Context) error {
 
 		params := service.InsertParamsFromFullAlbums(albumPtrs[start:end])
 
-		err = db.New(transaction).AlbumCacheInsertBulkNullable(ctx, params)
+		err = db.New(tx).AlbumCacheInsertBulkNullable(ctx, params)
 		if err != nil {
 			log.Println(err)
 		}
@@ -86,7 +86,7 @@ func uploadAlbumCache(ctx context.Context) error {
 		time.Sleep(time.Millisecond)
 	}
 
-	err = transaction.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func uploadArtistCache(ctx context.Context) error {
 
 	log.Printf("There are %d artists in the cache", len(artistPtrs))
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func uploadArtistCache(ctx context.Context) error {
 
 		params := service.InsertParamsFromFullArtists(artistPtrs[start:end])
 
-		err = db.New(transaction).ArtistCacheInsertBulkNullable(ctx, params)
+		err = db.New(tx).ArtistCacheInsertBulkNullable(ctx, params)
 		if err != nil {
 			log.Println(err)
 		}
@@ -127,7 +127,7 @@ func uploadArtistCache(ctx context.Context) error {
 		time.Sleep(time.Millisecond)
 	}
 
-	err = transaction.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		return err
 	}

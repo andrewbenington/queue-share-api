@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -21,7 +20,14 @@ var (
 )
 
 func doHistoryCycle(ctx context.Context) {
-	users, err := db.New(db.Service().DB).UsersToFetchHistory(ctx)
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return
+	}
+	defer tx.Commit(ctx)
+
+	users, err := db.New(tx).UsersToFetchHistory(ctx)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -38,6 +44,13 @@ func doHistoryCycle(ctx context.Context) {
 }
 
 func getHistoryForUser(ctx context.Context, user *db.User) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return
+	}
+	defer tx.Commit(ctx)
+
 	_, spClient, err := client.ForUser(ctx, user.ID)
 	if err != nil {
 		fmt.Println(err)
@@ -60,12 +73,6 @@ func getHistoryForUser(ctx context.Context, user *db.User) {
 		} else {
 			log.Printf("%d history entries found for %s", len(recentlyPlayed), user.Username)
 		}
-
-		// if user.Username == "andrewb57" {
-		// 	for _, track := range recentlyPlayed {
-		// 		fmt.Printf("%s - %s", track.Track.Name, track.PlayedAt.Format(time.RFC1123))
-		// 	}
-		// }
 
 		// Load URIs
 		trackIDs := lo.Map(recentlyPlayed, func(track spotify.RecentlyPlayedItem, _ int) string {
@@ -96,7 +103,7 @@ func getHistoryForUser(ctx context.Context, user *db.User) {
 			return
 		}
 
-		err = history.InsertEntries(ctx, db.Service().DB, insertParams)
+		err = history.InsertEntries(ctx, tx, insertParams)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -141,13 +148,9 @@ func processHistory(ctx context.Context, spClient *spotify.Client, items []spoti
 			ArtistName:       trackData.ArtistName,
 			AlbumName:        trackData.AlbumName,
 			SpotifyTrackUri:  string(item.Track.URI),
-			SpotifyArtistUri: sql.NullString{Valid: true, String: string(trackData.ArtistURI)},
-			SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(trackData.AlbumURI)},
-		}
-		if trackData.Isrc != nil {
-			row.Isrc = sql.NullString{Valid: true, String: *trackData.Isrc}
-		} else {
-			row.Isrc = sql.NullString{}
+			SpotifyArtistUri: &trackData.ArtistURI,
+			SpotifyAlbumUri:  &trackData.AlbumURI,
+			Isrc:             trackData.Isrc,
 		}
 
 		allRows = append(allRows, row)

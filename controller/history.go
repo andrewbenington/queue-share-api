@@ -32,7 +32,7 @@ type HistoryEntry struct {
 	ArtistName      string           `json:"artist_name"`
 	MsPlayed        int32            `json:"ms_played"`
 	SpotifyTrackUri string           `json:"spotify_track_uri"`
-	SpotifyAlbumUri string           `json:"spotify_album_uri"`
+	SpotifyAlbumUri *string          `json:"spotify_album_uri"`
 	ImageURL        *string          `json:"image_url"`
 	Artists         []db.TrackArtist `json:"artists"`
 }
@@ -71,12 +71,12 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 	includeSkippedParam := r.URL.Query().Get("include_skipped")
 	includeSkipped := strings.EqualFold(includeSkippedParam, "true")
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(r.Context())
 	if err != nil {
 		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := db.New(tx).HistoryGetAll(ctx, db.HistoryGetAllParams{
 		UserID:       userUUID,
@@ -95,7 +95,7 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 
 	entries := []HistoryEntry{}
 	for _, row := range rows {
-		artistID, err := service.IDFromURI(row.SpotifyArtistUri.String)
+		artistID, err := service.IDFromURIPtr(row.SpotifyArtistUri)
 		if err != nil {
 			continue
 		}
@@ -105,12 +105,12 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 			SpotifyTrackUri: row.SpotifyTrackUri,
 			AlbumName:       row.AlbumName,
 			ArtistName:      row.ArtistName,
-			SpotifyAlbumUri: row.SpotifyAlbumUri.String,
+			SpotifyAlbumUri: row.SpotifyAlbumUri,
 			MsPlayed:        row.MsPlayed,
 			Artists: append(
 				[]db.TrackArtist{{
 					Name: row.ArtistName,
-					URI:  row.SpotifyArtistUri.String,
+					URI:  row.SpotifyArtistUri,
 					ID:   artistID,
 				}},
 				row.OtherArtists...),
@@ -165,7 +165,7 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 	}
 	defer zipReader.Close()
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
@@ -205,7 +205,7 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 		fmt.Printf("Uploaded file %s\n", file.Name)
 	}
 
-	err = transaction.Commit()
+	err = transaction.Commit(ctx)
 	if err != nil {
 		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
 		return
@@ -223,9 +223,16 @@ func (c *StatsController) GetAllStreamsByURI(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	tx, err := db.Service().BeginTx(r.Context())
+	if err != nil {
+		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Commit(ctx)
+
 	rows, err := history.AllTrackStreamsByURI(
 		ctx,
-		db.Service().DB,
+		tx,
 		userUUID,
 		r.URL.Query().Get("spotify_uri"),
 		getFilterParams(r),

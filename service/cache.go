@@ -172,10 +172,12 @@ func InsertParamsFromFullTracks(tracks []*spotify.FullTrack) db.TrackCacheInsert
 }
 
 func trackArtistFromSimple(artist spotify.SimpleArtist, _ int) db.TrackArtist {
+	id := artist.ID.String()
+	uri := string(artist.URI)
 	return db.TrackArtist{
 		Name: artist.Name,
-		ID:   artist.ID.String(),
-		URI:  string(artist.URI),
+		ID:   &id,
+		URI:  &uri,
 	}
 }
 
@@ -397,51 +399,16 @@ func ArtistDataFromFullArtist(fa spotify.FullArtist) db.ArtistData {
 		imageURL = &image.URL
 	}
 
+	popularity := int32(fa.Popularity)
+	followerCount := int32(fa.Followers.Count)
+
 	return db.ArtistData{
 		ID:            fa.ID.String(),
 		URI:           string(fa.URI),
 		Name:          fa.Name,
 		ImageUrl:      imageURL,
 		Genres:        fa.Genres,
-		Popularity:    int(fa.Popularity),
-		FollowerCount: int(fa.Followers.Count),
+		Popularity:    &popularity,
+		FollowerCount: &followerCount,
 	}
 }
-
-// func AlbumDataFromFullAlbum(fa spotify.FullAlbum) db.AlbumData {
-// 	artist := fa.Artists[0]
-
-// 	image := GetAlbum300Image(fa.SimpleAlbum)
-// 	var imageURL *string
-// 	if image != nil {
-// 		imageURL = &image.URL
-// 	}
-
-// 	var isrc *string
-// 	if isrcField, ok := fa.ExternalIDs["isrc"]; ok {
-// 		isrc = &isrcField
-// 	}
-
-// 	return db.AlbumData{
-// 		ID:           fa.ID.String(),
-// 		URI:          string(fa.URI),
-// 		Name:         fa.Name,
-// 		ArtistID:     artist.ID.String(),
-// 		ArtistURI:    string(artist.URI),
-// 		ArtistName:   artist.Name,
-// 		AlbumGroup:   &fa.AlbumGroup,
-// 		AlbumType:    &fa.AlbumType,
-// 		ImageUrl:     imageURL,
-// 		ReleaseDate: fa.ReleaseDate,
-// 		OtherArtists: lo.Map(ft.Artists[1:], trackArtistFromSimple),
-// 		DurationMs:   int32(ft.Duration),
-// 		Popularity:   int32(ft.Popularity),
-// 		Explicit:     ft.Explicit,
-// 		PreviewUrl:   ft.PreviewURL,
-// 		DiscNumber:   int32(ft.DiscNumber),
-// 		TrackNumber:  int32(ft.TrackNumber),
-// 		Type:         ft.Type,
-// 		ExternalIds:  ft.ExternalIDs,
-// 		Isrc:         isrc,
-// 	}
-// }

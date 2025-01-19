@@ -46,7 +46,7 @@ func cycle() {
 	if config.GetIsProd() {
 		if shouldDoCycle(last_cycle_load_uris, cycle_period_load_uris) {
 			fmt.Println("doing uri cycle")
-			total := loadURIsByPopularity()
+			total := loadURIsByPopularity(ctx)
 			fmt.Println("Total:", total)
 			if total == 0 {
 				cycle_period_load_uris = time.Minute * 30
@@ -64,7 +64,7 @@ func cycle() {
 
 		if shouldDoCycle(last_cycle_spotify_profile, cycle_period_spotify_profile) {
 			fmt.Println("doing profile cycle")
-			doSpotifyProfileCycle()
+			doSpotifyProfileCycle(ctx)
 			last_cycle_spotify_profile = &now
 
 			fmt.Println("uploading cache")

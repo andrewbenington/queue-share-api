@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -33,16 +32,15 @@ import (
 
 var missingURICountByUser = map[string]int{}
 
-func loadURIsByPopularity() int {
-	ctx := context.Background()
+func loadURIsByPopularity(ctx context.Context) int {
 	total := 0
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
 		return 0
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := db.New(tx).MissingArtistURIs(ctx)
 	if err != nil {
@@ -61,7 +59,7 @@ func loadURIsByPopularity() int {
 	}
 
 	for range 5 {
-		rows, err := db.New(db.Service().DB).HistoryGetTopTracksWithoutURIs(ctx)
+		rows, err := db.New(tx).HistoryGetTopTracksWithoutURIs(ctx)
 		if err != nil {
 			fmt.Printf("Could not get tracks without URIs: %s\n", err)
 			return 0
@@ -98,10 +96,10 @@ func loadURIsByPopularity() int {
 		total += len(tracks)
 
 		for _, track := range tracks {
-			db.New(db.Service().DB).HistorySetURIsForTrack(ctx, db.HistorySetURIsForTrackParams{
+			db.New(tx).HistorySetURIsForTrack(ctx, db.HistorySetURIsForTrackParams{
 				SpotifyTrackUri:  string(track.URI),
-				SpotifyArtistUri: sql.NullString{Valid: true, String: string(track.ArtistURI)},
-				SpotifyAlbumUri:  sql.NullString{Valid: true, String: string(track.AlbumURI)},
+				SpotifyArtistUri: &track.ArtistURI,
+				SpotifyAlbumUri:  &track.AlbumURI,
 			})
 			fmt.Printf("loaded URIs for %s\n", track.Name)
 		}
@@ -130,10 +128,16 @@ func GetMissingURIsByUser() map[string]int {
 	return missingURICountByUser
 }
 
-func cacheTracksByPopularity() {
-	ctx := context.Background()
+func cacheTracksByPopularity(ctx context.Context) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return
+	}
+	defer tx.Commit(ctx)
+
 	for range 5 {
-		rows, err := db.New(db.Service().DB).HistoryGetTopTracksNotInCache(ctx)
+		rows, err := db.New(tx).HistoryGetTopTracksNotInCache(ctx)
 		if err != nil {
 			fmt.Printf("Could not get tracks not in cache: %s\n", err)
 			return
@@ -173,10 +177,16 @@ func cacheTracksByPopularity() {
 	}
 }
 
-func cacheAlbumsByPopularity() {
-	ctx := context.Background()
+func cacheAlbumsByPopularity(ctx context.Context) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return
+	}
+	defer tx.Commit(ctx)
+
 	for range 5 {
-		rows, err := db.New(db.Service().DB).HistoryGetTopAlbumsNotInCache(ctx)
+		rows, err := db.New(tx).HistoryGetTopAlbumsNotInCache(ctx)
 		if err != nil {
 			fmt.Printf("Could not get albums not in cache: %s\n", err)
 			return
@@ -197,12 +207,16 @@ func cacheAlbumsByPopularity() {
 
 		albumIDs := []string{}
 		for _, row := range rows {
-			id, err := service.IDFromURI(row.SpotifyAlbumUri.String)
+			id, err := service.IDFromURIPtr(row.SpotifyAlbumUri)
 			if err != nil {
-				fmt.Printf("Could not get service ID from uri %s\n", row.SpotifyAlbumUri.String)
+				if row.SpotifyAlbumUri != nil {
+					fmt.Printf("Could not get service ID from uri %s\n", *row.SpotifyAlbumUri)
+				} else {
+					fmt.Println("Could not get service ID from uri")
+				}
 				continue
 			}
-			albumIDs = append(albumIDs, id)
+			albumIDs = append(albumIDs, *id)
 		}
 
 		albums, err := service.GetAlbums(ctx, spClient, albumIDs)
@@ -216,10 +230,16 @@ func cacheAlbumsByPopularity() {
 	}
 }
 
-func updateTrackImageByAlbumPopularity() {
-	ctx := context.Background()
+func updateTrackImageByAlbumPopularity(ctx context.Context) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
+		return
+	}
+	defer tx.Commit(ctx)
+
 	for range 5 {
-		rows, err := db.New(db.Service().DB).HistoryGetTopAlbumsNotInCache(ctx)
+		rows, err := db.New(tx).HistoryGetTopAlbumsNotInCache(ctx)
 		if err != nil {
 			fmt.Printf("Could not get albums not in cache: %s\n", err)
 			return
@@ -240,12 +260,16 @@ func updateTrackImageByAlbumPopularity() {
 
 		albumIDs := []string{}
 		for _, row := range rows {
-			id, err := service.IDFromURI(row.SpotifyAlbumUri.String)
+			id, err := service.IDFromURIPtr(row.SpotifyAlbumUri)
 			if err != nil {
-				fmt.Printf("Could not get service ID from uri %s\n", row.SpotifyAlbumUri.String)
+				if row.SpotifyAlbumUri != nil {
+					fmt.Printf("Could not get service ID from uri %s\n", *row.SpotifyAlbumUri)
+				} else {
+					fmt.Println("Could not get service ID from uri")
+				}
 				continue
 			}
-			albumIDs = append(albumIDs, id)
+			albumIDs = append(albumIDs, *id)
 		}
 
 		albums, err := service.GetAlbums(ctx, spClient, albumIDs)

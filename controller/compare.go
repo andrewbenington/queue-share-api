@@ -46,11 +46,11 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 		return
 	}
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	friends, err := db.New(tx).UserGetFriends(ctx, userUUID)
 	if err != nil {
@@ -171,12 +171,12 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 		return
 	}
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	friends, err := db.New(tx).UserGetFriends(ctx, userUUID)
 	if err != nil {
@@ -301,12 +301,12 @@ func (c *StatsController) UserCompareFriendTopAlbums(w http.ResponseWriter, r *h
 		return
 	}
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	friends, err := db.New(tx).UserGetFriends(ctx, userUUID)
 	if err != nil {

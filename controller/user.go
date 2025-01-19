@@ -30,6 +30,8 @@ type CreateUserResponse struct {
 }
 
 func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	var req CreateUserBody
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -37,7 +39,7 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(r.Context())
 	if err != nil {
 		log.Printf("create transaction: %s", err)
 		requests.RespondInternalError(w)
@@ -64,7 +66,7 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	token, expiry, err := user.GetJWT()
 	if err != nil {
-		_ = tx.Rollback()
+		_ = tx.Rollback(ctx)
 		log.Printf("generate jwt: %s", err)
 		requests.RespondInternalError(w)
 		return
@@ -76,7 +78,7 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: expiry,
 	}
 
-	err = tx.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		log.Printf("commit tx: %s", err)
 		requests.RespondInternalError(w)
@@ -88,18 +90,20 @@ func (c *Controller) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) CurrentUser(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(r.Context())
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	u, err := user.GetByID(r.Context(), tx, userID)
 
@@ -122,20 +126,21 @@ type GetRoomsResponse struct {
 }
 
 func (c *Controller) GetUserHostedRooms(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
-	rooms, err := room.GetUserHostedRooms(r.Context(), tx, userID, true)
+	rooms, err := room.GetUserHostedRooms(ctx, tx, userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -147,20 +152,21 @@ func (c *Controller) GetUserHostedRooms(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c *Controller) GetUserJoinedRooms(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value(auth.UserContextKey).(string)
+	ctx := r.Context()
+	userID, ok := ctx.Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
-	rooms, err := room.GetUserJoinedRooms(r.Context(), tx, userID, true)
+	rooms, err := room.GetUserJoinedRooms(ctx, tx, userID, true)
 	if err != nil && err != sql.ErrNoRows {
 		log.Printf("Error getting user room: %s", err)
 		requests.RespondInternalError(w)
@@ -172,18 +178,20 @@ func (c *Controller) GetUserJoinedRooms(w http.ResponseWriter, r *http.Request) 
 }
 
 func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	userID, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(r.Context())
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	err = user.UnlinkSpotify(r.Context(), tx, userID)
 	if err != nil {
@@ -193,6 +201,7 @@ func (c *Controller) UnlinkSpotify(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) UserHasSpotifyHistory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 
 	userUUID, err := userUUIDFromRequest(r)
 	if err != nil {
@@ -200,12 +209,12 @@ func (c *Controller) UserHasSpotifyHistory(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(r.Context())
 	if err != nil {
 		requests.RespondInternalError(w)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	result, err := db.New(tx).UserHasSpotifyHistory(r.Context(), userUUID)
 	if err != nil {

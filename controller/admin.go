@@ -18,11 +18,12 @@ import (
 
 func (c *Controller) GetTableData(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tx, err := db.Service().DB.Begin()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := admin.GetTableSizes(ctx, tx)
 	if err != nil {
@@ -35,11 +36,12 @@ func (c *Controller) GetTableData(w http.ResponseWriter, r *http.Request) {
 
 func (c *Controller) GetUncachedTracks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tx, err := db.Service().DB.Begin()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := db.New(tx).UncachedTracks(ctx)
 	if err != nil {
@@ -52,11 +54,12 @@ func (c *Controller) GetUncachedTracks(w http.ResponseWriter, r *http.Request) {
 
 func (c *Controller) GetMissingISRCNumbers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tx, err := db.Service().DB.Begin()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := db.New(tx).MissingISRCNumbers(ctx)
 	if err != nil {
@@ -69,11 +72,12 @@ func (c *Controller) GetMissingISRCNumbers(w http.ResponseWriter, r *http.Reques
 
 func (c *Controller) GetMissingArtistURIs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tx, err := db.Service().DB.Begin()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := db.New(tx).MissingArtistURIs(ctx)
 	if err != nil {
@@ -86,11 +90,12 @@ func (c *Controller) GetMissingArtistURIs(w http.ResponseWriter, r *http.Request
 
 func (c *Controller) GetMissingArtistURIsByUser(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tx, err := db.Service().DB.Begin()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	missingByUser := engine.GetMissingURIsByUser()
 
@@ -118,11 +123,12 @@ type FullLogEntry struct {
 
 func (c *Controller) GetLogsByDate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	tx, err := db.Service().DB.Begin()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	dateString := r.URL.Query().Get("date")
 	timestamp, err := time.Parse("01-02-06", dateString)
@@ -167,11 +173,13 @@ func (c *Controller) GetLogsByDate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *Controller) GetGeneralInfo(w http.ResponseWriter, r *http.Request) {
-	tx, err := db.Service().DB.Begin()
+	ctx := r.Context()
+
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 	resp := map[string]interface{}{}
 	resp["log_queue"] = util.GetLogChannelSize()
 	json.NewEncoder(w).Encode(resp)

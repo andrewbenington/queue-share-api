@@ -9,6 +9,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/andrewbenington/queue-share-api/util"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
@@ -69,8 +70,8 @@ func UpdateSpotifyInfo(ctx context.Context, dbtx db.DBTX, userID string, info *s
 
 	return db.New(dbtx).UserUpdateSpotifyInfo(ctx, db.UserUpdateSpotifyInfoParams{
 		ID:              userUUID,
-		SpotifyAccount:  sql.NullString{String: info.ID, Valid: true},
-		SpotifyName:     sql.NullString{String: info.Display, Valid: true},
+		SpotifyAccount:  &info.ID,
+		SpotifyName:     &info.Display,
 		SpotifyImageUrl: &info.ImageURL,
 	})
 }
@@ -96,11 +97,12 @@ func GetByUsername(ctx context.Context, dbtx db.DBTX, username string) (*User, e
 	} else if err != nil {
 		return nil, err
 	}
+
 	return &User{
 		ID:           row.ID.String(),
 		Username:     row.Username,
 		DisplayName:  row.DisplayName,
-		SpotifyName:  row.SpotifyName.String,
+		SpotifyName:  util.StringFromPointer(row.SpotifyName),
 		SpotifyImage: row.SpotifyImageUrl,
 	}, nil
 }
@@ -120,7 +122,7 @@ func GetByID(ctx context.Context, dbtx db.DBTX, userID string) (*User, error) {
 		ID:           row.ID.String(),
 		Username:     row.Username,
 		DisplayName:  row.DisplayName,
-		SpotifyName:  row.SpotifyName.String,
+		SpotifyName:  util.StringFromPointer(row.SpotifyName),
 		SpotifyImage: row.SpotifyImageUrl,
 	}, nil
 }

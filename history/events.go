@@ -2,7 +2,6 @@ package history
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -130,7 +129,7 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 		return nil, err
 	}
 
-	if len(rankings) == 0 {
+	if len(rankings) == 0 || rankings[0].ISRC == nil {
 		return nil, nil
 	}
 
@@ -138,12 +137,15 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	trackIDs := map[string]bool{}
 
 	linkedList := &Node[TrackStreams]{Data: *rankings[0]}
-	nodesByISRC[rankings[0].ISRC] = linkedList
+	nodesByISRC[*rankings[0].ISRC] = linkedList
 	trackIDs[rankings[0].ID] = true
 
 	for _, rank := range rankings[1:] {
+		if rank.ISRC == nil {
+			continue
+		}
 		linkedList = linkedList.InsertBefore(*rank)
-		nodesByISRC[rank.ISRC] = linkedList
+		nodesByISRC[*rank.ISRC] = linkedList
 		trackIDs[rank.ID] = true
 	}
 
@@ -164,16 +166,20 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    sql.NullTime{Valid: true, Time: *eventsStart},
-		EndDate:      sql.NullTime{Valid: true, Time: *eventsEnd},
+		StartDate:    eventsStart,
+		EndDate:      eventsEnd,
 		MaxCount:     20000,
 	})
 
 	rankEvents := []TrackRankEvent{}
 
 	for _, stream := range lo.Reverse(allStreams) {
+		if stream.Isrc == nil {
+			continue
+		}
+
 		rankEvent := TrackRankEvent{}
-		node, ok := nodesByISRC[stream.Isrc.String]
+		node, ok := nodesByISRC[*stream.Isrc]
 		if !ok {
 			continue
 		}
@@ -257,16 +263,20 @@ func GetArtistRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    sql.NullTime{Valid: true, Time: *filter.Start},
-		EndDate:      sql.NullTime{Valid: true, Time: *filter.End},
+		StartDate:    filter.Start,
+		EndDate:      filter.End,
 		MaxCount:     20000,
 	})
 
 	rankEvents := []ArtistRankEvent{}
 
 	for _, stream := range lo.Reverse(allStreams) {
+		if stream.SpotifyArtistUri == nil {
+			continue
+		}
+
 		rankEvent := ArtistRankEvent{}
-		node, ok := nodesByID[service.IDFromURIMust(stream.SpotifyArtistUri.String)]
+		node, ok := nodesByID[*stream.SpotifyArtistUri]
 		if !ok {
 			continue
 		}
@@ -349,16 +359,20 @@ func GetAlbumRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    sql.NullTime{Valid: true, Time: *filter.Start},
-		EndDate:      sql.NullTime{Valid: true, Time: *filter.End},
+		StartDate:    filter.Start,
+		EndDate:      filter.End,
 		MaxCount:     20000,
 	})
 
 	rankEvents := []AlbumRankEvent{}
 
 	for _, stream := range lo.Reverse(allStreams) {
+		if stream.SpotifyAlbumUri == nil {
+			continue
+		}
+
 		rankEvent := AlbumRankEvent{}
-		node, ok := nodesByID[service.IDFromURIMust(stream.SpotifyAlbumUri.String)]
+		node, ok := nodesByID[*stream.SpotifyAlbumUri]
 		if !ok {
 			continue
 		}

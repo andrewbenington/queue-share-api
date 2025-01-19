@@ -62,12 +62,12 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
-		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+		requests.RespondWithDBError(w, err)
 		return
 	}
-	defer transaction.Commit()
+	defer tx.Commit(ctx)
 
 	albumURIs := lo.Map(
 		req.AlbumIDs,
@@ -78,7 +78,7 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 			return fmt.Sprintf("spotify:album:%s", id)
 		})
 
-	albumStreams, err := db.New(transaction).HistoryGetAlbumStreams(ctx, db.HistoryGetAlbumStreamsParams{
+	albumStreams, err := db.New(tx).HistoryGetAlbumStreams(ctx, db.HistoryGetAlbumStreamsParams{
 		UserID:    userUUID,
 		AlbumUris: albumURIs,
 	})
@@ -97,7 +97,7 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 			return fmt.Sprintf("spotify:artist:%s", id)
 		})
 
-	artistStreams, err := db.New(transaction).HistoryGetRecentArtistStreams(ctx, db.HistoryGetRecentArtistStreamsParams{
+	artistStreams, err := db.New(tx).HistoryGetRecentArtistStreams(ctx, db.HistoryGetRecentArtistStreamsParams{
 		UserID:     userUUID,
 		ArtistUris: artistURIs,
 	})

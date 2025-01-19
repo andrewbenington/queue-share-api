@@ -109,20 +109,20 @@ func (c *Controller) PushToRoomQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
 
 	if reqCtx.UserID != "" {
-		err = room.SetQueueTrackUser(ctx, transaction, reqCtx.Room.Code, songID, reqCtx.UserID)
+		err = room.SetQueueTrackUser(ctx, tx, reqCtx.Room.Code, songID, reqCtx.UserID)
 		if err != nil {
 			requests.RespondWithDBError(w, err)
 			return
 		}
 	} else if reqCtx.GuestID != "" {
-		err = room.SetQueueTrackGuest(ctx, transaction, reqCtx.Room.Code, songID, reqCtx.GuestID)
+		err = room.SetQueueTrackGuest(ctx, tx, reqCtx.Room.Code, songID, reqCtx.GuestID)
 		if err != nil {
 			requests.RespondWithDBError(w, err)
 			return
@@ -155,7 +155,7 @@ func (c *Controller) PushToRoomQueue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = transaction.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
 		return
@@ -201,7 +201,12 @@ func (c *Controller) PushToUserQueue(w http.ResponseWriter, r *http.Request) {
 }
 
 func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *service.CurrentQueue) (statusCode int, errMessage string) {
-	guestTracks, err := room.GetQueueTrackAddedBy(ctx, db.Service().DB, roomID)
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return http.StatusInternalServerError, err.Error()
+	}
+
+	guestTracks, err := room.GetQueueTrackAddedBy(ctx, tx, roomID)
 	if err == sql.ErrNoRows {
 		return http.StatusNotFound, constants.ErrorNotFound
 	}
@@ -224,7 +229,7 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *service.
 			queueTrack.AddedBy = gt.AddedBy
 			queueTrack.AddedAt = gt.Timestamp
 			if queueTrack.ID == q.CurrentlyPlaying.ID {
-				room.MarkTracksAsPlayedSince(ctx, db.Service().DB, roomID, gt.Timestamp)
+				room.MarkTracksAsPlayedSince(ctx, tx, roomID, gt.Timestamp)
 			}
 		}
 	}

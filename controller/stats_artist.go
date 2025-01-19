@@ -32,12 +32,12 @@ func (c *StatsController) GetTopArtistsByTimeframe(w http.ResponseWriter, r *htt
 	}
 	filter := getFilterParams(r)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer transaction.Commit(ctx)
 
 	// trackIDs := map[string]bool{}
 	rankingResults, code, err := history.ArtistStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
@@ -139,15 +139,15 @@ func (c *StatsController) GetArtistStatsByURI(w http.ResponseWriter, r *http.Req
 	filter := getFilterParams(r)
 	log.Printf("%+v", filter)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := history.AllArtistStreamsByURI(
-		ctx, transaction, userUUID, artistURI, filter,
+		ctx, tx, userUUID, artistURI, filter,
 	)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
@@ -155,7 +155,7 @@ func (c *StatsController) GetArtistStatsByURI(w http.ResponseWriter, r *http.Req
 	}
 
 	filter.ArtistURIs = []string{artistURI}
-	_, _, trackRanks, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, transaction, nil, nil)
+	_, _, trackRanks, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, nil, nil)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("couldn't get track counts: %s", err), http.StatusInternalServerError)
 		return
@@ -178,7 +178,7 @@ func (c *StatsController) GetArtistStatsByURI(w http.ResponseWriter, r *http.Req
 			AlbumName:       row.AlbumName,
 			MsPlayed:        int(row.MsPlayed),
 			SpotifyTrackUri: row.SpotifyTrackUri,
-			SpotifyAlbumUri: row.SpotifyAlbumUri.String,
+			SpotifyAlbumUri: row.SpotifyAlbumUri,
 		})
 		id, err := service.IDFromURI(row.SpotifyTrackUri)
 		if err != nil {
@@ -233,16 +233,16 @@ func (c *StatsController) GetArtistRankingsByURI(w http.ResponseWriter, r *http.
 
 	rankings := []TimeframeRanking{}
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer tx.Commit(ctx)
 
 	filter := getFilterParams(r)
 	log.Printf("%+v", filter)
-	allRankings, responseCode, err := history.ArtistStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
+	allRankings, responseCode, err := history.ArtistStreamRankingsByTimeframe(ctx, tx, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}

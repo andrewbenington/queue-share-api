@@ -10,6 +10,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/user"
+	"github.com/andrewbenington/queue-share-api/util"
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
@@ -37,7 +38,7 @@ func GetByCode(ctx context.Context, dbtx db.DBTX, code string) (Room, error) {
 			ID:           row.HostID.String(),
 			Username:     row.HostUsername,
 			DisplayName:  row.HostDisplay,
-			SpotifyName:  row.HostSpotifyName.String,
+			SpotifyName:  util.StringFromPointer(row.HostSpotifyName),
 			SpotifyImage: row.HostImage,
 		},
 		Code:    row.Code,
@@ -186,21 +187,14 @@ func GetAllMembers(ctx context.Context, dbtx db.DBTX, roomID string) ([]Member, 
 			ID:           row.UserID.String(),
 			Username:     row.Username,
 			DisplayName:  row.DisplayName,
-			SpotifyName:  row.SpotifyName.String,
-			SpotifyImage: stringFromPointer(row.SpotifyImageUrl),
+			SpotifyName:  util.StringFromPointer(row.SpotifyName),
+			SpotifyImage: util.StringFromPointer(row.SpotifyImageUrl),
 			IsModerator:  row.IsModerator,
 			QueuedTracks: int(row.QueuedTracks),
 		})
 	}
 
 	return users, nil
-}
-
-func stringFromPointer(ptr *string) string {
-	if ptr == nil {
-		return ""
-	}
-	return *ptr
 }
 
 func SetModerator(ctx context.Context, dbtx db.DBTX, roomID string, userID string, isModerator bool) error {
@@ -345,10 +339,10 @@ func GetQueueTrackAddedBy(ctx context.Context, dbtx db.DBTX, roomID string) (tra
 
 	for _, row := range rows {
 		addedBy := ""
-		if row.GuestName.Valid {
-			addedBy = row.GuestName.String
-		} else if row.MemberName.Valid {
-			addedBy = row.MemberName.String
+		if row.GuestName != nil {
+			addedBy = *row.GuestName
+		} else if row.MemberName != nil {
+			addedBy = *row.MemberName
 		}
 		tracks = append(tracks, QueuedTrack{
 			TrackID:   row.TrackID,

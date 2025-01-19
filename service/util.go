@@ -13,6 +13,18 @@ func IDFromURI(uri string) (string, error) {
 	return segments[2], nil
 }
 
+func IDFromURIPtr(uri *string) (*string, error) {
+	if uri == nil {
+		return nil, nil
+	}
+
+	segments := strings.Split(*uri, ":")
+	if len(segments) != 3 {
+		return nil, fmt.Errorf("bad uri format (%s)", *uri)
+	}
+	return &segments[2], nil
+}
+
 func IDFromURIMust(uri string) string {
 	segments := strings.Split(uri, ":")
 	if len(segments) != 3 {

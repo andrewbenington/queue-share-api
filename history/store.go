@@ -90,24 +90,24 @@ import (
 // }
 
 type StreamingEntry struct {
-	Timestamp        string  `json:"ts"`
-	Username         string  `json:"username"`
-	Platform         string  `json:"platform"`
-	MsPlayed         int32   `json:"ms_played"`
-	ConnCountry      string  `json:"conn_country"`
-	IpAddr           *string `json:"ip_addr_decrypted"`
-	UserAgent        *string `json:"user_agent_decrypted"`
-	TrackName        string  `json:"master_metadata_track_name"`
-	ArtistName       string  `json:"master_metadata_album_artist_name"`
-	AlbumName        string  `json:"master_metadata_album_album_name"`
-	SpotifyTrackUri  string  `json:"spotify_track_uri"`
-	ReasonStart      *string `json:"reason_start"`
-	ReasonEnd        *string `json:"reason_end"`
-	Shuffle          bool    `json:"shuffle"`
-	Skipped          *bool   `json:"skipped"`
-	Offline          bool    `json:"offline"`
-	OfflineTimestamp int64   `json:"offline_timestamp"`
-	IncognitoMode    bool    `json:"incognito_mode"`
+	Timestamp        string     `json:"ts"`
+	Username         string     `json:"username"`
+	Platform         string     `json:"platform"`
+	MsPlayed         int32      `json:"ms_played"`
+	ConnCountry      string     `json:"conn_country"`
+	IpAddr           *string    `json:"ip_addr_decrypted"`
+	UserAgent        *string    `json:"user_agent_decrypted"`
+	TrackName        string     `json:"master_metadata_track_name"`
+	ArtistName       string     `json:"master_metadata_album_artist_name"`
+	AlbumName        string     `json:"master_metadata_album_album_name"`
+	SpotifyTrackUri  string     `json:"spotify_track_uri"`
+	ReasonStart      *string    `json:"reason_start"`
+	ReasonEnd        *string    `json:"reason_end"`
+	Shuffle          bool       `json:"shuffle"`
+	Skipped          *bool      `json:"skipped"`
+	Offline          bool       `json:"offline"`
+	OfflineTimestamp *time.Time `json:"offline_timestamp"`
+	IncognitoMode    bool       `json:"incognito_mode"`
 }
 
 func InsertEntry(ctx context.Context, transaction db.DBTX, entry db.HistoryInsertOneParams) error {
@@ -121,19 +121,19 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 		Platform:         []string{},
 		MsPlayed:         []int32{},
 		ConnCountry:      []string{},
-		IpAddr:           []string{},
-		UserAgent:        []string{},
+		IpAddr:           []*string{},
+		UserAgent:        []*string{},
 		TrackName:        []string{},
 		ArtistName:       []string{},
 		AlbumName:        []string{},
 		SpotifyTrackUri:  []string{},
-		ReasonStart:      []string{},
-		ReasonEnd:        []string{},
+		ReasonStart:      []*string{},
+		ReasonEnd:        []*string{},
 		Shuffle:          []bool{},
-		Skipped:          []bool{},
+		Skipped:          []*bool{},
 		Offline:          []bool{},
 		IncognitoMode:    []bool{},
-		OfflineTimestamp: []time.Time{},
+		OfflineTimestamp: []*time.Time{},
 		FromHistory:      []bool{},
 		ISRC:             []*string{},
 	}
@@ -149,23 +149,23 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 		params.Platform = append(params.Platform, entry.Platform)
 		params.MsPlayed = append(params.MsPlayed, entry.MsPlayed)
 		params.ConnCountry = append(params.ConnCountry, entry.ConnCountry)
-		params.IpAddr = append(params.IpAddr, entry.IpAddr.String)
-		params.UserAgent = append(params.UserAgent, entry.UserAgent.String)
+		params.IpAddr = append(params.IpAddr, entry.IpAddr)
+		params.UserAgent = append(params.UserAgent, entry.UserAgent)
 		params.TrackName = append(params.TrackName, entry.TrackName)
 		params.ArtistName = append(params.ArtistName, entry.ArtistName)
 		params.AlbumName = append(params.AlbumName, entry.AlbumName)
 		params.SpotifyTrackUri = append(params.SpotifyTrackUri, entry.SpotifyTrackUri)
-		params.SpotifyArtistUri = append(params.SpotifyArtistUri, StringPtrFromNullString(entry.SpotifyArtistUri))
-		params.SpotifyAlbumUri = append(params.SpotifyAlbumUri, StringPtrFromNullString(entry.SpotifyAlbumUri))
-		params.ReasonStart = append(params.ReasonStart, entry.ReasonStart.String)
-		params.ReasonEnd = append(params.ReasonEnd, entry.ReasonEnd.String)
+		params.SpotifyArtistUri = append(params.SpotifyArtistUri, entry.SpotifyArtistUri)
+		params.SpotifyAlbumUri = append(params.SpotifyAlbumUri, entry.SpotifyAlbumUri)
+		params.ReasonStart = append(params.ReasonStart, entry.ReasonStart)
+		params.ReasonEnd = append(params.ReasonEnd, entry.ReasonEnd)
 		params.Shuffle = append(params.Shuffle, entry.Shuffle)
-		params.Skipped = append(params.Skipped, entry.Skipped.Bool)
+		params.Skipped = append(params.Skipped, entry.Skipped)
 		params.Offline = append(params.Offline, entry.Offline)
 		params.IncognitoMode = append(params.IncognitoMode, entry.IncognitoMode)
-		params.OfflineTimestamp = append(params.OfflineTimestamp, entry.OfflineTimestamp.Time)
+		params.OfflineTimestamp = append(params.OfflineTimestamp, entry.OfflineTimestamp)
 		params.FromHistory = append(params.FromHistory, entry.FromHistory)
-		params.ISRC = append(params.ISRC, StringPtrFromNullString(entry.Isrc))
+		params.ISRC = append(params.ISRC, entry.Isrc)
 	}
 	return db.New(transaction).HistoryInsertBulkNullable(ctx, params)
 }
@@ -185,21 +185,19 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 		Platform:         []string{},
 		MsPlayed:         []int32{},
 		ConnCountry:      []string{},
-		IpAddr:           []string{},
-		UserAgent:        []string{},
+		IpAddr:           []*string{},
+		UserAgent:        []*string{},
 		TrackName:        []string{},
 		ArtistName:       []string{},
 		AlbumName:        []string{},
 		SpotifyTrackUri:  []string{},
-		SpotifyArtistUri: []*string{},
-		SpotifyAlbumUri:  []*string{},
-		ReasonStart:      []string{},
-		ReasonEnd:        []string{},
+		ReasonStart:      []*string{},
+		ReasonEnd:        []*string{},
 		Shuffle:          []bool{},
-		Skipped:          []bool{},
+		Skipped:          []*bool{},
 		Offline:          []bool{},
 		IncognitoMode:    []bool{},
-		OfflineTimestamp: []time.Time{},
+		OfflineTimestamp: []*time.Time{},
 		FromHistory:      []bool{},
 		ISRC:             []*string{},
 	}
@@ -220,8 +218,8 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 		params.Platform = append(params.Platform, entry.Platform)
 		params.MsPlayed = append(params.MsPlayed, entry.MsPlayed)
 		params.ConnCountry = append(params.ConnCountry, entry.ConnCountry)
-		params.IpAddr = append(params.IpAddr, NullStringFromPtr(entry.IpAddr).String)
-		params.UserAgent = append(params.UserAgent, NullStringFromPtr(entry.UserAgent).String)
+		params.IpAddr = append(params.IpAddr, entry.IpAddr)
+		params.UserAgent = append(params.UserAgent, entry.UserAgent)
 		params.TrackName = append(params.TrackName, entry.TrackName)
 		params.ArtistName = append(params.ArtistName, entry.ArtistName)
 		params.AlbumName = append(params.AlbumName, entry.AlbumName)
@@ -235,13 +233,13 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 			params.SpotifyArtistUri = append(params.SpotifyArtistUri, nil)
 			params.ISRC = append(params.ISRC, nil)
 		}
-		params.ReasonStart = append(params.ReasonStart, NullStringFromPtr(entry.ReasonStart).String)
-		params.ReasonEnd = append(params.ReasonEnd, NullStringFromPtr(entry.ReasonEnd).String)
+		params.ReasonStart = append(params.ReasonStart, entry.ReasonStart)
+		params.ReasonEnd = append(params.ReasonEnd, entry.ReasonEnd)
 		params.Shuffle = append(params.Shuffle, entry.Shuffle)
-		params.Skipped = append(params.Skipped, NullBoolFromPtr(entry.Skipped).Bool)
+		params.Skipped = append(params.Skipped, entry.Skipped)
 		params.Offline = append(params.Offline, entry.Offline)
 		params.IncognitoMode = append(params.IncognitoMode, entry.IncognitoMode)
-		params.OfflineTimestamp = append(params.OfflineTimestamp, time.Unix(entry.OfflineTimestamp/1000, entry.OfflineTimestamp%1000))
+		params.OfflineTimestamp = append(params.OfflineTimestamp, entry.OfflineTimestamp)
 		params.FromHistory = append(params.FromHistory, true)
 	}
 	return db.New(transaction).HistoryInsertBulkNullable(ctx, params)
@@ -315,7 +313,7 @@ func AllArtistStreamsByURI(ctx context.Context, transaction db.DBTX, userUUID uu
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		URI:          sql.NullString{Valid: true, String: uri},
+		URI:          &uri,
 	})
 }
 
@@ -326,7 +324,7 @@ func AllAlbumStreamsByURI(ctx context.Context, transaction db.DBTX, userUUID uui
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
-		URI:          sql.NullString{Valid: true, String: uri},
+		URI:          &uri,
 	})
 }
 
@@ -369,7 +367,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 		EndDate:      filter.End.UTC(),
 		MaxTracks:    filter.Max + 20,
 		ArtistUris:   filter.ArtistURIs,
-		AlbumURI:     NullStringFromPtr(filter.AlbumURI),
+		AlbumURI:     filter.AlbumURI,
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -391,7 +389,7 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 			ID:      service.IDFromURIMust(row.SpotifyTrackUri),
 			Streams: int(row.Occurrences),
 			Rank:    currentRank,
-			ISRC:    row.Isrc.String,
+			ISRC:    row.Isrc,
 		}
 
 		streamsByURI[row.SpotifyTrackUri] = row.Occurrences
@@ -461,6 +459,11 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 	var prevCount int64 = 0
 	var currentRank int64 = 0
 	for _, row := range rows {
+		if row.SpotifyAlbumUri == nil {
+			continue
+		}
+		spotifyAlbumURI := *row.SpotifyAlbumUri
+
 		if row.Occurrences != prevCount {
 			currentRank++
 			prevCount = row.Occurrences
@@ -473,17 +476,17 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 		}
 
 		albumStreams := AlbumStreams{
-			ID:      service.IDFromURIMust(row.SpotifyAlbumUri.String),
+			ID:      service.IDFromURIMust(spotifyAlbumURI),
 			Streams: row.Occurrences,
 			Tracks:  trackURIs,
 			Rank:    currentRank,
 		}
 
-		streamsByURI[row.SpotifyAlbumUri.String] = row.Occurrences
-		ranksByURI[row.SpotifyAlbumUri.String] = currentRank
+		streamsByURI[spotifyAlbumURI] = row.Occurrences
+		ranksByURI[spotifyAlbumURI] = currentRank
 
 		if lastStreams != nil {
-			if lastStreams, ok := lastStreams[row.SpotifyAlbumUri.String]; ok {
+			if lastStreams, ok := lastStreams[spotifyAlbumURI]; ok {
 				diff := row.Occurrences - lastStreams
 				albumStreams.StreamsChange = &diff
 			}
@@ -491,7 +494,7 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 		}
 
 		if lastRanks != nil {
-			if lastRank, ok := lastRanks[row.SpotifyAlbumUri.String]; ok {
+			if lastRank, ok := lastRanks[spotifyAlbumURI]; ok {
 				diff := lastRank - currentRank
 				albumStreams.RankChange = &diff
 			}
@@ -546,6 +549,11 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 	var prevCount int64 = 0
 	var currentRank int64 = 0
 	for _, row := range rows {
+		if row.SpotifyArtistUri == nil {
+			continue
+		}
+		spotifyArtistURI := *row.SpotifyArtistUri
+
 		if row.Occurrences != prevCount {
 			currentRank++
 			prevCount = row.Occurrences
@@ -563,17 +571,17 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		// }
 
 		artistStreams := ArtistStreams{
-			ID:      service.IDFromURIMust(row.SpotifyArtistUri.String),
+			ID:      service.IDFromURIMust(spotifyArtistURI),
 			Streams: row.Occurrences,
 			Rank:    currentRank,
 			Tracks:  trackURIs,
 		}
 
-		streamsByURI[row.SpotifyArtistUri.String] = row.Occurrences
-		ranksByURI[row.SpotifyArtistUri.String] = currentRank
+		streamsByURI[spotifyArtistURI] = row.Occurrences
+		ranksByURI[spotifyArtistURI] = currentRank
 
 		if lastStreams != nil {
-			if lastStreams, ok := lastStreams[row.SpotifyArtistUri.String]; ok {
+			if lastStreams, ok := lastStreams[spotifyArtistURI]; ok {
 				diff := row.Occurrences - lastStreams
 				artistStreams.StreamsChange = &diff
 			}
@@ -581,7 +589,7 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		}
 
 		if lastRanks != nil {
-			if lastRank, ok := lastRanks[row.SpotifyArtistUri.String]; ok {
+			if lastRank, ok := lastRanks[spotifyArtistURI]; ok {
 				diff := lastRank - currentRank
 				artistStreams.RankChange = &diff
 			}
@@ -638,12 +646,12 @@ type TrackRankings struct {
 }
 
 type TrackStreams struct {
-	ID            string `json:"spotify_id"`
-	Streams       int    `json:"stream_count"`
-	StreamsChange *int64 `json:"streams_change,omitempty"`
-	Rank          int64  `json:"rank"`
-	RankChange    *int64 `json:"rank_change,omitempty"`
-	ISRC          string `json:"isrc"`
+	ID            string  `json:"spotify_id"`
+	Streams       int     `json:"stream_count"`
+	StreamsChange *int64  `json:"streams_change,omitempty"`
+	Rank          int64   `json:"rank"`
+	RankChange    *int64  `json:"rank_change,omitempty"`
+	ISRC          *string `json:"isrc"`
 }
 
 func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]*TrackRankings, int, error) {
@@ -671,11 +679,11 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	current := firstStart
 	// log.Printf("current: %s", firstStart.Format(time.ANSIC))
@@ -751,11 +759,11 @@ func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, u
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	current := firstStart
 	for current.Before(endTime) {
@@ -767,11 +775,13 @@ func ArtistStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, u
 			return nil, http.StatusNotFound, err
 		}
 
-		results = append(results, &ArtistRankings{
-			Artists:              rankingList,
-			StartDateUnixSeconds: current.Unix(),
-			Timeframe:            filter.Timeframe,
-		})
+		if len(rankingList) > 0 {
+			results = append(results, &ArtistRankings{
+				Artists:              rankingList,
+				StartDateUnixSeconds: current.Unix(),
+				Timeframe:            filter.Timeframe,
+			})
+		}
 
 		lastMonthStreams = thisMonthStreams
 		lastMonthRanks = thisMonthRanks
@@ -823,11 +833,11 @@ func AlbumStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 	lastMonthStreams := map[string]int64{}
 	lastMonthRanks := map[string]int64{}
 
-	tx, err := db.Service().DB.Begin()
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	current := firstStart
 	for current.Before(endTime) {

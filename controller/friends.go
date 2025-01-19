@@ -34,11 +34,11 @@ func (c *Controller) UserFriendRequestData(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	suggestions, err := db.New(tx).UserGetFriendSuggestions(ctx, userUUID)
 	if err != nil {
@@ -66,6 +66,8 @@ func (c *Controller) UserFriendRequestData(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *Controller) UserSendFriendRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	_, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
@@ -85,11 +87,11 @@ func (c *Controller) UserSendFriendRequest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	err = db.New(tx).UserSendFriendRequest(r.Context(), db.UserSendFriendRequestParams{
 		UserID:   userUUID,
@@ -104,6 +106,8 @@ func (c *Controller) UserSendFriendRequest(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *Controller) UserDeleteFriendRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	_, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
@@ -123,13 +127,13 @@ func (c *Controller) UserDeleteFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	transaction, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
 
-	err = db.New(transaction).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
+	err = db.New(tx).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
 		UserID:   userUUID,
 		FriendID: friendUUID,
 	})
@@ -138,7 +142,7 @@ func (c *Controller) UserDeleteFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = db.New(transaction).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
+	err = db.New(tx).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
 		UserID:   userUUID,
 		FriendID: friendUUID,
 	})
@@ -147,7 +151,7 @@ func (c *Controller) UserDeleteFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = transaction.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
 		return
@@ -157,6 +161,8 @@ func (c *Controller) UserDeleteFriendRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	_, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
@@ -176,13 +182,13 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	transaction, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
 
-	ok, err = db.New(transaction).UserGetFriendRequestExists(r.Context(), db.UserGetFriendRequestExistsParams{
+	ok, err = db.New(tx).UserGetFriendRequestExists(r.Context(), db.UserGetFriendRequestExistsParams{
 		FriendID: userUUID,
 		UserID:   friendUUID,
 	})
@@ -195,7 +201,7 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = db.New(transaction).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
+	err = db.New(tx).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
 		UserID:   friendUUID,
 		FriendID: userUUID,
 	})
@@ -204,7 +210,7 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = db.New(transaction).UserInsertFriend(r.Context(), db.UserInsertFriendParams{
+	err = db.New(tx).UserInsertFriend(r.Context(), db.UserInsertFriendParams{
 		UserID:   userUUID,
 		FriendID: friendUUID,
 	})
@@ -213,7 +219,7 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = db.New(transaction).UserInsertFriend(r.Context(), db.UserInsertFriendParams{
+	err = db.New(tx).UserInsertFriend(r.Context(), db.UserInsertFriendParams{
 		UserID:   friendUUID,
 		FriendID: userUUID,
 	})
@@ -222,7 +228,7 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	err = transaction.Commit()
+	err = tx.Commit(ctx)
 	if err != nil {
 		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
 		return
@@ -232,6 +238,8 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 }
 
 func (c *Controller) UserGetFriends(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
 	_, ok := r.Context().Value(auth.UserContextKey).(string)
 	if !ok {
 		requests.RespondAuthError(w)
@@ -244,12 +252,12 @@ func (c *Controller) UserGetFriends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	friends, err := db.New(tx).UserGetFriends(r.Context(), userUUID)
 	if err == sql.ErrNoRows {
@@ -288,11 +296,11 @@ func userOrFriendUUIDFromRequest(ctx context.Context, r *http.Request) (uuid.UUI
 		return userUUID, nil
 	}
 
-	tx, err := db.Service().DB.BeginTx(r.Context(), nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return uuid.UUID{}, err
 	}
-	defer tx.Commit()
+	defer tx.Commit(ctx)
 
 	isFriend, err := db.New(tx).UserIsFriends(ctx, db.UserIsFriendsParams{
 		UserID:   userUUID,

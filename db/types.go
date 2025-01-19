@@ -7,9 +7,9 @@ import (
 )
 
 type TrackArtist struct {
-	ID   string `json:"id"`
-	URI  string `json:"uri"`
-	Name string `json:"name"`
+	ID   *string `json:"id"`
+	URI  *string `json:"uri"`
+	Name string  `json:"name"`
 }
 
 type TrackArtists []TrackArtist

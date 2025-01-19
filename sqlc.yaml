@@ -7,6 +7,7 @@ sql:
     engine: "postgresql"
     gen:
       go:
+        sql_package: pgx/v5
         emit_pointers_for_null_types: true
         emit_result_struct_pointers: true
         emit_json_tags: true
@@ -20,6 +21,32 @@ sql:
           spotify_album_cache: "AlbumData"
           spotify_artist_cache: "ArtistData"
         overrides:
+          - db_type: pg_catalog.timestamp
+            go_type: time.Time
+          - db_type: pg_catalog.timestamptz
+            go_type: time.Time
+          - db_type: pg_catalog.timestamp
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: pg_catalog.timestamptz
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: uuid
+            go_type:
+              import: github.com/google/uuid
+              package: uuid
+              type: UUID
+          - db_type: uuid
+            nullable: true
+            go_type:
+              import: github.com/google/uuid
+              package: uuid
+              type: UUID
+              pointer: true
           - column: spotify_track_cache.other_artists
             go_type:
               type: "TrackArtists"
@@ -32,34 +59,4 @@ sql:
           - column: spotify_track_cache.external_ids
             go_type:
               type: TrackExternalIDs
-          - column: spotify_track_cache.image_url
-            go_type:
-              type: "*string"
-          - column: spotify_track_cache.isrc
-            go_type:
-              type: "*string"
-          - column: spotify_album_cache.album_group
-            go_type:
-              type: "*string"
-          - column: spotify_album_cache.album_type
-            go_type:
-              type: "*string"
-          - column: spotify_album_cache.image_url
-            go_type:
-              type: "*string"
-          - column: spotify_album_cache.release_date
-            go_type:
-              type: "*time.Time"
-          - column: spotify_artist_cache.image_url
-            go_type:
-              type: "*string"
-          - column: spotify_artist_cache.popularity
-            go_type:
-              type: "int"
-          - column: spotify_artist_cache.follower_count
-            go_type:
-              type: "int"
-          - column: users.spotify_image_url
-            go_type:
-              type: "*string"
     strict_order_by: false

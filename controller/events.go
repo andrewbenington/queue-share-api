@@ -27,12 +27,12 @@ func (c *StatsController) GetRecentUserEvents(w http.ResponseWriter, r *http.Req
 
 	filter := getFilterParams(r)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer transaction.Commit(ctx)
 
 	trackEvents, err := history.GetTrackRankEvents(ctx, transaction, userUUID, filter)
 	if err != nil {
@@ -149,12 +149,12 @@ func (c *StatsController) GetNewArtists(w http.ResponseWriter, r *http.Request) 
 	}
 	fmt.Println(filter.End)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer transaction.Commit(ctx)
 
 	newArtistData, err := db.New(transaction).HistoryGetNewArtists(ctx, db.HistoryGetNewArtistsParams{
 		UserID:    userUUID,

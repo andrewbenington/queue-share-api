@@ -32,7 +32,7 @@ type TrackCacheInsertBulkNullableParams struct {
 }
 
 func (q *Queries) TrackCacheInsertBulkNullable(ctx context.Context, arg TrackCacheInsertBulkNullableParams) error {
-	_, err := q.db.ExecContext(ctx, trackCacheInsertBulk,
+	_, err := q.db.Exec(ctx, trackCacheInsertBulk,
 		pq.Array(arg.ID),
 		pq.Array(arg.Uri),
 		pq.Array(arg.Name),
@@ -74,7 +74,7 @@ type AlbumCacheInsertBulkNullableParams struct {
 }
 
 func (q *Queries) AlbumCacheInsertBulkNullable(ctx context.Context, arg AlbumCacheInsertBulkNullableParams) error {
-	_, err := q.db.ExecContext(ctx, albumCacheInsertBulk,
+	_, err := q.db.Exec(ctx, albumCacheInsertBulk,
 		pq.Array(arg.ID),
 		pq.Array(arg.Uri),
 		pq.Array(arg.Name),
@@ -103,7 +103,7 @@ type ArtistCacheInsertBulkNullableParams struct {
 }
 
 func (q *Queries) ArtistCacheInsertBulkNullable(ctx context.Context, arg ArtistCacheInsertBulkNullableParams) error {
-	_, err := q.db.ExecContext(ctx, artistCacheInsertBulk,
+	_, err := q.db.Exec(ctx, artistCacheInsertBulk,
 		pq.Array(arg.ID),
 		pq.Array(arg.Uri),
 		pq.Array(arg.Name),
@@ -116,32 +116,32 @@ func (q *Queries) ArtistCacheInsertBulkNullable(ctx context.Context, arg ArtistC
 }
 
 type HistoryInsertBulkNullableParams struct {
-	UserIds          []uuid.UUID `json:"user_ids"`
-	Timestamp        []time.Time `json:"timestamp"`
-	Platform         []string    `json:"platform"`
-	MsPlayed         []int32     `json:"ms_played"`
-	ConnCountry      []string    `json:"conn_country"`
-	IpAddr           []string    `json:"ip_addr"`
-	UserAgent        []string    `json:"user_agent"`
-	TrackName        []string    `json:"track_name"`
-	ArtistName       []string    `json:"artist_name"`
-	AlbumName        []string    `json:"album_name"`
-	SpotifyTrackUri  []string    `json:"spotify_track_uri"`
-	SpotifyArtistUri []*string   `json:"spotify_artist_uri"`
-	SpotifyAlbumUri  []*string   `json:"spotify_album_uri"`
-	ReasonStart      []string    `json:"reason_start"`
-	ReasonEnd        []string    `json:"reason_end"`
-	Shuffle          []bool      `json:"shuffle"`
-	Skipped          []bool      `json:"skipped"`
-	Offline          []bool      `json:"offline"`
-	OfflineTimestamp []time.Time `json:"offline_timestamp"`
-	IncognitoMode    []bool      `json:"incognito_mode"`
-	FromHistory      []bool      `json:"from_history"`
-	ISRC             []*string   `json:"isrc"`
+	UserIds          []uuid.UUID  `json:"user_ids"`
+	Timestamp        []time.Time  `json:"timestamp"`
+	Platform         []string     `json:"platform"`
+	MsPlayed         []int32      `json:"ms_played"`
+	ConnCountry      []string     `json:"conn_country"`
+	IpAddr           []*string    `json:"ip_addr"`
+	UserAgent        []*string    `json:"user_agent"`
+	TrackName        []string     `json:"track_name"`
+	ArtistName       []string     `json:"artist_name"`
+	AlbumName        []string     `json:"album_name"`
+	SpotifyTrackUri  []string     `json:"spotify_track_uri"`
+	SpotifyArtistUri []*string    `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  []*string    `json:"spotify_album_uri"`
+	ReasonStart      []*string    `json:"reason_start"`
+	ReasonEnd        []*string    `json:"reason_end"`
+	Shuffle          []bool       `json:"shuffle"`
+	Skipped          []*bool      `json:"skipped"`
+	Offline          []bool       `json:"offline"`
+	OfflineTimestamp []*time.Time `json:"offline_timestamp"`
+	IncognitoMode    []bool       `json:"incognito_mode"`
+	FromHistory      []bool       `json:"from_history"`
+	ISRC             []*string    `json:"isrc"`
 }
 
 func (q *Queries) HistoryInsertBulkNullable(ctx context.Context, arg HistoryInsertBulkNullableParams) error {
-	_, err := q.db.ExecContext(ctx, historyInsertBulk,
+	_, err := q.db.Exec(ctx, historyInsertBulk,
 		pq.Array(arg.UserIds),
 		pq.Array(arg.Timestamp),
 		pq.Array(arg.Platform),

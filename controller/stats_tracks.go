@@ -31,12 +31,12 @@ func (c *StatsController) GetTopTracksByTimeframe(w http.ResponseWriter, r *http
 
 	filter := getFilterParams(r)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer transaction.Commit(ctx)
 
 	rankingResults, code, err := history.TrackStreamRankingsByTimeframe(ctx, transaction, userUUID, filter)
 	if err != nil {
@@ -77,7 +77,7 @@ type Stream struct {
 	TrackName       string    `json:"track_name"`
 	AlbumName       string    `json:"album_name"`
 	SpotifyTrackUri string    `json:"spotify_track_uri"`
-	SpotifyAlbumUri string    `json:"spotify_album_uri"`
+	SpotifyAlbumUri *string   `json:"spotify_album_uri"`
 	ISRC            *string   `json:"isrc,omitempty"`
 }
 type TrackStatsResponse struct {
@@ -113,12 +113,12 @@ func (c *StatsController) GetTrackStatsByURI(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer transaction.Commit(ctx)
 
 	rows, err := history.AllTrackStreamsByURI(
 		ctx, transaction, userUUID, trackURI, getFilterParams(r),
@@ -136,7 +136,7 @@ func (c *StatsController) GetTrackStatsByURI(w http.ResponseWriter, r *http.Requ
 			AlbumName:       row.AlbumName,
 			MsPlayed:        int(row.MsPlayed),
 			SpotifyTrackUri: row.SpotifyTrackUri,
-			SpotifyAlbumUri: row.SpotifyAlbumUri.String,
+			SpotifyAlbumUri: row.SpotifyAlbumUri,
 			ISRC:            row.Isrc,
 		})
 	}
@@ -175,12 +175,12 @@ func (c *StatsController) GetTrackRankingsByURI(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer transaction.Commit(ctx)
 
 	filter := getFilterParams(r)
 	filter.Max = 30

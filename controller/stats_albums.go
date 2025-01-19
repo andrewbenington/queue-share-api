@@ -31,14 +31,14 @@ func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http
 
 	filter := getFilterParams(r)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer tx.Commit(ctx)
 
-	rankingResults, code, err := history.AlbumStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
+	rankingResults, code, err := history.AlbumStreamRankingsByTimeframe(ctx, tx, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), code)
 		return
@@ -107,15 +107,15 @@ func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Requ
 
 	filter := getFilterParams(r)
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer tx.Commit(ctx)
 
 	rows, err := history.AllAlbumStreamsByURI(
-		ctx, transaction, userUUID, albumURI, filter,
+		ctx, tx, userUUID, albumURI, filter,
 	)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
@@ -123,7 +123,7 @@ func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Requ
 	}
 
 	filter.AlbumURI = &albumURI
-	_, _, trackRanks, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, transaction, nil, nil)
+	_, _, trackRanks, err := history.CalcTrackStreamsAndRanks(ctx, userUUID, filter, tx, nil, nil)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("couldn't get track counts: %s", err), http.StatusInternalServerError)
 		return
@@ -199,15 +199,15 @@ func (c *StatsController) GetAlbumRankingsByURI(w http.ResponseWriter, r *http.R
 
 	rankings := []TimeframeRanking{}
 
-	transaction, err := db.Service().DB.BeginTx(ctx, nil)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit()
+	defer tx.Commit(ctx)
 
 	filter := getFilterParams(r)
-	allRankings, responseCode, err := history.AlbumStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
+	allRankings, responseCode, err := history.AlbumStreamRankingsByTimeframe(ctx, tx, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
 	}

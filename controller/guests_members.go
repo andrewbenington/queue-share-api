@@ -14,6 +14,11 @@ import (
 
 func (*Controller) JoinRoomAsMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit(ctx)
 
 	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
@@ -32,7 +37,7 @@ func (*Controller) JoinRoomAsMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = room.AddMember(ctx, db.Service().DB, reqCtx.Room.ID, reqCtx.UserID)
+	err = room.AddMember(ctx, tx, reqCtx.Room.ID, reqCtx.UserID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -53,6 +58,11 @@ type AddMemberRequest struct {
 
 func (*Controller) AddMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit(ctx)
 
 	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
@@ -72,7 +82,7 @@ func (*Controller) AddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = room.AddMemberByUsername(ctx, db.Service().DB, reqCtx.Room.ID, body.Username, body.IsModerator)
+	err = room.AddMemberByUsername(ctx, tx, reqCtx.Room.ID, body.Username, body.IsModerator)
 	if err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
 			requests.RespondWithError(w, http.StatusConflict, "User already added")
@@ -99,6 +109,12 @@ type SetModeratorRequest struct {
 
 func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit(ctx)
+
 	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
@@ -117,7 +133,7 @@ func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = room.SetModerator(ctx, db.Service().DB, reqCtx.Room.ID, body.UserID, body.IsModerator)
+	err = room.SetModerator(ctx, tx, reqCtx.Room.ID, body.UserID, body.IsModerator)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -135,6 +151,11 @@ func (*Controller) SetModerator(w http.ResponseWriter, r *http.Request) {
 
 func (*Controller) DeleteMember(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit(ctx)
 
 	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
@@ -149,7 +170,7 @@ func (*Controller) DeleteMember(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.URL.Query().Get("user_id")
 
-	err = room.RemoveMember(ctx, db.Service().DB, reqCtx.Room.ID, userID)
+	err = room.RemoveMember(ctx, tx, reqCtx.Room.ID, userID)
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -167,6 +188,11 @@ func (*Controller) DeleteMember(w http.ResponseWriter, r *http.Request) {
 
 func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		requests.RespondWithDBError(w, err)
+	}
+	defer tx.Commit(ctx)
 
 	reqCtx, err := getRoomRequestContext(ctx, r)
 	if err != nil {
@@ -188,9 +214,9 @@ func (*Controller) AddGuest(w http.ResponseWriter, r *http.Request) {
 
 	var guest *room.Guest
 	if reqCtx.GuestID != "" {
-		guest, err = room.InsertGuestWithID(ctx, db.Service().DB, reqCtx.Room.Code, req.Name, reqCtx.GuestID)
+		guest, err = room.InsertGuestWithID(ctx, tx, reqCtx.Room.Code, req.Name, reqCtx.GuestID)
 	} else {
-		guest, err = room.InsertGuest(ctx, db.Service().DB, reqCtx.Room.Code, req.Name)
+		guest, err = room.InsertGuest(ctx, tx, reqCtx.Room.Code, req.Name)
 	}
 
 	if err != nil {
@@ -237,13 +263,18 @@ func (*Controller) GetRoomGuestsAndMembers(w http.ResponseWriter, r *http.Reques
 }
 
 func getRoomGuestsAndMembers(ctx context.Context, roomID string) (*GetRoomGuestsAndMembersResponse, error) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit(ctx)
 
-	guests, err := room.GetAllRoomGuests(ctx, db.Service().DB, roomID)
+	guests, err := room.GetAllRoomGuests(ctx, tx, roomID)
 	if err != nil {
 		return nil, err
 	}
 
-	members, err := room.GetAllMembers(ctx, db.Service().DB, roomID)
+	members, err := room.GetAllMembers(ctx, tx, roomID)
 	if err != nil {
 		return nil, err
 	}
