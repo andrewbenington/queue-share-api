@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/config"
@@ -36,7 +35,7 @@ func (d *DBService) Initialize() error {
 	defer cancel()
 	err = dbConn.PingContext(ctx)
 	if err != nil {
-		log.Fatalf("couldn't connect to db: %s", err)
+		return fmt.Errorf("couldn't connect to db: %w", err)
 	}
 
 	return nil

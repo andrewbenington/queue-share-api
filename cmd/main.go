@@ -24,7 +24,8 @@ func main() {
 	a.Initialize()
 	err = db.Service().Initialize()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		// log.Fatal(err)
 	}
 
 	addr := "0.0.0.0:8080"

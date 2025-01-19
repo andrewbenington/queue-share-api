@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -281,6 +282,7 @@ func getFilterParams(r *http.Request) history.FilterParams {
 	}
 
 	startParam := r.URL.Query().Get("start_unix")
+	log.Println(startParam)
 	startUnix, err := strconv.Atoi(startParam)
 	if err != nil {
 		startUnix = 0
@@ -300,8 +302,8 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		Max:            int32(max),
 		ArtistURIs:     artistURIs,
 		AlbumURI:       albumURI,
-		Start:          start,
-		End:            end,
+		Start:          &start,
+		End:            &end,
 		Timeframe:      timeframe,
 	}
 }

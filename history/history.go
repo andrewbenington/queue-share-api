@@ -42,3 +42,17 @@ func (t Timeframe) DefaultFirstStartTime() *time.Time {
 		return nil
 	}
 }
+
+
+func (t Timeframe) GetEarliestStartTime(end time.Time) *time.Time {
+	switch t {
+	case TimeframeDay:
+		monthBefore := end.AddDate(0, -1, 0)
+		return &monthBefore
+	case TimeframeWeek:
+		twelveWeeksBefore := end.AddDate(0, 0, -12*7)
+		return &twelveWeeksBefore
+	default:
+		return nil
+	}
+}

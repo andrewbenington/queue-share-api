@@ -23,7 +23,7 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/room/{code}/player", a.Controller.GetPlayback).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/room/{code}/devices", a.Controller.Devices).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/room/{code}/playlists", a.Controller.UserPlaylists).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/room/{code}/playlists", a.Controller.RoomPlaylists).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/room/{code}/suggested", a.Controller.SuggestedTracks).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/room/{code}/playlist", a.Controller.GetPlaylist).Methods("GET", "OPTIONS")
@@ -46,6 +46,7 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/user/rooms/joined", a.Controller.GetUserJoinedRooms).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/user/spotify", a.Controller.UnlinkSpotify).Methods("DELETE", "OPTIONS")
 	a.Router.HandleFunc("/user/has-spotify-history", a.Controller.UserHasSpotifyHistory).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/user/playlists", a.Controller.UserPlaylists).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/user/friend-suggestions", a.Controller.UserFriendRequestData).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/user/friend-request", a.Controller.UserSendFriendRequest).Methods("POST", "OPTIONS")
@@ -55,6 +56,7 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/user/to-process", a.Controller.TracksLeftToProcess).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/user/push-to-queue", a.Controller.PushToUserQueue).Methods("POST", "OPTIONS")
+	a.Router.HandleFunc("/user/build-queue", a.StatsController.AddMixToQueue).Methods("POST", "OPTIONS")
 
 	a.Router.HandleFunc("/stats/upload", a.StatsController.UploadHistory).Methods("POST", "OPTIONS")
 	a.Router.HandleFunc("/stats/history", a.StatsController.GetAllHistory).Methods("GET", "OPTIONS")
@@ -70,8 +72,9 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/stats/compare-artists", a.StatsController.UserCompareFriendTopArtists).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/stats/compare-albums", a.StatsController.UserCompareFriendTopAlbums).Methods("GET", "OPTIONS")
 
-	a.Router.HandleFunc("/stats/track-events", a.StatsController.GetRecentTrackEvents).Methods("GET", "OPTIONS")
-	a.Router.HandleFunc("/stats/artist-events", a.StatsController.GetRecentArtistEvents).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/stats/artist-events", a.StatsController.GetRecentUserEvents).Methods("GET", "OPTIONS")
+
+	a.Router.HandleFunc("/stats/new-artists", a.StatsController.GetNewArtists).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/rankings/track/{spotify_uri}", a.StatsController.GetTrackRankingsByURI).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/rankings/album/{spotify_uri}", a.StatsController.GetAlbumRankingsByURI).Methods("GET", "OPTIONS")

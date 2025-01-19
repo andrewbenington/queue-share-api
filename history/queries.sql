@@ -452,3 +452,117 @@ ORDER BY
     COUNT DESC
 LIMIT 50;
 
+-- name: HistoryGetRecentArtistStreams :many
+WITH SongStreamCounts AS (
+    SELECT
+        spotify_artist_uri,
+        spotify_track_uri,
+        COUNT(*) AS stream_count
+    FROM
+        spotify_history
+    WHERE
+        user_id = @user_id
+        AND spotify_artist_uri = ANY (@artist_uris::text[])
+        AND timestamp >= CURRENT_DATE - INTERVAL '6 months'
+    GROUP BY
+        spotify_artist_uri,
+        spotify_track_uri
+),
+RankedStreams AS (
+    SELECT
+        spotify_artist_uri,
+        spotify_track_uri,
+        stream_count,
+        ROW_NUMBER() OVER (PARTITION BY spotify_artist_uri ORDER BY stream_count DESC) AS rank
+    FROM
+        SongStreamCounts
+)
+SELECT
+    spotify_artist_uri,
+    spotify_track_uri,
+    stream_count
+FROM
+    RankedStreams
+WHERE
+    rank <= 10
+ORDER BY
+    spotify_artist_uri,
+    rank;
+
+-- name: HistoryGetAlbumStreams :many
+WITH SongStreamCounts AS (
+    SELECT
+        spotify_album_uri,
+        spotify_track_uri,
+        COUNT(*) AS stream_count
+    FROM
+        spotify_history
+    WHERE
+        user_id = @user_id
+        AND spotify_album_uri = ANY (@album_uris::text[])
+    GROUP BY
+        spotify_album_uri,
+        spotify_track_uri
+),
+RankedStreams AS (
+    SELECT
+        spotify_album_uri,
+        spotify_track_uri,
+        stream_count,
+        ROW_NUMBER() OVER (PARTITION BY spotify_album_uri ORDER BY stream_count DESC) AS rank
+    FROM
+        SongStreamCounts
+)
+SELECT
+    spotify_album_uri,
+    spotify_track_uri,
+    stream_count
+FROM
+    RankedStreams
+WHERE
+    rank <= 10
+ORDER BY
+    spotify_album_uri,
+    rank;
+
+-- name: HistoryGetNewArtists :many
+WITH all_artists AS (
+    SELECT
+        spotify_artist_uri,
+        count(*),
+        array_agg(DISTINCT date(timestamp))::text[] AS distinct_dates
+    FROM
+        spotify_history h1
+    WHERE
+        h1.user_id = @user_id
+        AND h1.timestamp >= @start_date::timestamp
+        AND h1.timestamp < @end_date::timestamp
+    GROUP BY
+        spotify_artist_uri
+),
+new_this_month AS (
+    SELECT
+        *
+    FROM
+        all_artists aa
+    WHERE
+        NOT EXISTS (
+            SELECT
+                1
+            FROM
+                spotify_history h2
+            WHERE
+                h2.user_id = @user_id
+                AND timestamp < @start_date::timestamp
+                AND h2.spotify_artist_uri = aa.spotify_artist_uri))
+SELECT
+    TRIM(LEADING 'spotify:artist:' FROM spotify_artist_uri)::text AS id,
+    count,
+    distinct_dates
+FROM
+    new_this_month
+WHERE
+    count > 5
+    AND array_length(distinct_dates, 1) > 1
+LIMIT 100;
+

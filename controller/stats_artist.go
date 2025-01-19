@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -136,6 +137,7 @@ func (c *StatsController) GetArtistStatsByURI(w http.ResponseWriter, r *http.Req
 	}
 
 	filter := getFilterParams(r)
+	log.Printf("%+v", filter)
 
 	transaction, err := db.Service().DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -239,6 +241,7 @@ func (c *StatsController) GetArtistRankingsByURI(w http.ResponseWriter, r *http.
 	defer transaction.Commit()
 
 	filter := getFilterParams(r)
+	log.Printf("%+v", filter)
 	allRankings, responseCode, err := history.ArtistStreamRankingsByTimeframe(ctx, transaction, userUUID, filter, nil, nil)
 	if err != nil {
 		http.Error(w, err.Error(), responseCode)
