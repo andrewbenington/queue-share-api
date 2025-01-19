@@ -651,7 +651,7 @@ func TrackStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, us
 	firstStart := filter.Timeframe.GetEarliestStartTime(*filter.End)
 	end := *filter.End
 
-	if filter.Start != nil && firstStart == nil || filter.Start.After(*firstStart) {
+	if filter.Start != nil && (firstStart == nil || filter.Start.After(*firstStart)) {
 		firstStart = filter.Start
 	} else if defaultFirstStart := filter.Timeframe.DefaultFirstStartTime(); defaultFirstStart != nil {
 		firstStart = defaultFirstStart
