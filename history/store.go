@@ -535,6 +535,7 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		EndDate:      end.UTC(),
 		Max:          filter.Max + 20,
 	})
+	log.Printf("%d top artist rows", len(rows))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -550,6 +551,7 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 	var currentRank int64 = 0
 	for _, row := range rows {
 		if row.SpotifyArtistUri == nil {
+			log.Printf("No artist uri (internal)")
 			continue
 		}
 		spotifyArtistURI := *row.SpotifyArtistUri
@@ -585,7 +587,6 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 				diff := row.Occurrences - lastStreams
 				artistStreams.StreamsChange = &diff
 			}
-
 		}
 
 		if lastRanks != nil {
@@ -598,6 +599,7 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		rankingList = append(rankingList, &artistStreams)
 	}
 
+	log.Printf("ranking list length: %d (%d)", len(rankingList), int(filter.Max))
 	if len(rankingList) > int(filter.Max) {
 		rankingList = rankingList[:filter.Max]
 	}

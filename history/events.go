@@ -2,6 +2,8 @@ package history
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/client"
@@ -272,12 +274,19 @@ func GetArtistRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid
 
 	for _, stream := range lo.Reverse(allStreams) {
 		if stream.SpotifyArtistUri == nil {
+			log.Printf("no artist uri; skipping")
 			continue
 		}
 
 		rankEvent := ArtistRankEvent{}
-		node, ok := nodesByID[*stream.SpotifyArtistUri]
+		id, err := service.IDFromURI(*stream.SpotifyArtistUri)
+		if err != nil {
+			return nil, fmt.Errorf("bad spotify uri: %s", *stream.SpotifyArtistUri)
+		}
+
+		node, ok := nodesByID[id]
 		if !ok {
+			log.Printf("could not find node width id %s; skipping", id)
 			continue
 		}
 
@@ -372,7 +381,12 @@ func GetAlbumRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 		}
 
 		rankEvent := AlbumRankEvent{}
-		node, ok := nodesByID[*stream.SpotifyAlbumUri]
+		id, err := service.IDFromURI(*stream.SpotifyAlbumUri)
+		if err != nil {
+			return nil, fmt.Errorf("bad spotify uri: %s", *stream.SpotifyAlbumUri)
+		}
+
+		node, ok := nodesByID[id]
 		if !ok {
 			continue
 		}

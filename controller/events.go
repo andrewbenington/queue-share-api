@@ -43,6 +43,7 @@ func (c *StatsController) GetRecentUserEvents(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	log.Printf("%d artist events", len(artistEvents))
 
 	albumEvents, err := history.GetAlbumRankEvents(ctx, transaction, userUUID, filter)
 	if err != nil {
