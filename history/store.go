@@ -508,7 +508,7 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 
 	return
 }
-func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, transaction db.DBTX, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
+func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter FilterParams, tx db.DBTX, start time.Time, end time.Time, lastStreams map[string]int64, lastRanks map[string]int64) (
 	streamsByURI map[string]int64,
 	ranksByURI map[string]int64,
 	rankingList []*ArtistStreams,
@@ -519,15 +519,7 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 
 	var rows []*db.HistoryGetTopArtistsInTimeframeRow
 
-	// cacheIdentifier := fmt.Sprintf("%s-%d-%d-%d", userUUID, start.UnixMilli(), end.UnixMilli(), filter.Max)
-	// artistCacheLock.Lock()
-	// cachedRows, ok := artistRankingsCache[cacheIdentifier]
-	// artistCacheLock.Unlock()
-
-	// if ok && time.Since(end) >= time.Hour*24 {
-	// 	rows = cachedRows
-	// } else {
-	rows, err = db.New(transaction).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
+	rows, err = db.New(tx).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
@@ -535,17 +527,9 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		EndDate:      end.UTC(),
 		Max:          filter.Max + 20,
 	})
-	log.Printf("%d top artist rows", len(rows))
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	// if start.Minute() == 0 && end.Minute() == 0 {
-	// 	artistCacheLock.Lock()
-	// 	artistRankingsCache[cacheIdentifier] = rows
-	// 	artistCacheLock.Unlock()
-	// }
-	// }
 
 	var prevCount int64 = 0
 	var currentRank int64 = 0
@@ -566,11 +550,6 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		if err != nil {
 			return nil, nil, nil, err
 		}
-
-		// primaryURICounts, err := getPrimaryURICounts(ctx, transaction, trackURIs)
-		// if err != nil {
-		// 	return nil, nil, nil, err
-		// }
 
 		artistStreams := ArtistStreams{
 			ID:      service.IDFromURIMust(spotifyArtistURI),
@@ -599,7 +578,6 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 		rankingList = append(rankingList, &artistStreams)
 	}
 
-	log.Printf("ranking list length: %d (%d)", len(rankingList), int(filter.Max))
 	if len(rankingList) > int(filter.Max) {
 		rankingList = rankingList[:filter.Max]
 	}

@@ -67,7 +67,7 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 		requests.RespondWithDBError(w, err)
 		return
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	albumURIs := lo.Map(
 		req.AlbumIDs,
@@ -115,7 +115,6 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 	for _, stream := range artistStreams {
 		allTrackURIsSet[stream.SpotifyTrackUri] = true
 	}
-	fmt.Printf("ARTIST: %+v\n", artistStreams)
 
 	for _, uri := range playlistTrackURIs {
 		allTrackURIsSet[uri] = true
@@ -142,5 +141,6 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	tx.Commit(ctx)
 	w.WriteHeader(http.StatusAccepted)
 }

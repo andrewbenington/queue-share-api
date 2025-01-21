@@ -132,6 +132,7 @@ func (c *Controller) UserDeleteFriendRequest(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(ctx)
 
 	err = db.New(tx).UserDeleteFriendRequest(r.Context(), db.UserDeleteFriendRequestParams{
 		UserID:   userUUID,
@@ -187,6 +188,7 @@ func (c *Controller) UserAcceptFriendRequest(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(ctx)
 
 	ok, err = db.New(tx).UserGetFriendRequestExists(r.Context(), db.UserGetFriendRequestExistsParams{
 		FriendID: userUUID,
@@ -257,7 +259,7 @@ func (c *Controller) UserGetFriends(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	friends, err := db.New(tx).UserGetFriends(r.Context(), userUUID)
 	if err == sql.ErrNoRows {
@@ -300,7 +302,7 @@ func userOrFriendUUIDFromRequest(ctx context.Context, r *http.Request) (uuid.UUI
 	if err != nil {
 		return uuid.UUID{}, err
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	isFriend, err := db.New(tx).UserIsFriends(ctx, db.UserIsFriendsParams{
 		UserID:   userUUID,

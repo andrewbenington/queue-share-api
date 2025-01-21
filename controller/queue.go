@@ -114,6 +114,7 @@ func (c *Controller) PushToRoomQueue(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(ctx)
 
 	if reqCtx.UserID != "" {
 		err = room.SetQueueTrackUser(ctx, tx, reqCtx.Room.Code, songID, reqCtx.UserID)
@@ -205,6 +206,7 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *service.
 	if err != nil {
 		return http.StatusInternalServerError, err.Error()
 	}
+	defer tx.Rollback(ctx)
 
 	guestTracks, err := room.GetQueueTrackAddedBy(ctx, tx, roomID)
 	if err == sql.ErrNoRows {
@@ -232,6 +234,11 @@ func addGuestsAndMembersToTracks(ctx context.Context, roomID string, q *service.
 				room.MarkTracksAsPlayedSince(ctx, tx, roomID, gt.Timestamp)
 			}
 		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Sprintf("commit transaction: %s", err)
 	}
 
 	return http.StatusOK, ""

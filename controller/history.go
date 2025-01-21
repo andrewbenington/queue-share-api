@@ -165,11 +165,12 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 	}
 	defer zipReader.Close()
 
-	transaction, err := db.Service().BeginTx(ctx)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(ctx)
 
 	for _, file := range zipReader.File {
 		if strings.EqualFold(path.Base(file.Name), "Userdata.json") {
@@ -195,7 +196,7 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		err = history.InsertEntriesFromHistory(ctx, transaction, userUUID, entryData)
+		err = history.InsertEntriesFromHistory(ctx, tx, userUUID, entryData)
 		if err != nil {
 			fmt.Println(err)
 			http.Error(w, "Error uploading history", http.StatusInternalServerError)
@@ -205,7 +206,7 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 		fmt.Printf("Uploaded file %s\n", file.Name)
 	}
 
-	err = transaction.Commit(ctx)
+	err = tx.Commit(ctx)
 	if err != nil {
 		http.Error(w, "Error committing DB transaction", http.StatusInternalServerError)
 		return

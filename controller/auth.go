@@ -34,6 +34,7 @@ func (c *Controller) GetToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(ctx)
 
 	username, password, ok := r.BasicAuth()
 	if !ok {
@@ -124,6 +125,7 @@ func (c *Controller) SpotifyAuthRedirect(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
+	defer tx.Rollback(ctx)
 
 	if !ok {
 		log.Printf("unknown spotify state")

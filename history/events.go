@@ -221,12 +221,12 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	return rankEvents, err
 }
 
-func GetArtistRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]ArtistRankEvent, error) {
+func GetArtistRankEvents(ctx context.Context, tx db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]ArtistRankEvent, error) {
 	filter.ensureStartAndEnd()
 	filter.Max = 50
 	filter.IncludeSkipped = false
 
-	_, _, rankings, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, transaction, time.Unix(0, 0), *filter.Start, nil, nil)
+	_, _, rankings, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, tx, time.Unix(0, 0), *filter.Start, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func GetArtistRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid
 		linkedList = linkedList.Next
 	}
 
-	allStreams, err := db.New(transaction).HistoryGetAll(ctx, db.HistoryGetAllParams{
+	allStreams, err := db.New(tx).HistoryGetAll(ctx, db.HistoryGetAllParams{
 		UserID:       userUUID,
 		MinMsPlayed:  filter.MinMSPlayed,
 		IncludeSkips: filter.IncludeSkipped,
@@ -286,7 +286,6 @@ func GetArtistRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid
 
 		node, ok := nodesByID[id]
 		if !ok {
-			log.Printf("could not find node width id %s; skipping", id)
 			continue
 		}
 

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -27,25 +26,24 @@ func (c *StatsController) GetRecentUserEvents(w http.ResponseWriter, r *http.Req
 
 	filter := getFilterParams(r)
 
-	transaction, err := db.Service().BeginTx(ctx)
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
 		return
 	}
-	defer transaction.Commit(ctx)
+	defer tx.Rollback(ctx)
 
-	trackEvents, err := history.GetTrackRankEvents(ctx, transaction, userUUID, filter)
+	trackEvents, err := history.GetTrackRankEvents(ctx, tx, userUUID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	artistEvents, err := history.GetArtistRankEvents(ctx, transaction, userUUID, filter)
+	artistEvents, err := history.GetArtistRankEvents(ctx, tx, userUUID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	log.Printf("%d artist events", len(artistEvents))
 
-	albumEvents, err := history.GetAlbumRankEvents(ctx, transaction, userUUID, filter)
+	albumEvents, err := history.GetAlbumRankEvents(ctx, tx, userUUID, filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -148,7 +146,6 @@ func (c *StatsController) GetNewArtists(w http.ResponseWriter, r *http.Request) 
 		filter.Start = &monthAgo
 		filter.End = &today
 	}
-	fmt.Println(filter.End)
 
 	transaction, err := db.Service().BeginTx(ctx)
 	if err != nil {

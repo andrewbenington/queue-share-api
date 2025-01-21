@@ -67,6 +67,7 @@ func uploadAlbumCache(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
 	for i := range (len(albumPtrs) / 100) + 1 {
 		start := i * 100
@@ -108,6 +109,7 @@ func uploadArtistCache(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback(ctx)
 
 	for i := range (len(artistPtrs) / 100) + 1 {
 		start := i * 100

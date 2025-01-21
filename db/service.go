@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/config"
@@ -16,7 +17,8 @@ var (
 )
 
 type DBService struct {
-	Pool *pgxpool.Pool
+	Pool          *pgxpool.Pool
+	usedConnCount int
 }
 
 func Service() *DBService {
@@ -30,7 +32,25 @@ func (d *DBService) Initialize() error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
-	dbpool, err := pgxpool.New(ctx, config.GetDBString())
+	cfg, err := pgxpool.ParseConfig(config.GetDBString())
+	if err != nil {
+		return fmt.Errorf("get db pool config: %w", err)
+	}
+	cfg.MaxConns = 30
+	cfg.MaxConnIdleTime = time.Minute * 5
+	cfg.BeforeAcquire = func(ctx context.Context, c *pgx.Conn) bool {
+		d.usedConnCount++
+		log.Printf("Pool usage: %d/30", d.usedConnCount)
+		return true
+	}
+
+	cfg.AfterRelease = func(c *pgx.Conn) bool {
+		d.usedConnCount--
+		log.Printf("Pool usage: %d/30", d.usedConnCount)
+		return true
+	}
+
+	dbpool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return fmt.Errorf("create connection pool: %w", err)
 	}

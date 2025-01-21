@@ -23,7 +23,7 @@ func (c *Controller) GetTableData(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	rows, err := admin.GetTableSizes(ctx, tx)
 	if err != nil {
@@ -41,7 +41,7 @@ func (c *Controller) GetUncachedTracks(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	rows, err := db.New(tx).UncachedTracks(ctx)
 	if err != nil {
@@ -59,7 +59,7 @@ func (c *Controller) GetMissingISRCNumbers(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	rows, err := db.New(tx).MissingISRCNumbers(ctx)
 	if err != nil {
@@ -77,7 +77,7 @@ func (c *Controller) GetMissingArtistURIs(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	rows, err := db.New(tx).MissingArtistURIs(ctx)
 	if err != nil {
@@ -95,7 +95,7 @@ func (c *Controller) GetMissingArtistURIsByUser(w http.ResponseWriter, r *http.R
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	missingByUser := engine.GetMissingURIsByUser()
 
@@ -128,7 +128,7 @@ func (c *Controller) GetLogsByDate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 
 	dateString := r.URL.Query().Get("date")
 	timestamp, err := time.Parse("01-02-06", dateString)
@@ -179,7 +179,7 @@ func (c *Controller) GetGeneralInfo(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	defer tx.Commit(ctx)
+	defer tx.Rollback(ctx)
 	resp := map[string]interface{}{}
 	resp["log_queue"] = util.GetLogChannelSize()
 	json.NewEncoder(w).Encode(resp)
