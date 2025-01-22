@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand/v2"
 	"net/http"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/andrewbenington/queue-share-api/util"
 	"github.com/samber/lo"
 	"github.com/zmb3/spotify/v2"
 )
@@ -45,20 +47,19 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	playlistTrackURIs := []string{}
+	playlistTracks := []spotify.FullTrack{}
+
 	for _, playlistID := range req.PlaylistIDs {
 		playlist, err := spClient.GetPlaylist(ctx, spotify.ID(playlistID))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		perm := rand.Perm(len(playlist.Tracks.Tracks))
-		for _, v := range perm[:10] {
-			track := playlist.Tracks.Tracks[v]
+		for _, track := range playlist.Tracks.Tracks {
 			if strings.HasPrefix(string(track.Track.URI), "spotify:local") {
 				continue
 			}
-			playlistTrackURIs = append(playlistTrackURIs, string(track.Track.URI))
+			playlistTracks = append(playlistTracks, track.Track)
 		}
 	}
 
@@ -107,28 +108,9 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	allTrackURIsSet := map[string]bool{}
-	for _, stream := range albumStreams {
-		allTrackURIsSet[stream.SpotifyTrackUri] = true
-	}
+	shuffledTrackURIs := shuffleAndSeparateSameArtist(artistStreams, albumStreams, playlistTracks)
 
-	for _, stream := range artistStreams {
-		allTrackURIsSet[stream.SpotifyTrackUri] = true
-	}
-
-	for _, uri := range playlistTrackURIs {
-		allTrackURIsSet[uri] = true
-	}
-
-	allTrackURIs := lo.Keys(allTrackURIsSet)
-	fmt.Println("ALL", allTrackURIs)
-	shuffledTrackURIs := make([]string, len(allTrackURIsSet))
-	perm := rand.Perm(len(allTrackURIsSet))
-	for i, v := range perm {
-		shuffledTrackURIs[v] = allTrackURIs[i]
-	}
-
-	for _, uri := range shuffledTrackURIs {
+	for _, uri := range shuffledTrackURIs[:40] {
 		err = service.PushToUserQueue(r.Context(), spClient, service.IDFromURIMust(uri))
 		if err != nil && strings.Contains(err.Error(), "No active device found") {
 			requests.RespondWithError(w, http.StatusBadRequest, "Host is not playing music")
@@ -143,4 +125,138 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 
 	tx.Commit(ctx)
 	w.WriteHeader(http.StatusAccepted)
+}
+
+type TrackToShuffle interface {
+	artistURI() string
+	trackURI() string
+	source() string
+}
+
+type ArtistTrackToShuffle struct {
+	row *db.HistoryGetRecentArtistStreamsRow
+}
+
+func (t *ArtistTrackToShuffle) artistURI() string {
+	return *t.row.SpotifyArtistUri
+}
+
+func (t *ArtistTrackToShuffle) trackURI() string {
+	return t.row.SpotifyTrackUri
+}
+
+func (t *ArtistTrackToShuffle) source() string {
+	return "artist"
+}
+
+type AlbumTrackToShuffle struct {
+	row *db.HistoryGetAlbumStreamsRow
+}
+
+func (t *AlbumTrackToShuffle) artistURI() string {
+	return *t.row.SpotifyArtistUri
+}
+
+func (t *AlbumTrackToShuffle) trackURI() string {
+	return t.row.SpotifyTrackUri
+}
+
+func (t *AlbumTrackToShuffle) source() string {
+	return "album"
+}
+
+type PlaylistTrackToShuffle struct {
+	track spotify.FullTrack
+}
+
+func (t *PlaylistTrackToShuffle) artistURI() string {
+	return string(t.track.Artists[0].URI)
+}
+
+func (t *PlaylistTrackToShuffle) trackURI() string {
+	return string(t.track.URI)
+}
+
+func (t *PlaylistTrackToShuffle) source() string {
+	return "track"
+}
+
+func shuffleAndSeparateSameArtist(fromArtists []*db.HistoryGetRecentArtistStreamsRow, fromAlbums []*db.HistoryGetAlbumStreamsRow, fromPlaylists []spotify.FullTrack) []string {
+
+	toShuffle := []TrackToShuffle{}
+	included := map[string]struct{}{}
+
+	for _, row := range fromArtists {
+		if _, ok := included[row.SpotifyTrackUri]; ok {
+			continue
+		}
+		toShuffle = append(toShuffle, &ArtistTrackToShuffle{
+			row: row,
+		})
+		included[row.SpotifyTrackUri] = struct{}{}
+	}
+
+	for _, row := range fromAlbums {
+		if _, ok := included[row.SpotifyTrackUri]; ok {
+			continue
+		}
+		toShuffle = append(toShuffle, &AlbumTrackToShuffle{
+			row: row,
+		})
+		included[row.SpotifyTrackUri] = struct{}{}
+	}
+
+	for _, track := range fromPlaylists {
+		if _, ok := included[string(track.URI)]; ok {
+			continue
+		}
+		toShuffle = append(toShuffle, &PlaylistTrackToShuffle{
+			track: track,
+		})
+		included[string(track.URI)] = struct{}{}
+	}
+
+	toShuffle = shuffleAndSeparateByArtist(toShuffle)
+	uris := make([]string, 0, len(toShuffle))
+	for _, track := range toShuffle {
+		uris = append(uris, track.trackURI())
+	}
+
+	return uris
+}
+
+type TracksToShuffle = []TrackToShuffle
+
+func shuffleAndSeparateByArtist(tracks []TrackToShuffle) []TrackToShuffle {
+
+	perm := rand.Perm(len(tracks))
+	shuffled := util.DoublyLinkedList[TrackToShuffle]{}
+	for _, v := range perm {
+		shuffled.PushEnd(tracks[v])
+	}
+
+	shuffledAndSeparated := util.DoublyLinkedList[TrackToShuffle]{}
+	prevSize := 0
+	log.Printf("Starting separation (size %d)...", shuffled.Size())
+
+	toAdd := &shuffled
+	for prevSize != toAdd.Size() {
+		log.Printf("Separation pass (%d separated, %d remaining)...", shuffledAndSeparated.Size(), toAdd.Size())
+		prevSize = toAdd.Size()
+		toAddNext := util.DoublyLinkedList[TrackToShuffle]{}
+		for toAdd.Size() > 0 {
+			log.Printf("toAdd size: %d", toAdd.Size())
+			next := toAdd.PopFirst()
+			if last := shuffledAndSeparated.PeekLast(); last == nil || (*next).artistURI() != (*last).artistURI() {
+				log.Printf("Pushing artist %s", (*next).artistURI())
+				shuffledAndSeparated.PushEnd(*next)
+			} else {
+				log.Printf("Artist %s previously pushed, moving %s to the end", (*next).artistURI(), (*next).trackURI())
+				toAddNext.PushEnd(*next)
+			}
+		}
+		toAdd = &toAddNext
+	}
+
+	return shuffledAndSeparated.ToSlice()
 }

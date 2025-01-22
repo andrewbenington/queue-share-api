@@ -9,73 +9,12 @@ import (
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/andrewbenington/queue-share-api/util"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
-
-type Node[T any] struct {
-	Data T
-	Prev *Node[T]
-	Next *Node[T]
-}
-
-func (n *Node[T]) InsertAfter(data T) *Node[T] {
-	newNode := Node[T]{
-		Data: data,
-		Next: n.Next,
-		Prev: n,
-	}
-
-	if n.Next != nil {
-		n.Next.Prev = &newNode
-	}
-
-	n.Next = &newNode
-
-	return &newNode
-}
-
-func (n *Node[T]) InsertBefore(data T) *Node[T] {
-	newNode := Node[T]{
-		Data: data,
-		Next: n,
-		Prev: n.Prev,
-	}
-
-	if n.Prev != nil {
-		n.Prev.Next = &newNode
-	}
-
-	n.Prev = &newNode
-
-	return &newNode
-}
-
-func (this *Node[T]) SwapWithNext() {
-	if this.Next == nil {
-		return
-	}
-
-	afterThis := this.Next
-	beforeThis := this.Prev
-	twoAfterThis := afterThis.Next
-
-	afterThis.Prev = beforeThis
-	afterThis.Next = this
-	this.Prev = afterThis
-	this.Next = twoAfterThis
-
-	if twoAfterThis != nil {
-		twoAfterThis.Prev = this
-	}
-
-	if beforeThis != nil {
-		beforeThis.Next = afterThis
-	}
-
-}
 
 type RankEvent interface {
 	GetTime() time.Time
@@ -135,10 +74,10 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 		return nil, nil
 	}
 
-	nodesByISRC := map[string]*Node[TrackStreams]{}
+	nodesByISRC := map[string]*util.Node[TrackStreams]{}
 	trackIDs := map[string]bool{}
 
-	linkedList := &Node[TrackStreams]{Data: *rankings[0]}
+	linkedList := &util.Node[TrackStreams]{Data: *rankings[0]}
 	nodesByISRC[*rankings[0].ISRC] = linkedList
 	trackIDs[rankings[0].ID] = true
 
@@ -235,10 +174,10 @@ func GetArtistRankEvents(ctx context.Context, tx db.DBTX, userUUID uuid.UUID, fi
 		return nil, nil
 	}
 
-	nodesByID := map[string]*Node[ArtistStreams]{}
+	nodesByID := map[string]*util.Node[ArtistStreams]{}
 	artistIDs := map[string]bool{}
 
-	linkedList := &Node[ArtistStreams]{Data: *rankings[0]}
+	linkedList := &util.Node[ArtistStreams]{Data: *rankings[0]}
 	nodesByID[rankings[0].ID] = linkedList
 	artistIDs[rankings[0].ID] = true
 
@@ -337,10 +276,10 @@ func GetAlbumRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 		return nil, nil
 	}
 
-	nodesByID := map[string]*Node[AlbumStreams]{}
+	nodesByID := map[string]*util.Node[AlbumStreams]{}
 	albumIDs := map[string]bool{}
 
-	linkedList := &Node[AlbumStreams]{Data: *rankings[0]}
+	linkedList := &util.Node[AlbumStreams]{Data: *rankings[0]}
 	nodesByID[rankings[0].ID] = linkedList
 	albumIDs[rankings[0].ID] = true
 

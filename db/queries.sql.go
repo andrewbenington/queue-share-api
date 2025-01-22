@@ -229,6 +229,7 @@ const historyGetAlbumStreams = `-- name: HistoryGetAlbumStreams :many
 WITH SongStreamCounts AS (
     SELECT
         spotify_album_uri,
+        spotify_artist_uri,
         spotify_track_uri,
         COUNT(*) AS stream_count
     FROM
@@ -238,11 +239,13 @@ WITH SongStreamCounts AS (
         AND spotify_album_uri = ANY ($2::text[])
     GROUP BY
         spotify_album_uri,
+        spotify_artist_uri,
         spotify_track_uri
 ),
 RankedStreams AS (
     SELECT
         spotify_album_uri,
+        spotify_artist_uri,
         spotify_track_uri,
         stream_count,
         ROW_NUMBER() OVER (PARTITION BY spotify_album_uri ORDER BY stream_count DESC) AS rank
@@ -251,6 +254,7 @@ RankedStreams AS (
 )
 SELECT
     spotify_album_uri,
+    spotify_artist_uri,
     spotify_track_uri,
     stream_count
 FROM
@@ -268,9 +272,10 @@ type HistoryGetAlbumStreamsParams struct {
 }
 
 type HistoryGetAlbumStreamsRow struct {
-	SpotifyAlbumUri *string `json:"spotify_album_uri"`
-	SpotifyTrackUri string  `json:"spotify_track_uri"`
-	StreamCount     int64   `json:"stream_count"`
+	SpotifyAlbumUri  *string `json:"spotify_album_uri"`
+	SpotifyArtistUri *string `json:"spotify_artist_uri"`
+	SpotifyTrackUri  string  `json:"spotify_track_uri"`
+	StreamCount      int64   `json:"stream_count"`
 }
 
 func (q *Queries) HistoryGetAlbumStreams(ctx context.Context, arg HistoryGetAlbumStreamsParams) ([]*HistoryGetAlbumStreamsRow, error) {
@@ -282,7 +287,12 @@ func (q *Queries) HistoryGetAlbumStreams(ctx context.Context, arg HistoryGetAlbu
 	var items []*HistoryGetAlbumStreamsRow
 	for rows.Next() {
 		var i HistoryGetAlbumStreamsRow
-		if err := rows.Scan(&i.SpotifyAlbumUri, &i.SpotifyTrackUri, &i.StreamCount); err != nil {
+		if err := rows.Scan(
+			&i.SpotifyAlbumUri,
+			&i.SpotifyArtistUri,
+			&i.SpotifyTrackUri,
+			&i.StreamCount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, &i)

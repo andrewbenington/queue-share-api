@@ -493,6 +493,7 @@ ORDER BY
 WITH SongStreamCounts AS (
     SELECT
         spotify_album_uri,
+        spotify_artist_uri,
         spotify_track_uri,
         COUNT(*) AS stream_count
     FROM
@@ -502,11 +503,13 @@ WITH SongStreamCounts AS (
         AND spotify_album_uri = ANY (@album_uris::text[])
     GROUP BY
         spotify_album_uri,
+        spotify_artist_uri,
         spotify_track_uri
 ),
 RankedStreams AS (
     SELECT
         spotify_album_uri,
+        spotify_artist_uri,
         spotify_track_uri,
         stream_count,
         ROW_NUMBER() OVER (PARTITION BY spotify_album_uri ORDER BY stream_count DESC) AS rank
@@ -515,6 +518,7 @@ RankedStreams AS (
 )
 SELECT
     spotify_album_uri,
+    spotify_artist_uri,
     spotify_track_uri,
     stream_count
 FROM

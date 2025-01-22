@@ -3,12 +3,13 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 15.5 (Homebrew)
--- Dumped by pg_dump version 16.2 (Homebrew)
+-- Dumped from database version 16.0 (Debian 16.0-1.pgdg120+1)
+-- Dumped by pg_dump version 17.2 (Homebrew)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -211,7 +212,7 @@ CREATE TABLE public.spotify_history (
     platform character varying NOT NULL,
     ms_played integer NOT NULL,
     conn_country character varying NOT NULL,
-    ip_addr character varying(15),
+    ip_addr character varying,
     user_agent character varying,
     track_name character varying NOT NULL,
     artist_name character varying NOT NULL,
@@ -525,6 +526,20 @@ ALTER TABLE ONLY public.user_passwords
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: track_cache_isrc_idx; Type: INDEX; Schema: public; Owner: queue_share
+--
+
+CREATE INDEX track_cache_isrc_idx ON public.spotify_track_cache USING btree (isrc);
+
+
+--
+-- Name: track_cache_uri_idx; Type: INDEX; Schema: public; Owner: queue_share
+--
+
+CREATE INDEX track_cache_uri_idx ON public.spotify_track_cache USING btree (uri);
 
 
 --
