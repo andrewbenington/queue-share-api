@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/config"
@@ -40,13 +39,13 @@ func (d *DBService) Initialize() error {
 	cfg.MaxConnIdleTime = time.Minute * 5
 	cfg.BeforeAcquire = func(ctx context.Context, c *pgx.Conn) bool {
 		d.usedConnCount++
-		log.Printf("Pool usage: %d/30", d.usedConnCount)
+		// log.Printf("Pool usage: %d/30", d.usedConnCount)
 		return true
 	}
 
 	cfg.AfterRelease = func(c *pgx.Conn) bool {
 		d.usedConnCount--
-		log.Printf("Pool usage: %d/30", d.usedConnCount)
+		// log.Printf("Pool usage: %d/30", d.usedConnCount)
 		return true
 	}
 

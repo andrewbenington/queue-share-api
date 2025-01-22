@@ -137,8 +137,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND (sqlc.narg(start_date)::timestamp IS NULL
         OR sqlc.narg(end_date)::timestamp IS NULL
         OR timestamp BETWEEN sqlc.narg(start_date)::timestamp AND sqlc.narg(end_date)::timestamp)
@@ -164,8 +162,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND h.spotify_track_uri = tc2.uri
 ORDER BY
     timestamp ASC;
@@ -184,8 +180,6 @@ FROM
     JOIN SPOTIFY_TRACK_CACHE tc ON sh.spotify_track_uri = tc.uri
         AND user_id = @user_id
         AND ms_played >= @min_ms_played
-        AND (skipped != TRUE
-            OR @include_skips::boolean)
         AND spotify_artist_uri = @uri
     ORDER BY
         timestamp ASC;
@@ -205,8 +199,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND spotify_album_uri = @uri
 ORDER BY
     timestamp ASC;
@@ -229,8 +221,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND timestamp BETWEEN (@year::int || '-01-01 00:00:00')::timestamp AND (cast(((@year::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     artist_name
@@ -247,8 +237,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND timestamp BETWEEN (@year::int || '-01-01 00:00:00')::timestamp AND (cast(((@year::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     album_name
@@ -265,8 +253,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND timestamp BETWEEN (@year::int || '-01-01 00:00:00')::timestamp AND (cast(((@year::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     track_name
@@ -283,8 +269,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND timestamp BETWEEN @start_date::timestamp AND @end_date::timestamp
     AND (sqlc.narg(artist_uris)::text[] IS NULL
         OR spotify_artist_uri = ANY (sqlc.narg(artist_uris)::text[]))
@@ -308,8 +292,6 @@ WITH top_isrcs AS (
     WHERE
         user_id = @user_id
         AND ms_played >= @min_ms_played
-        AND (skipped != TRUE
-            OR @include_skips::boolean)
         AND timestamp BETWEEN @start_date::timestamp AND @end_date::timestamp
         AND (sqlc.narg(artist_uris)::text[] IS NULL
             OR spotify_artist_uri = ANY (sqlc.narg(artist_uris)::text[]))
@@ -359,8 +341,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND timestamp BETWEEN @start_date::timestamp AND @end_date::timestamp
 GROUP BY
     spotify_artist_uri
@@ -378,8 +358,6 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
-    AND (skipped != TRUE
-        OR @include_skips::boolean)
     AND timestamp BETWEEN @start_date::timestamp AND @end_date::timestamp
     AND (sqlc.narg(artist_uri)::text IS NULL
         OR spotify_artist_uri = sqlc.narg(artist_uri)::text)

@@ -61,7 +61,6 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	eventsStart := filter.Start
 	eventsEnd := filter.End
 	filter.Max = 50
-	filter.IncludeSkipped = false
 	filter.End = filter.Start
 	filter.Start = &time.Time{}
 
@@ -104,12 +103,11 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	}
 
 	allStreams, err := db.New(transaction).HistoryGetAll(ctx, db.HistoryGetAllParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    eventsStart,
-		EndDate:      eventsEnd,
-		MaxCount:     20000,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		StartDate:   eventsStart,
+		EndDate:     eventsEnd,
+		MaxCount:    20000,
 	})
 
 	rankEvents := []TrackRankEvent{}
@@ -163,7 +161,6 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 func GetArtistRankEvents(ctx context.Context, tx db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]ArtistRankEvent, error) {
 	filter.ensureStartAndEnd()
 	filter.Max = 50
-	filter.IncludeSkipped = false
 
 	_, _, rankings, err := CalcArtistStreamsAndRanks(ctx, userUUID, filter, tx, time.Unix(0, 0), *filter.Start, nil, nil)
 	if err != nil {
@@ -201,12 +198,11 @@ func GetArtistRankEvents(ctx context.Context, tx db.DBTX, userUUID uuid.UUID, fi
 	}
 
 	allStreams, err := db.New(tx).HistoryGetAll(ctx, db.HistoryGetAllParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    filter.Start,
-		EndDate:      filter.End,
-		MaxCount:     20000,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		StartDate:   filter.Start,
+		EndDate:     filter.End,
+		MaxCount:    20000,
 	})
 
 	rankEvents := []ArtistRankEvent{}
@@ -265,7 +261,6 @@ func GetArtistRankEvents(ctx context.Context, tx db.DBTX, userUUID uuid.UUID, fi
 func GetAlbumRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams) ([]AlbumRankEvent, error) {
 	filter.ensureStartAndEnd()
 	filter.Max = 50
-	filter.IncludeSkipped = false
 
 	_, _, rankings, err := CalcAlbumStreamsAndRanks(ctx, userUUID, filter, transaction, time.Unix(0, 0), *filter.Start, nil, nil)
 	if err != nil {
@@ -303,12 +298,11 @@ func GetAlbumRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	}
 
 	allStreams, err := db.New(transaction).HistoryGetAll(ctx, db.HistoryGetAllParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    filter.Start,
-		EndDate:      filter.End,
-		MaxCount:     20000,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		StartDate:   filter.Start,
+		EndDate:     filter.End,
+		MaxCount:    20000,
 	})
 
 	rankEvents := []AlbumRankEvent{}

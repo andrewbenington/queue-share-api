@@ -143,6 +143,7 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 			fmt.Println("skipping track with no name")
 			continue
 		}
+		log.Printf("inserting %s into history at %s", entry.TrackName, entry.Timestamp)
 
 		params.UserIds = append(params.UserIds, entry.UserID)
 		params.Timestamp = append(params.Timestamp, entry.Timestamp)
@@ -246,14 +247,13 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 }
 
 type FilterParams struct {
-	MinMSPlayed    int32
-	IncludeSkipped bool
-	Max            int32
-	ArtistURIs     []string
-	AlbumURI       *string
-	Timeframe      Timeframe
-	Start          *time.Time
-	End            *time.Time
+	MinMSPlayed int32
+	Max         int32
+	ArtistURIs  []string
+	AlbumURI    *string
+	Timeframe   Timeframe
+	Start       *time.Time
+	End         *time.Time
 }
 
 func (f *FilterParams) ensureMinimum() {
@@ -299,10 +299,9 @@ func AllTrackStreamsByURI(ctx context.Context, transaction db.DBTX, userUUID uui
 	filter.ensureMinimum()
 
 	return db.New(transaction).HistoryGetByTrackURI(ctx, db.HistoryGetByTrackURIParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		URI:          uri,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		URI:         uri,
 	})
 }
 
@@ -310,10 +309,9 @@ func AllArtistStreamsByURI(ctx context.Context, transaction db.DBTX, userUUID uu
 	filter.ensureMinimum()
 
 	return db.New(transaction).HistoryGetByArtistURI(ctx, db.HistoryGetByArtistURIParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		URI:          &uri,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		URI:         &uri,
 	})
 }
 
@@ -321,10 +319,9 @@ func AllAlbumStreamsByURI(ctx context.Context, transaction db.DBTX, userUUID uui
 	filter.ensureMinimum()
 
 	return db.New(transaction).HistoryGetByAlbumURI(ctx, db.HistoryGetByAlbumURIParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		URI:          &uri,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		URI:         &uri,
 	})
 }
 
@@ -360,14 +357,13 @@ func CalcTrackStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 	// 	rows = cachedRows
 	// } else {
 	rows, err = db.New(transaction).HistoryGetTopTracksInTimeframeDedup(ctx, db.HistoryGetTopTracksInTimeframeDedupParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    filter.Start.UTC(),
-		EndDate:      filter.End.UTC(),
-		MaxTracks:    filter.Max + 20,
-		ArtistUris:   filter.ArtistURIs,
-		AlbumURI:     filter.AlbumURI,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		StartDate:   filter.Start.UTC(),
+		EndDate:     filter.End.UTC(),
+		MaxTracks:   filter.Max + 20,
+		ArtistUris:  filter.ArtistURIs,
+		AlbumURI:    filter.AlbumURI,
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -440,12 +436,11 @@ func CalcAlbumStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter Fi
 	// 	rows = cachedRows
 	// } else {
 	rows, err = db.New(transaction).HistoryGetTopAlbumsInTimeframe(ctx, db.HistoryGetTopAlbumsInTimeframeParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    start.UTC(),
-		EndDate:      end.UTC(),
-		Max:          filter.Max + 20,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		StartDate:   start.UTC(),
+		EndDate:     end.UTC(),
+		Max:         filter.Max + 20,
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -520,12 +515,11 @@ func CalcArtistStreamsAndRanks(ctx context.Context, userUUID uuid.UUID, filter F
 	var rows []*db.HistoryGetTopArtistsInTimeframeRow
 
 	rows, err = db.New(tx).HistoryGetTopArtistsInTimeframe(ctx, db.HistoryGetTopArtistsInTimeframeParams{
-		UserID:       userUUID,
-		MinMsPlayed:  filter.MinMSPlayed,
-		IncludeSkips: filter.IncludeSkipped,
-		StartDate:    start.UTC(),
-		EndDate:      end.UTC(),
-		Max:          filter.Max + 20,
+		UserID:      userUUID,
+		MinMsPlayed: filter.MinMSPlayed,
+		StartDate:   start.UTC(),
+		EndDate:     end.UTC(),
+		Max:         filter.Max + 20,
 	})
 	if err != nil {
 		return nil, nil, nil, err
@@ -856,10 +850,9 @@ func AlbumStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID u
 
 	for year := minYear; year <= maxYear; year++ {
 		rows, err := db.New(transaction).HistoryGetAlbumStreamCountByYear(ctx, db.HistoryGetAlbumStreamCountByYearParams{
-			UserID:       userUUID,
-			MinMsPlayed:  filter.MinMSPlayed,
-			IncludeSkips: filter.IncludeSkipped,
-			Year:         int32(year),
+			UserID:      userUUID,
+			MinMsPlayed: filter.MinMSPlayed,
+			Year:        int32(year),
 		})
 
 		if err != nil {
@@ -889,10 +882,9 @@ func ArtistStreamCountByYear(ctx context.Context, transaction db.DBTX, userUUID 
 
 	for year := minYear; year <= maxYear; year++ {
 		rows, err := db.New(transaction).HistoryGetArtistStreamCountByYear(ctx, db.HistoryGetArtistStreamCountByYearParams{
-			UserID:       userUUID,
-			MinMsPlayed:  filter.MinMSPlayed,
-			IncludeSkips: filter.IncludeSkipped,
-			Year:         int32(year),
+			UserID:      userUUID,
+			MinMsPlayed: filter.MinMSPlayed,
+			Year:        int32(year),
 		})
 
 		if err != nil {

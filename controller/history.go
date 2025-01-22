@@ -68,9 +68,6 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 		limit = DEFAULT_LIMIT
 	}
 
-	includeSkippedParam := r.URL.Query().Get("include_skipped")
-	includeSkipped := strings.EqualFold(includeSkippedParam, "true")
-
 	tx, err := db.Service().BeginTx(r.Context())
 	if err != nil {
 		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
@@ -79,10 +76,9 @@ func (c *StatsController) GetAllHistory(w http.ResponseWriter, r *http.Request) 
 	defer tx.Commit(ctx)
 
 	rows, err := db.New(tx).HistoryGetAll(ctx, db.HistoryGetAllParams{
-		UserID:       userUUID,
-		MinMsPlayed:  int32(minMSPlayed),
-		IncludeSkips: includeSkipped,
-		MaxCount:     int32(limit)})
+		UserID:      userUUID,
+		MinMsPlayed: int32(minMSPlayed),
+		MaxCount:    int32(limit)})
 	if err != nil {
 		requests.RespondWithDBError(w, err)
 		return
@@ -262,9 +258,6 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		minMSPlayed = DEFAULT_MIN_MS_FILTER
 	}
 
-	includeSkippedParam := r.URL.Query().Get("include_skipped")
-	includeSkipped := strings.EqualFold(includeSkippedParam, "true")
-
 	maxParam := r.URL.Query().Get("max")
 	max, err := strconv.Atoi(maxParam)
 	if err != nil {
@@ -305,13 +298,12 @@ func getFilterParams(r *http.Request) history.FilterParams {
 	}
 
 	return history.FilterParams{
-		MinMSPlayed:    int32(minMSPlayed),
-		IncludeSkipped: includeSkipped,
-		Max:            int32(max),
-		ArtistURIs:     artistURIs,
-		AlbumURI:       albumURI,
-		Start:          &start,
-		End:            &end,
-		Timeframe:      timeframe,
+		MinMSPlayed: int32(minMSPlayed),
+		Max:         int32(max),
+		ArtistURIs:  artistURIs,
+		AlbumURI:    albumURI,
+		Start:       &start,
+		End:         &end,
+		Timeframe:   timeframe,
 	}
 }

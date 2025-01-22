@@ -178,9 +178,7 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND timestamp BETWEEN ($4::int || '-01-01 00:00:00')::timestamp AND (cast((($4::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
+    AND timestamp BETWEEN ($3::int || '-01-01 00:00:00')::timestamp AND (cast((($3::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     album_name
 ORDER BY
@@ -189,10 +187,9 @@ LIMIT 35
 `
 
 type HistoryGetAlbumStreamCountByYearParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	Year         int32     `json:"year"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	Year        int32     `json:"year"`
 }
 
 type HistoryGetAlbumStreamCountByYearRow struct {
@@ -201,12 +198,7 @@ type HistoryGetAlbumStreamCountByYearRow struct {
 }
 
 func (q *Queries) HistoryGetAlbumStreamCountByYear(ctx context.Context, arg HistoryGetAlbumStreamCountByYearParams) ([]*HistoryGetAlbumStreamCountByYearRow, error) {
-	rows, err := q.db.Query(ctx, historyGetAlbumStreamCountByYear,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-		arg.Year,
-	)
+	rows, err := q.db.Query(ctx, historyGetAlbumStreamCountByYear, arg.UserID, arg.MinMsPlayed, arg.Year)
 	if err != nil {
 		return nil, err
 	}
@@ -322,23 +314,20 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND ($4::timestamp IS NULL
-        OR $5::timestamp IS NULL
-        OR timestamp BETWEEN $4::timestamp AND $5::timestamp)
+    AND ($3::timestamp IS NULL
+        OR $4::timestamp IS NULL
+        OR timestamp BETWEEN $3::timestamp AND $4::timestamp)
 ORDER BY
     timestamp DESC
-LIMIT $6
+LIMIT $5
 `
 
 type HistoryGetAllParams struct {
-	UserID       uuid.UUID  `json:"user_id"`
-	MinMsPlayed  int32      `json:"min_ms_played"`
-	IncludeSkips bool       `json:"include_skips"`
-	StartDate    *time.Time `json:"start_date"`
-	EndDate      *time.Time `json:"end_date"`
-	MaxCount     int32      `json:"max_count"`
+	UserID      uuid.UUID  `json:"user_id"`
+	MinMsPlayed int32      `json:"min_ms_played"`
+	StartDate   *time.Time `json:"start_date"`
+	EndDate     *time.Time `json:"end_date"`
+	MaxCount    int32      `json:"max_count"`
 }
 
 type HistoryGetAllRow struct {
@@ -359,7 +348,6 @@ func (q *Queries) HistoryGetAll(ctx context.Context, arg HistoryGetAllParams) ([
 	rows, err := q.db.Query(ctx, historyGetAll,
 		arg.UserID,
 		arg.MinMsPlayed,
-		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
 		arg.MaxCount,
@@ -403,9 +391,7 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND timestamp BETWEEN ($4::int || '-01-01 00:00:00')::timestamp AND (cast((($4::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
+    AND timestamp BETWEEN ($3::int || '-01-01 00:00:00')::timestamp AND (cast((($3::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     artist_name
 ORDER BY
@@ -414,10 +400,9 @@ LIMIT 35
 `
 
 type HistoryGetArtistStreamCountByYearParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	Year         int32     `json:"year"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	Year        int32     `json:"year"`
 }
 
 type HistoryGetArtistStreamCountByYearRow struct {
@@ -426,12 +411,7 @@ type HistoryGetArtistStreamCountByYearRow struct {
 }
 
 func (q *Queries) HistoryGetArtistStreamCountByYear(ctx context.Context, arg HistoryGetArtistStreamCountByYearParams) ([]*HistoryGetArtistStreamCountByYearRow, error) {
-	rows, err := q.db.Query(ctx, historyGetArtistStreamCountByYear,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-		arg.Year,
-	)
+	rows, err := q.db.Query(ctx, historyGetArtistStreamCountByYear, arg.UserID, arg.MinMsPlayed, arg.Year)
 	if err != nil {
 		return nil, err
 	}
@@ -465,18 +445,15 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND spotify_album_uri = $4
+    AND spotify_album_uri = $3
 ORDER BY
     timestamp ASC
 `
 
 type HistoryGetByAlbumURIParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	URI          *string   `json:"uri"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	URI         *string   `json:"uri"`
 }
 
 type HistoryGetByAlbumURIRow struct {
@@ -491,12 +468,7 @@ type HistoryGetByAlbumURIRow struct {
 }
 
 func (q *Queries) HistoryGetByAlbumURI(ctx context.Context, arg HistoryGetByAlbumURIParams) ([]*HistoryGetByAlbumURIRow, error) {
-	rows, err := q.db.Query(ctx, historyGetByAlbumURI,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-		arg.URI,
-	)
+	rows, err := q.db.Query(ctx, historyGetByAlbumURI, arg.UserID, arg.MinMsPlayed, arg.URI)
 	if err != nil {
 		return nil, err
 	}
@@ -538,18 +510,15 @@ FROM
     JOIN SPOTIFY_TRACK_CACHE tc ON sh.spotify_track_uri = tc.uri
         AND user_id = $1
         AND ms_played >= $2
-        AND (skipped != TRUE
-            OR $3::boolean)
-        AND spotify_artist_uri = $4
+        AND spotify_artist_uri = $3
     ORDER BY
         timestamp ASC
 `
 
 type HistoryGetByArtistURIParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	URI          *string   `json:"uri"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	URI         *string   `json:"uri"`
 }
 
 type HistoryGetByArtistURIRow struct {
@@ -563,12 +532,7 @@ type HistoryGetByArtistURIRow struct {
 }
 
 func (q *Queries) HistoryGetByArtistURI(ctx context.Context, arg HistoryGetByArtistURIParams) ([]*HistoryGetByArtistURIRow, error) {
-	rows, err := q.db.Query(ctx, historyGetByArtistURI,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-		arg.URI,
-	)
+	rows, err := q.db.Query(ctx, historyGetByArtistURI, arg.UserID, arg.MinMsPlayed, arg.URI)
 	if err != nil {
 		return nil, err
 	}
@@ -613,18 +577,15 @@ FROM
 WHERE
     user_id = $2
     AND ms_played >= $3
-    AND (skipped != TRUE
-        OR $4::boolean)
     AND h.spotify_track_uri = tc2.uri
 ORDER BY
     timestamp ASC
 `
 
 type HistoryGetByTrackURIParams struct {
-	URI          string    `json:"uri"`
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
+	URI         string    `json:"uri"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
 }
 
 type HistoryGetByTrackURIRow struct {
@@ -640,12 +601,7 @@ type HistoryGetByTrackURIRow struct {
 }
 
 func (q *Queries) HistoryGetByTrackURI(ctx context.Context, arg HistoryGetByTrackURIParams) ([]*HistoryGetByTrackURIRow, error) {
-	rows, err := q.db.Query(ctx, historyGetByTrackURI,
-		arg.URI,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-	)
+	rows, err := q.db.Query(ctx, historyGetByTrackURI, arg.URI, arg.UserID, arg.MinMsPlayed)
 	if err != nil {
 		return nil, err
 	}
@@ -849,26 +805,23 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND timestamp BETWEEN $4::timestamp AND $5::timestamp
-    AND ($6::text IS NULL
-        OR spotify_artist_uri = $6::text)
+    AND timestamp BETWEEN $3::timestamp AND $4::timestamp
+    AND ($5::text IS NULL
+        OR spotify_artist_uri = $5::text)
 GROUP BY
     spotify_album_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT $7
+LIMIT $6
 `
 
 type HistoryGetTopAlbumsInTimeframeParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	ArtistURI    *string   `json:"artist_uri"`
-	Max          int32     `json:"max"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	StartDate   time.Time `json:"start_date"`
+	EndDate     time.Time `json:"end_date"`
+	ArtistURI   *string   `json:"artist_uri"`
+	Max         int32     `json:"max"`
 }
 
 type HistoryGetTopAlbumsInTimeframeRow struct {
@@ -881,7 +834,6 @@ func (q *Queries) HistoryGetTopAlbumsInTimeframe(ctx context.Context, arg Histor
 	rows, err := q.db.Query(ctx, historyGetTopAlbumsInTimeframe,
 		arg.UserID,
 		arg.MinMsPlayed,
-		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
 		arg.ArtistURI,
@@ -956,23 +908,20 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND timestamp BETWEEN $4::timestamp AND $5::timestamp
+    AND timestamp BETWEEN $3::timestamp AND $4::timestamp
 GROUP BY
     spotify_artist_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT $6
+LIMIT $5
 `
 
 type HistoryGetTopArtistsInTimeframeParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	Max          int32     `json:"max"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	StartDate   time.Time `json:"start_date"`
+	EndDate     time.Time `json:"end_date"`
+	Max         int32     `json:"max"`
 }
 
 type HistoryGetTopArtistsInTimeframeRow struct {
@@ -985,7 +934,6 @@ func (q *Queries) HistoryGetTopArtistsInTimeframe(ctx context.Context, arg Histo
 	rows, err := q.db.Query(ctx, historyGetTopArtistsInTimeframe,
 		arg.UserID,
 		arg.MinMsPlayed,
-		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
 		arg.Max,
@@ -1017,29 +965,26 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND timestamp BETWEEN $4::timestamp AND $5::timestamp
-    AND ($6::text[] IS NULL
-        OR spotify_artist_uri = ANY ($6::text[]))
-    AND ($7::text IS NULL
-        OR spotify_album_uri = $7::text)
+    AND timestamp BETWEEN $3::timestamp AND $4::timestamp
+    AND ($5::text[] IS NULL
+        OR spotify_artist_uri = ANY ($5::text[]))
+    AND ($6::text IS NULL
+        OR spotify_album_uri = $6::text)
 GROUP BY
     spotify_track_uri
 ORDER BY
     COUNT(*) DESC
-LIMIT $8
+LIMIT $7
 `
 
 type HistoryGetTopTracksInTimeframeParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	ArtistUris   []string  `json:"artist_uris"`
-	AlbumURI     *string   `json:"album_uri"`
-	MaxTracks    int32     `json:"max_tracks"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	StartDate   time.Time `json:"start_date"`
+	EndDate     time.Time `json:"end_date"`
+	ArtistUris  []string  `json:"artist_uris"`
+	AlbumURI    *string   `json:"album_uri"`
+	MaxTracks   int32     `json:"max_tracks"`
 }
 
 type HistoryGetTopTracksInTimeframeRow struct {
@@ -1051,7 +996,6 @@ func (q *Queries) HistoryGetTopTracksInTimeframe(ctx context.Context, arg Histor
 	rows, err := q.db.Query(ctx, historyGetTopTracksInTimeframe,
 		arg.UserID,
 		arg.MinMsPlayed,
-		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
 		arg.ArtistUris,
@@ -1088,18 +1032,16 @@ WITH top_isrcs AS (
     WHERE
         user_id = $1
         AND ms_played >= $2
-        AND (skipped != TRUE
-            OR $3::boolean)
-        AND timestamp BETWEEN $4::timestamp AND $5::timestamp
-        AND ($6::text[] IS NULL
-            OR spotify_artist_uri = ANY ($6::text[]))
-        AND ($7::text IS NULL
-            OR h.spotify_album_uri = $7::text)
+        AND timestamp BETWEEN $3::timestamp AND $4::timestamp
+        AND ($5::text[] IS NULL
+            OR spotify_artist_uri = ANY ($5::text[]))
+        AND ($6::text IS NULL
+            OR h.spotify_album_uri = $6::text)
     GROUP BY
         tc.isrc
     ORDER BY
         COUNT(*) DESC
-    LIMIT $8
+    LIMIT $7
 ),
 pref_albums AS (
     SELECT DISTINCT ON (top_isrcs.isrc)
@@ -1131,14 +1073,13 @@ ORDER BY
 `
 
 type HistoryGetTopTracksInTimeframeDedupParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	ArtistUris   []string  `json:"artist_uris"`
-	AlbumURI     *string   `json:"album_uri"`
-	MaxTracks    int32     `json:"max_tracks"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	StartDate   time.Time `json:"start_date"`
+	EndDate     time.Time `json:"end_date"`
+	ArtistUris  []string  `json:"artist_uris"`
+	AlbumURI    *string   `json:"album_uri"`
+	MaxTracks   int32     `json:"max_tracks"`
 }
 
 type HistoryGetTopTracksInTimeframeDedupRow struct {
@@ -1152,7 +1093,6 @@ func (q *Queries) HistoryGetTopTracksInTimeframeDedup(ctx context.Context, arg H
 	rows, err := q.db.Query(ctx, historyGetTopTracksInTimeframeDedup,
 		arg.UserID,
 		arg.MinMsPlayed,
-		arg.IncludeSkips,
 		arg.StartDate,
 		arg.EndDate,
 		arg.ArtistUris,
@@ -1272,9 +1212,7 @@ FROM
 WHERE
     user_id = $1
     AND ms_played >= $2
-    AND (skipped != TRUE
-        OR $3::boolean)
-    AND timestamp BETWEEN ($4::int || '-01-01 00:00:00')::timestamp AND (cast((($4::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
+    AND timestamp BETWEEN ($3::int || '-01-01 00:00:00')::timestamp AND (cast((($3::int) + 1) AS text) || '-01-01 00:00:00')::timestamp
 GROUP BY
     track_name
 ORDER BY
@@ -1283,10 +1221,9 @@ LIMIT 35
 `
 
 type HistoryGetTrackStreamCountByYearParams struct {
-	UserID       uuid.UUID `json:"user_id"`
-	MinMsPlayed  int32     `json:"min_ms_played"`
-	IncludeSkips bool      `json:"include_skips"`
-	Year         int32     `json:"year"`
+	UserID      uuid.UUID `json:"user_id"`
+	MinMsPlayed int32     `json:"min_ms_played"`
+	Year        int32     `json:"year"`
 }
 
 type HistoryGetTrackStreamCountByYearRow struct {
@@ -1295,12 +1232,7 @@ type HistoryGetTrackStreamCountByYearRow struct {
 }
 
 func (q *Queries) HistoryGetTrackStreamCountByYear(ctx context.Context, arg HistoryGetTrackStreamCountByYearParams) ([]*HistoryGetTrackStreamCountByYearRow, error) {
-	rows, err := q.db.Query(ctx, historyGetTrackStreamCountByYear,
-		arg.UserID,
-		arg.MinMsPlayed,
-		arg.IncludeSkips,
-		arg.Year,
-	)
+	rows, err := q.db.Query(ctx, historyGetTrackStreamCountByYear, arg.UserID, arg.MinMsPlayed, arg.Year)
 	if err != nil {
 		return nil, err
 	}
