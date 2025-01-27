@@ -33,11 +33,11 @@ func (e *TrackRankEvent) GetTime() time.Time {
 }
 
 type ArtistRankEvent struct {
-	Artist    *spotify.FullArtist `json:"artist"`
-	Rank      int64               `json:"rank"`
-	Streams   int64               `json:"streams"`
-	Surpassed []ArtistRankEvent   `json:"surpassed"`
-	DateUnix  int64               `json:"date_unix"`
+	Artist    *db.ArtistData    `json:"artist"`
+	Rank      int64             `json:"rank"`
+	Streams   int64             `json:"streams"`
+	Surpassed []ArtistRankEvent `json:"surpassed"`
+	DateUnix  int64             `json:"date_unix"`
 }
 
 func (e *ArtistRankEvent) GetTime() time.Time {

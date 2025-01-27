@@ -72,6 +72,14 @@ VALUES (
 ON CONFLICT
     DO NOTHING;
 
+-- name: AlbumCacheGetByID :many
+SELECT
+    *
+FROM
+    SPOTIFY_ALBUM_CACHE
+WHERE
+    id = ANY (@album_ids::text[]);
+
 -- name: AlbumCacheInsertBulk :exec
 INSERT INTO SPOTIFY_ALBUM_CACHE(
     id,
@@ -117,7 +125,23 @@ VALUES (
 ON CONFLICT
     DO NOTHING;
 
--- name: ArtistCacheInsertBulk :exec
+-- name: ArtistCacheGetPresentIDs :many
+SELECT
+    id
+FROM
+    SPOTIFY_ARTIST_CACHE
+WHERE
+    id = ANY (@artist_ids::text[]);
+
+-- name: ArtistCacheGetByID :many
+SELECT
+    *
+FROM
+    SPOTIFY_ARTIST_CACHE
+WHERE
+    id = ANY (@artist_ids::text[]);
+
+-- name: ArtistCacheInsertBulk :copyfrom
 INSERT INTO SPOTIFY_ARTIST_CACHE(
     id,
     uri,
@@ -127,22 +151,43 @@ INSERT INTO SPOTIFY_ARTIST_CACHE(
     popularity,
     follower_count)
 VALUES (
-    unnest(
-        @id ::text[]),
-    unnest(
-        @uri ::text[]),
-    unnest(
-        @name ::text[]),
-    unnest(
-        @image_url ::text[]),
-    unnest(
-        @genres ::jsonb[]),
-    unnest(
-        @popularity ::int[]),
-    unnest(
-        @follower_count ::int[]))
-ON CONFLICT
-    DO NOTHING;
+    @id,
+    @uri,
+    @name,
+    @image_url,
+    @genres,
+    @popularity,
+    @follower_count);
+
+-- name: ArtistCacheInsertOne :exec
+INSERT INTO SPOTIFY_ARTIST_CACHE(
+    id,
+    uri,
+    name,
+    image_url,
+    genres,
+    popularity,
+    follower_count)
+VALUES (
+    @id,
+    @uri,
+    @name,
+    @image_url,
+    @genres,
+    @popularity,
+    @follower_count);
+
+-- name: ArtistCacheUpdateOne :exec
+UPDATE
+    SPOTIFY_ARTIST_CACHE
+SET
+    name = @name,
+    image_url = @image_url,
+    genres = @genres,
+    popularity = @popularity,
+    follower_count = @follower_count
+WHERE
+    id = @id;
 
 -- name: TracksGetPrimaryURIs :many
 WITH top_isrcs AS (

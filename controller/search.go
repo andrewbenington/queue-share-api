@@ -8,12 +8,10 @@ import (
 
 	"github.com/andrewbenington/queue-share-api/auth"
 	"github.com/andrewbenington/queue-share-api/client"
-	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/zmb3/spotify/v2"
 )
 
 var (
@@ -172,10 +170,7 @@ func (c *Controller) GetArtistsByURIs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	artistData := lo.MapEntries(artists, func(k string, v spotify.FullArtist) (string, db.ArtistData) {
-		return k, service.ArtistDataFromFullArtist(v)
-	})
-	json.NewEncoder(w).Encode(artistData)
+	json.NewEncoder(w).Encode(artists)
 }
 
 func (c *Controller) GetTracksByURIs(w http.ResponseWriter, r *http.Request) {

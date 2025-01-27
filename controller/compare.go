@@ -145,7 +145,7 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 type CompareArtistsResp struct {
 	StreamsByURI  map[string]map[uuid.UUID]int64         `json:"streams_by_uri"`
 	RanksByURI    map[string]map[uuid.UUID]int64         `json:"ranks_by_uri"`
-	ArtistData    map[string]spotify.FullArtist          `json:"artist_data"`
+	ArtistData    map[string]db.ArtistData               `json:"artist_data"`
 	FriendData    map[uuid.UUID]*db.User                 `json:"friend_data"`
 	FriendStreams map[uuid.UUID][]*history.ArtistStreams `json:"friend_streams"`
 }

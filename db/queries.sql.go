@@ -13,6 +13,49 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const albumCacheGetByID = `-- name: AlbumCacheGetByID :many
+SELECT
+    id, uri, name, artist_id, artist_uri, artist_name, album_group, album_type, image_url, release_date, release_date_precision, genres, popularity
+FROM
+    SPOTIFY_ALBUM_CACHE
+WHERE
+    id = ANY ($1::text[])
+`
+
+func (q *Queries) AlbumCacheGetByID(ctx context.Context, albumIds []string) ([]*AlbumData, error) {
+	rows, err := q.db.Query(ctx, albumCacheGetByID, albumIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*AlbumData
+	for rows.Next() {
+		var i AlbumData
+		if err := rows.Scan(
+			&i.ID,
+			&i.URI,
+			&i.Name,
+			&i.ArtistID,
+			&i.ArtistURI,
+			&i.ArtistName,
+			&i.AlbumGroup,
+			&i.AlbumType,
+			&i.ImageUrl,
+			&i.ReleaseDate,
+			&i.ReleaseDatePrecision,
+			&i.Genres,
+			&i.Popularity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const albumCacheInsertBulk = `-- name: AlbumCacheInsertBulk :exec
 INSERT INTO SPOTIFY_ALBUM_CACHE(
     id,
@@ -94,7 +137,83 @@ func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsert
 	return err
 }
 
-const artistCacheInsertBulk = `-- name: ArtistCacheInsertBulk :exec
+const artistCacheGetByID = `-- name: ArtistCacheGetByID :many
+SELECT
+    id, uri, name, image_url, genres, popularity, follower_count
+FROM
+    SPOTIFY_ARTIST_CACHE
+WHERE
+    id = ANY ($1::text[])
+`
+
+func (q *Queries) ArtistCacheGetByID(ctx context.Context, artistIds []string) ([]*ArtistData, error) {
+	rows, err := q.db.Query(ctx, artistCacheGetByID, artistIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*ArtistData
+	for rows.Next() {
+		var i ArtistData
+		if err := rows.Scan(
+			&i.ID,
+			&i.URI,
+			&i.Name,
+			&i.ImageUrl,
+			&i.Genres,
+			&i.Popularity,
+			&i.FollowerCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const artistCacheGetPresentIDs = `-- name: ArtistCacheGetPresentIDs :many
+SELECT
+    id
+FROM
+    SPOTIFY_ARTIST_CACHE
+WHERE
+    id = ANY ($1::text[])
+`
+
+func (q *Queries) ArtistCacheGetPresentIDs(ctx context.Context, artistIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, artistCacheGetPresentIDs, artistIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+type ArtistCacheInsertBulkParams struct {
+	ID            string   `json:"id"`
+	URI           string   `json:"uri"`
+	Name          string   `json:"name"`
+	ImageUrl      *string  `json:"image_url"`
+	Genres        []string `json:"genres"`
+	Popularity    *int32   `json:"popularity"`
+	FollowerCount *int32   `json:"follower_count"`
+}
+
+const artistCacheInsertOne = `-- name: ArtistCacheInsertOne :exec
 INSERT INTO SPOTIFY_ARTIST_CACHE(
     id,
     uri,
@@ -104,36 +223,27 @@ INSERT INTO SPOTIFY_ARTIST_CACHE(
     popularity,
     follower_count)
 VALUES (
-    unnest(
-        $1 ::text[]),
-    unnest(
-        $2 ::text[]),
-    unnest(
-        $3 ::text[]),
-    unnest(
-        $4 ::text[]),
-    unnest(
-        $5 ::jsonb[]),
-    unnest(
-        $6 ::int[]),
-    unnest(
-        $7 ::int[]))
-ON CONFLICT
-    DO NOTHING
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7)
 `
 
-type ArtistCacheInsertBulkParams struct {
-	ID            []string `json:"id"`
-	URI           []string `json:"uri"`
-	Name          []string `json:"name"`
-	ImageUrl      []string `json:"image_url"`
-	Genres        [][]byte `json:"genres"`
-	Popularity    []int32  `json:"popularity"`
-	FollowerCount []int32  `json:"follower_count"`
+type ArtistCacheInsertOneParams struct {
+	ID            string   `json:"id"`
+	URI           string   `json:"uri"`
+	Name          string   `json:"name"`
+	ImageUrl      *string  `json:"image_url"`
+	Genres        []string `json:"genres"`
+	Popularity    *int32   `json:"popularity"`
+	FollowerCount *int32   `json:"follower_count"`
 }
 
-func (q *Queries) ArtistCacheInsertBulk(ctx context.Context, arg ArtistCacheInsertBulkParams) error {
-	_, err := q.db.Exec(ctx, artistCacheInsertBulk,
+func (q *Queries) ArtistCacheInsertOne(ctx context.Context, arg ArtistCacheInsertOneParams) error {
+	_, err := q.db.Exec(ctx, artistCacheInsertOne,
 		arg.ID,
 		arg.URI,
 		arg.Name,
@@ -141,6 +251,40 @@ func (q *Queries) ArtistCacheInsertBulk(ctx context.Context, arg ArtistCacheInse
 		arg.Genres,
 		arg.Popularity,
 		arg.FollowerCount,
+	)
+	return err
+}
+
+const artistCacheUpdateOne = `-- name: ArtistCacheUpdateOne :exec
+UPDATE
+    SPOTIFY_ARTIST_CACHE
+SET
+    name = $1,
+    image_url = $2,
+    genres = $3,
+    popularity = $4,
+    follower_count = $5
+WHERE
+    id = $6
+`
+
+type ArtistCacheUpdateOneParams struct {
+	Name          string   `json:"name"`
+	ImageUrl      *string  `json:"image_url"`
+	Genres        []string `json:"genres"`
+	Popularity    *int32   `json:"popularity"`
+	FollowerCount *int32   `json:"follower_count"`
+	ID            string   `json:"id"`
+}
+
+func (q *Queries) ArtistCacheUpdateOne(ctx context.Context, arg ArtistCacheUpdateOneParams) error {
+	_, err := q.db.Exec(ctx, artistCacheUpdateOne,
+		arg.Name,
+		arg.ImageUrl,
+		arg.Genres,
+		arg.Popularity,
+		arg.FollowerCount,
+		arg.ID,
 	)
 	return err
 }

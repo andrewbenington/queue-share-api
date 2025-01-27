@@ -12,7 +12,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/samber/lo"
-	"github.com/zmb3/spotify/v2"
 )
 
 func (c *StatsController) GetRecentUserEvents(w http.ResponseWriter, r *http.Request) {
@@ -119,9 +118,9 @@ func artistEventIsNext(
 }
 
 type NewArtistsResponseEntry struct {
-	StreamCount int                `json:"stream_count"`
-	Artist      spotify.FullArtist `json:"artist"`
-	FirstStream time.Time          `json:"first_stream"`
+	StreamCount int           `json:"stream_count"`
+	Artist      db.ArtistData `json:"artist"`
+	FirstStream time.Time     `json:"first_stream"`
 }
 
 func (c *StatsController) GetNewArtists(w http.ResponseWriter, r *http.Request) {

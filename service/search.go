@@ -106,26 +106,48 @@ func GetTracks(ctx context.Context, spClient *spotify.Client, ids []string) (map
 	return tracks, nil
 }
 
-func GetArtist(ctx context.Context, spClient *spotify.Client, id string) (*spotify.FullArtist, error) {
+func GetArtist(ctx context.Context, spClient *spotify.Client, id string) (*db.ArtistData, error) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit(ctx)
 
-	artists := getArtistsFromCache([]string{id})
+	artists, err := getArtistsFromCache(ctx, tx, []string{id})
+	if err != nil {
+		return nil, err
+	}
 
 	if artist, ok := artists[id]; ok {
 		return &artist, nil
 	}
 
-	artist, err := spClient.GetArtist(ctx, spotify.ID(id))
+	spotifyArtist, err := spClient.GetArtist(ctx, spotify.ID(id))
 	if err != nil {
 		return nil, err
 	}
 
-	cacheArtists([]*spotify.FullArtist{artist})
+	cacheArtists(ctx, []*spotify.FullArtist{spotifyArtist})
 
-	return artist, nil
+	artist := ArtistDataFromFullArtist(*spotifyArtist)
+
+	return &artist, nil
 }
 
-func GetArtists(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]spotify.FullArtist, error) {
-	artists := getArtistsFromCache(ids)
+func GetArtists(ctx context.Context, spClient *spotify.Client, ids []string) (map[string]db.ArtistData, error) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Commit(ctx)
+
+	artists, err := getArtistsFromCache(ctx, tx, ids)
+	if err != nil {
+		log.Printf("error getting artists from cache: %s", err)
+	} else {
+		log.Printf("%d/%d artists already cached", len(artists), len(ids))
+	}
+
 	idsToGet := []spotify.ID{}
 	log.Printf("%d/%d artists already cached", len(artists), len(ids))
 
@@ -146,10 +168,10 @@ func GetArtists(ctx context.Context, spClient *spotify.Client, ids []string) (ma
 			return nil, err
 		}
 
-		cacheArtists(results)
+		cacheArtists(ctx, results)
 
 		for _, artist := range results {
-			artists[artist.ID.String()] = *artist
+			artists[artist.ID.String()] = ArtistDataFromFullArtist(*artist)
 		}
 	}
 

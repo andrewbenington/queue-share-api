@@ -68,11 +68,8 @@ func cycle() {
 			last_cycle_spotify_profile = &now
 
 			fmt.Println("uploading cache")
-			// uploadTrackCache(ctx)
 			uploadAlbumCache(ctx)
-			uploadArtistCache(ctx)
 		}
-
 	}
 
 	if shouldDoCycle(last_cycle_save_logs, cycle_period_save_logs) {
@@ -80,12 +77,6 @@ func cycle() {
 		util.WriteChannelLogsToFile()
 		last_cycle_save_logs = &now
 	}
-	// fmt.Println("doing track cache cycle")
-	// cacheTracksByPopularity()
-	// fmt.Println("doing album cache cycle")
-	// cacheAlbumsByPopularity()
-
-	// history.WriteCachesToFile()
 
 	// fmt.Println("engine cycle complete")
 }

@@ -92,29 +92,6 @@ func (q *Queries) AlbumCacheInsertBulkNullable(ctx context.Context, arg AlbumCac
 	return err
 }
 
-type ArtistCacheInsertBulkNullableParams struct {
-	ID            []string  `json:"id"`
-	Uri           []string  `json:"uri"`
-	Name          []string  `json:"name"`
-	ImageUrl      []*string `json:"image_url"`
-	Genres        []*string `json:"genres"`
-	Popularity    []int32   `json:"popularity"`
-	FollowerCount []int32   `json:"follower_count"`
-}
-
-func (q *Queries) ArtistCacheInsertBulkNullable(ctx context.Context, arg ArtistCacheInsertBulkNullableParams) error {
-	_, err := q.db.Exec(ctx, artistCacheInsertBulk,
-		pq.Array(arg.ID),
-		pq.Array(arg.Uri),
-		pq.Array(arg.Name),
-		pq.Array(arg.ImageUrl),
-		pq.Array(arg.Genres),
-		pq.Array(arg.Popularity),
-		pq.Array(arg.FollowerCount),
-	)
-	return err
-}
-
 type HistoryInsertBulkNullableParams struct {
 	UserIds          []uuid.UUID  `json:"user_ids"`
 	Timestamp        []time.Time  `json:"timestamp"`
