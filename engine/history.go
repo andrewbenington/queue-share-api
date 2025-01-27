@@ -49,7 +49,7 @@ func getHistoryForUser(ctx context.Context, user *db.User) {
 		fmt.Printf("Could not connect to database to get missing artist URIs %s\n", err)
 		return
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Commit(ctx)
 
 	_, spClient, err := client.ForUser(ctx, user.ID)
 	if err != nil {
@@ -108,17 +108,8 @@ func getHistoryForUser(ctx context.Context, user *db.User) {
 			fmt.Println(err)
 			return
 		}
-		log.Printf("Inserted %d entries for %s", len(insertParams), user.DisplayName)
 		time.Sleep(5 * time.Second)
 	}
-	err = tx.Commit(ctx)
-	if err != nil {
-		log.Println(err)
-		return
-	} else {
-		log.Println("committed history")
-	}
-
 }
 
 func processHistory(ctx context.Context, spClient *spotify.Client, items []spotify.RecentlyPlayedItem, userID uuid.UUID) ([]db.HistoryInsertOneParams, error) {
