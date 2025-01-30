@@ -24,6 +24,12 @@ func SearchArtists(ctx context.Context, spClient *spotify.Client, text string) (
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
+
+	err = CacheArtists(ctx, results.Artists.Artists)
+	if err != nil {
+		log.Printf("error caching artists: %s", err)
+	}
+
 	return lo.Map(results.Artists.Artists, ArtistDataFromFullArtistIdx), nil
 }
 
@@ -127,7 +133,7 @@ func GetArtist(ctx context.Context, spClient *spotify.Client, id string) (*db.Ar
 		return nil, err
 	}
 
-	cacheArtists(ctx, []*spotify.FullArtist{spotifyArtist})
+	CacheArtistsPtrs(ctx, []*spotify.FullArtist{spotifyArtist})
 
 	artist := ArtistDataFromFullArtist(*spotifyArtist)
 
@@ -168,7 +174,7 @@ func GetArtists(ctx context.Context, spClient *spotify.Client, ids []string) (ma
 			return nil, err
 		}
 
-		cacheArtists(ctx, results)
+		CacheArtistsPtrs(ctx, results)
 
 		for _, artist := range results {
 			artists[artist.ID.String()] = ArtistDataFromFullArtist(*artist)

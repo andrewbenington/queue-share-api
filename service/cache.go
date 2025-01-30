@@ -180,7 +180,7 @@ func stringSlicesAreEqual(s1 []string, s2 []string) bool {
 	return true
 }
 
-func cacheArtists(ctx context.Context, artistsToCache []*spotify.FullArtist) error {
+func CacheArtistsPtrs(ctx context.Context, artistsToCache []*spotify.FullArtist) error {
 	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return err
@@ -237,7 +237,85 @@ func cacheArtists(ctx context.Context, artistsToCache []*spotify.FullArtist) err
 				})
 			}
 		} else {
-			log.Printf("inserting new entry for %s", dbArtist.Name)
+			log.Printf("inserting new entry for %s", artistToCache.Name)
+			db.New(tx).ArtistCacheInsertOne(ctx, db.ArtistCacheInsertOneParams{
+				ID:            artistToCache.ID.String(),
+				URI:           string(artistToCache.URI),
+				Name:          artistToCache.Name,
+				ImageUrl:      preferredImageURL,
+				Genres:        artistToCache.Genres,
+				Popularity:    &popularity,
+				FollowerCount: &followerCount,
+			})
+		}
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CacheArtists(ctx context.Context, artistsToCache []spotify.FullArtist) error {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	artistIDs := lo.Map(artistsToCache, func(a spotify.FullArtist, _ int) string { return a.ID.String() })
+
+	rows, err := db.New(tx).ArtistCacheGetByID(ctx, artistIDs)
+	if err != nil {
+		return err
+	}
+
+	dbArtists := lo.SliceToMap(rows, func(row *db.ArtistData) (string, *db.ArtistData) {
+		return row.ID, row
+	})
+
+	for i, artistToCache := range artistsToCache {
+		if i%100 == 0 {
+			log.Printf("processing artist %d/%d", i+1, len(artistsToCache))
+		}
+		var preferredImageURL *string
+		if preferredImage := GetArtist128Image(artistToCache); preferredImage != nil {
+			preferredImageURL = &preferredImage.URL
+		}
+
+		popularity := int32(artistToCache.Popularity)
+		followerCount := int32(artistToCache.Followers.Count)
+
+		if dbArtist, ok := dbArtists[artistToCache.ID.String()]; ok {
+			genresHaveChanges := stringSlicesAreEqual(dbArtist.Genres, artistToCache.Genres)
+			var dbPopularity int32 = 0
+			if dbArtist.Popularity != nil {
+				dbPopularity = *dbArtist.Popularity
+			}
+			var dbFollowers int32 = 0
+			if dbArtist.FollowerCount != nil {
+				dbPopularity = *dbArtist.FollowerCount
+			}
+			if dbArtist.ImageUrl != preferredImageURL ||
+				dbArtist.Name != artistToCache.Name ||
+				genresHaveChanges ||
+				dbPopularity != popularity ||
+				dbFollowers != followerCount {
+				log.Printf("updating artist cache for %s", dbArtist.Name)
+
+				db.New(tx).ArtistCacheUpdateOne(ctx, db.ArtistCacheUpdateOneParams{
+					ID:            artistToCache.ID.String(),
+					Name:          artistToCache.Name,
+					ImageUrl:      preferredImageURL,
+					Genres:        artistToCache.Genres,
+					Popularity:    &popularity,
+					FollowerCount: &followerCount,
+				})
+			}
+		} else {
+			log.Printf("inserting new entry for %s", artistToCache.Name)
 			db.New(tx).ArtistCacheInsertOne(ctx, db.ArtistCacheInsertOneParams{
 				ID:            artistToCache.ID.String(),
 				URI:           string(artistToCache.URI),
