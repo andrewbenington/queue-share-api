@@ -12,7 +12,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/util"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
@@ -45,11 +44,11 @@ func (e *ArtistRankEvent) GetTime() time.Time {
 }
 
 type AlbumRankEvent struct {
-	Album     *spotify.FullAlbum `json:"album"`
-	Rank      int64              `json:"rank"`
-	Streams   int64              `json:"streams"`
-	Surpassed []AlbumRankEvent   `json:"surpassed"`
-	DateUnix  int64              `json:"date_unix"`
+	Album     *db.AlbumData    `json:"album"`
+	Rank      int64            `json:"rank"`
+	Streams   int64            `json:"streams"`
+	Surpassed []AlbumRankEvent `json:"surpassed"`
+	DateUnix  int64            `json:"date_unix"`
 }
 
 func (e *AlbumRankEvent) GetTime() time.Time {

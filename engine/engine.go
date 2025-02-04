@@ -43,6 +43,8 @@ func cycle() {
 	ctx := context.Background()
 	now := time.Now()
 
+	// uploadAlbumCache(ctx)
+
 	if config.GetIsProd() {
 		if shouldDoCycle(last_cycle_load_uris, cycle_period_load_uris) {
 			fmt.Println("doing uri cycle")
@@ -67,8 +69,6 @@ func cycle() {
 			doSpotifyProfileCycle(ctx)
 			last_cycle_spotify_profile = &now
 
-			fmt.Println("uploading cache")
-			uploadAlbumCache(ctx)
 		}
 	}
 

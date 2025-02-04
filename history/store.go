@@ -773,13 +773,13 @@ type AlbumRankings struct {
 }
 
 type AlbumStreams struct {
-	ID            string             `json:"spotify_id"`
-	Streams       int64              `json:"stream_count"`
-	StreamsChange *int64             `json:"streams_change,omitempty"`
-	Rank          int64              `json:"rank"`
-	RankChange    *int64             `json:"rank_change,omitempty"`
-	Album         *spotify.FullAlbum `json:"album,omitempty"`
-	Tracks        []string           `json:"tracks"`
+	ID            string        `json:"spotify_id"`
+	Streams       int64         `json:"stream_count"`
+	StreamsChange *int64        `json:"streams_change,omitempty"`
+	Rank          int64         `json:"rank"`
+	RankChange    *int64        `json:"rank_change,omitempty"`
+	Album         *db.AlbumData `json:"album,omitempty"`
+	Tracks        []string      `json:"tracks"`
 }
 
 func AlbumStreamRankingsByTimeframe(ctx context.Context, transaction db.DBTX, userUUID uuid.UUID, filter FilterParams, start *time.Time, end *time.Time) ([]*AlbumRankings, int, error) {

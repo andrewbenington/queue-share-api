@@ -189,6 +189,56 @@ SET
 WHERE
     id = @id;
 
+-- name: AlbumCacheInsertOne :exec
+INSERT INTO SPOTIFY_ALBUM_CACHE(
+    id,
+    uri,
+    name,
+    artist_id,
+    artist_uri,
+    artist_name,
+    album_group,
+    album_type,
+    image_url,
+    release_date,
+    release_date_precision,
+    genres,
+    popularity,
+    upc,
+    spotify_track_ids,
+    track_isrcs)
+VALUES (
+    @id,
+    @uri,
+    @name,
+    @artist_id,
+    @artist_uri,
+    @artist_name,
+    @album_group,
+    @album_type,
+    @image_url,
+    @release_date,
+    @release_date_precision,
+    @genres,
+    @popularity,
+    @upc,
+    @spotify_track_ids,
+    @track_isrcs);
+
+-- name: AlbumCacheUpdateOne :exec
+UPDATE
+    SPOTIFY_ALBUM_CACHE
+SET
+    name = @name,
+    image_url = @image_url,
+    genres = @genres,
+    popularity = @popularity,
+    upc = @upc,
+    spotify_track_ids = @spotify_track_ids,
+    track_isrcs = @track_isrcs
+WHERE
+    id = @id;
+
 -- name: TracksGetPrimaryURIs :many
 WITH top_isrcs AS (
     SELECT

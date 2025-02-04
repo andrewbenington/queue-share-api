@@ -5,38 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
-	"path"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/db"
 	"github.com/samber/lo"
 	"github.com/zmb3/spotify/v2"
 )
-
-var (
-	spotifyAlbumCache = map[string]spotify.FullAlbum{}
-)
-
-func init() {
-
-	// load album cache
-	filePath := path.Join("temp", "album_cache.json")
-	if _, err := os.Stat(filePath); err != nil {
-		return
-	}
-	bytes, err := os.ReadFile(filePath)
-	if err != nil {
-		fmt.Printf("Error loading track data cache: %s\n", err)
-		return
-	}
-	err = json.Unmarshal(bytes, &spotifyAlbumCache)
-	if err != nil {
-		fmt.Printf("Error parsing album data cache: %s\n", err)
-	} else {
-		fmt.Println("Album cache loaded successfully")
-	}
-}
 
 func CacheFullTracks(ctx context.Context, tx db.DBTX, tracks []*spotify.FullTrack) {
 	params := InsertParamsFromFullTracks(tracks)
@@ -158,29 +132,28 @@ func GetTracksFromCache(ctx context.Context, tx db.DBTX, ids []string) (map[stri
 	return cacheHits, nil
 }
 
-func stringSlicesAreEqual(s1 []string, s2 []string) bool {
-	inFirst := map[string]bool{}
-	for _, s := range s1 {
-		inFirst[s] = false
+func stringSlicesDiffer(slice1 []string, slice2 []string) bool {
+	inBothMap := map[string]bool{}
+
+	for _, s := range slice1 {
+		inBothMap[s] = false
+	}
+	for _, s := range slice2 {
+		if _, ok := inBothMap[s]; !ok {
+			return true
+		}
+		inBothMap[s] = true
 	}
 
-	for _, s := range s2 {
-		if _, ok := inFirst[s]; ok {
-			inFirst[s] = true
-		} else {
-			return false
+	for _, inBoth := range inBothMap {
+		if !inBoth {
+			return true
 		}
 	}
-
-	for _, inSecond := range inFirst {
-		if !inSecond {
-			return false
-		}
-	}
-	return true
+	return false
 }
 
-func CacheArtistsPtrs(ctx context.Context, artistsToCache []*spotify.FullArtist) error {
+func CacheSpotifyArtists(ctx context.Context, artistsToCache []*spotify.FullArtist) error {
 	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
 		return err
@@ -211,85 +184,7 @@ func CacheArtistsPtrs(ctx context.Context, artistsToCache []*spotify.FullArtist)
 		followerCount := int32(artistToCache.Followers.Count)
 
 		if dbArtist, ok := dbArtists[artistToCache.ID.String()]; ok {
-			genresHaveChanges := stringSlicesAreEqual(dbArtist.Genres, artistToCache.Genres)
-			var dbPopularity int32 = 0
-			if dbArtist.Popularity != nil {
-				dbPopularity = *dbArtist.Popularity
-			}
-			var dbFollowers int32 = 0
-			if dbArtist.FollowerCount != nil {
-				dbPopularity = *dbArtist.FollowerCount
-			}
-			if dbArtist.ImageUrl != preferredImageURL ||
-				dbArtist.Name != artistToCache.Name ||
-				genresHaveChanges ||
-				dbPopularity != popularity ||
-				dbFollowers != followerCount {
-				log.Printf("updating artist cache for %s", dbArtist.Name)
-
-				db.New(tx).ArtistCacheUpdateOne(ctx, db.ArtistCacheUpdateOneParams{
-					ID:            artistToCache.ID.String(),
-					Name:          artistToCache.Name,
-					ImageUrl:      preferredImageURL,
-					Genres:        artistToCache.Genres,
-					Popularity:    &popularity,
-					FollowerCount: &followerCount,
-				})
-			}
-		} else {
-			log.Printf("inserting new entry for %s", artistToCache.Name)
-			db.New(tx).ArtistCacheInsertOne(ctx, db.ArtistCacheInsertOneParams{
-				ID:            artistToCache.ID.String(),
-				URI:           string(artistToCache.URI),
-				Name:          artistToCache.Name,
-				ImageUrl:      preferredImageURL,
-				Genres:        artistToCache.Genres,
-				Popularity:    &popularity,
-				FollowerCount: &followerCount,
-			})
-		}
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func CacheArtists(ctx context.Context, artistsToCache []spotify.FullArtist) error {
-	tx, err := db.Service().BeginTx(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	artistIDs := lo.Map(artistsToCache, func(a spotify.FullArtist, _ int) string { return a.ID.String() })
-
-	rows, err := db.New(tx).ArtistCacheGetByID(ctx, artistIDs)
-	if err != nil {
-		return err
-	}
-
-	dbArtists := lo.SliceToMap(rows, func(row *db.ArtistData) (string, *db.ArtistData) {
-		return row.ID, row
-	})
-
-	for i, artistToCache := range artistsToCache {
-		if i%100 == 0 {
-			log.Printf("processing artist %d/%d", i+1, len(artistsToCache))
-		}
-		var preferredImageURL *string
-		if preferredImage := GetArtist128Image(artistToCache); preferredImage != nil {
-			preferredImageURL = &preferredImage.URL
-		}
-
-		popularity := int32(artistToCache.Popularity)
-		followerCount := int32(artistToCache.Followers.Count)
-
-		if dbArtist, ok := dbArtists[artistToCache.ID.String()]; ok {
-			genresHaveChanges := stringSlicesAreEqual(dbArtist.Genres, artistToCache.Genres)
+			genresHaveChanges := stringSlicesDiffer(dbArtist.Genres, artistToCache.Genres)
 			var dbPopularity int32 = 0
 			if dbArtist.Popularity != nil {
 				dbPopularity = *dbArtist.Popularity
@@ -348,25 +243,109 @@ func getArtistsFromCache(ctx context.Context, tx db.DBTX, ids []string) (map[str
 	return cacheHits, nil
 }
 
-func cacheFullAlbums(ctx context.Context, tx db.DBTX, albums []*spotify.FullAlbum) {
-	for _, album := range albums {
-		spotifyAlbumCache[string(album.ID)] = *album
+func strPtrsDiffer(p1 *string, p2 *string) bool {
+	if p1 == nil && p2 == nil {
+		return false
 	}
-	bytes, err := json.Marshal(spotifyAlbumCache)
+	if p1 == nil || p2 == nil {
+		return true
+	}
+	return *p1 == *p2
+}
+
+func i32PtrsDiffer(p1 *int32, p2 *int32) bool {
+	if p1 == nil && p2 == nil {
+		return false
+	}
+	if p1 == nil || p2 == nil {
+		return true
+	}
+	return *p1 == *p2
+}
+
+func CacheSpotifyAlbums(ctx context.Context, albumsToCache []*spotify.FullAlbum) error {
+	tx, err := db.Service().BeginTx(ctx)
 	if err != nil {
-		fmt.Printf("Error serializing Spotify album cache: %s", err)
-		return
+		return err
 	}
-	err = os.WriteFile(path.Join("temp", "album_cache.json"), bytes, 0644)
+	defer tx.Rollback(ctx)
+
+	albumIDs := lo.Map(albumsToCache, func(a *spotify.FullAlbum, _ int) string { return a.ID.String() })
+
+	rows, err := db.New(tx).AlbumCacheGetByID(ctx, albumIDs)
 	if err != nil {
-		fmt.Printf("Error serializing Spotify album cache: %s", err)
+		return err
 	}
-	params := InsertParamsFromFullAlbums(albums)
-	err = db.New(tx).AlbumCacheInsertBulkNullable(ctx, params)
+
+	dbAlbums := lo.SliceToMap(rows, func(row *db.AlbumData) (string, *db.AlbumData) {
+		return row.ID, row
+	})
+
+	for i, spotifyAlbum := range albumsToCache {
+		if i%100 == 0 {
+			log.Printf("processing album %d/%d", i+1, len(albumsToCache))
+		}
+
+		newData, err := AlbumDataFromSpotifyAlbum(*spotifyAlbum)
+		if err != nil {
+			log.Printf("Error converting spotify album %s (%s): %s", spotifyAlbum.Name, spotifyAlbum.URI, err)
+			continue
+		}
+
+		if existingData, ok := dbAlbums[spotifyAlbum.ID.String()]; ok {
+			genresHaveChanges := stringSlicesDiffer(existingData.Genres, newData.Genres)
+
+			trackIDsHaveChanges := stringSlicesDiffer(existingData.SpotifyTrackIds, newData.SpotifyTrackIds)
+			trackISRCsHaveChanges := stringSlicesDiffer(existingData.TrackIsrcs, newData.TrackIsrcs)
+
+			if strPtrsDiffer(existingData.ImageUrl, newData.ImageUrl) ||
+				existingData.Name != newData.Name ||
+				genresHaveChanges ||
+				trackIDsHaveChanges || trackISRCsHaveChanges ||
+				i32PtrsDiffer(existingData.Popularity, newData.Popularity) {
+				log.Printf("updating album cache for %s", existingData.Name)
+
+				db.New(tx).AlbumCacheUpdateOne(ctx, db.AlbumCacheUpdateOneParams{
+					ID:              newData.ID,
+					Name:            newData.Name,
+					ImageUrl:        newData.ImageUrl,
+					Genres:          newData.Genres,
+					Popularity:      newData.Popularity,
+					Upc:             newData.Upc,
+					SpotifyTrackIds: newData.SpotifyTrackIds,
+					TrackIsrcs:      newData.TrackIsrcs,
+				})
+			}
+		} else {
+			log.Printf("inserting new entry for %s", spotifyAlbum.Name)
+
+			db.New(tx).AlbumCacheInsertOne(ctx, db.AlbumCacheInsertOneParams{
+				ID:                   newData.ID,
+				URI:                  newData.URI,
+				Name:                 newData.Name,
+				ArtistID:             newData.ArtistID,
+				ArtistURI:            newData.ArtistURI,
+				ArtistName:           newData.ArtistName,
+				AlbumGroup:           newData.AlbumGroup,
+				AlbumType:            newData.AlbumType,
+				ImageUrl:             newData.ImageUrl,
+				ReleaseDate:          newData.ReleaseDate,
+				ReleaseDatePrecision: newData.ReleaseDatePrecision,
+				Genres:               newData.Genres,
+				Popularity:           newData.Popularity,
+				Upc:                  newData.Upc,
+				SpotifyTrackIds:      newData.SpotifyTrackIds,
+				TrackIsrcs:           newData.TrackIsrcs,
+			})
+		}
+	}
+
+	err = tx.Commit(ctx)
 	if err != nil {
-		fmt.Printf("Error inserting into album cache: %s", err)
-		return
+		return err
 	}
+
+	return nil
 }
 
 func InsertParamsFromFullAlbums(albums []*spotify.FullAlbum) db.AlbumCacheInsertBulkNullableParams {
@@ -420,83 +399,14 @@ func InsertParamsFromFullAlbums(albums []*spotify.FullAlbum) db.AlbumCacheInsert
 	return params
 }
 
-func getAlbumsFromCache(ids []string) map[string]spotify.FullAlbum {
-	cacheHits := map[string]spotify.FullAlbum{}
-	for _, id := range ids {
-		if albumData, ok := spotifyAlbumCache[id]; ok {
-			cacheHits[id] = albumData
-		}
+func getAlbumsFromCache(ctx context.Context, tx db.DBTX, ids []string) (map[string]db.AlbumData, error) {
+	rows, err := db.New(tx).AlbumCacheGetByID(ctx, ids)
+	if err != nil {
+		return nil, err
 	}
-	return cacheHits
-}
-
-func GetAlbumCache() map[string]spotify.FullAlbum {
-	return spotifyAlbumCache
-}
-
-func TrackDataFromFullTrackIdx(ft spotify.FullTrack, _ int) db.TrackData {
-	return TrackDataFromFullTrack(ft)
-}
-
-func TrackDataFromFullTrack(ft spotify.FullTrack) db.TrackData {
-	artist := ft.Artists[0]
-
-	image := GetAlbum300Image(ft.Album)
-	var imageURL *string
-	if image != nil {
-		imageURL = &image.URL
+	cacheHits := map[string]db.AlbumData{}
+	for _, row := range rows {
+		cacheHits[row.ID] = *row
 	}
-
-	var isrc *string
-	if isrcField, ok := ft.ExternalIDs["isrc"]; ok {
-		isrc = &isrcField
-	}
-
-	return db.TrackData{
-		ID:           ft.ID.String(),
-		URI:          string(ft.URI),
-		Name:         ft.Name,
-		AlbumID:      ft.Album.ID.String(),
-		AlbumURI:     string(ft.Album.URI),
-		AlbumName:    ft.Album.Name,
-		ArtistID:     artist.ID.String(),
-		ArtistURI:    string(artist.URI),
-		ArtistName:   artist.Name,
-		ImageUrl:     imageURL,
-		OtherArtists: lo.Map(ft.Artists[1:], trackArtistFromSimple),
-		DurationMs:   int32(ft.Duration),
-		Popularity:   int32(ft.Popularity),
-		Explicit:     ft.Explicit,
-		PreviewUrl:   ft.PreviewURL,
-		DiscNumber:   int32(ft.DiscNumber),
-		TrackNumber:  int32(ft.TrackNumber),
-		Type:         ft.Type,
-		ExternalIds:  ft.ExternalIDs,
-		Isrc:         isrc,
-	}
-}
-
-func ArtistDataFromFullArtistIdx(fa spotify.FullArtist, _ int) db.ArtistData {
-	return ArtistDataFromFullArtist(fa)
-}
-
-func ArtistDataFromFullArtist(fa spotify.FullArtist) db.ArtistData {
-	image := GetArtist300Image(fa)
-	var imageURL *string
-	if image != nil {
-		imageURL = &image.URL
-	}
-
-	popularity := int32(fa.Popularity)
-	followerCount := int32(fa.Followers.Count)
-
-	return db.ArtistData{
-		ID:            fa.ID.String(),
-		URI:           string(fa.URI),
-		Name:          fa.Name,
-		ImageUrl:      imageURL,
-		Genres:        fa.Genres,
-		Popularity:    &popularity,
-		FollowerCount: &followerCount,
-	}
+	return cacheHits, nil
 }

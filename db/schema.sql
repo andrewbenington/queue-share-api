@@ -179,7 +179,10 @@ CREATE TABLE public.spotify_album_cache (
     release_date date,
     release_date_precision text,
     genres jsonb,
-    popularity integer
+    popularity integer,
+    upc text,
+    spotify_track_ids jsonb,
+    track_isrcs jsonb
 );
 
 

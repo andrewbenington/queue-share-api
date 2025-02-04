@@ -107,6 +107,34 @@ func GetArtist128Image(a spotify.FullArtist) *spotify.Image {
 	return preferredImage
 }
 
+func GetAlbum128Image(a spotify.FullAlbum) *spotify.Image {
+	var preferredImage *spotify.Image
+	for _, image := range a.Images {
+		if preferredImage == nil {
+			preferredImage = &image
+		} else if image.Height >= 128 && image.Height < preferredImage.Height {
+			preferredImage = &image
+		} else if image.Height <= 128 && image.Height > preferredImage.Height {
+			preferredImage = &image
+		}
+	}
+	return preferredImage
+}
+
+func GetSimpleAlbum128Image(a spotify.SimpleAlbum) *spotify.Image {
+	var preferredImage *spotify.Image
+	for _, image := range a.Images {
+		if preferredImage == nil {
+			preferredImage = &image
+		} else if image.Height >= 128 && image.Height < preferredImage.Height {
+			preferredImage = &image
+		} else if image.Height <= 128 && image.Height > preferredImage.Height {
+			preferredImage = &image
+		}
+	}
+	return preferredImage
+}
+
 func GetArtistsForTrack(t spotify.FullTrack) []string {
 	artists := []string{}
 	for _, a := range t.Artists {

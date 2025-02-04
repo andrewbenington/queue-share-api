@@ -15,7 +15,7 @@ import (
 
 const albumCacheGetByID = `-- name: AlbumCacheGetByID :many
 SELECT
-    id, uri, name, artist_id, artist_uri, artist_name, album_group, album_type, image_url, release_date, release_date_precision, genres, popularity
+    id, uri, name, artist_id, artist_uri, artist_name, album_group, album_type, image_url, release_date, release_date_precision, genres, popularity, upc, spotify_track_ids, track_isrcs
 FROM
     SPOTIFY_ALBUM_CACHE
 WHERE
@@ -45,6 +45,9 @@ func (q *Queries) AlbumCacheGetByID(ctx context.Context, albumIds []string) ([]*
 			&i.ReleaseDatePrecision,
 			&i.Genres,
 			&i.Popularity,
+			&i.Upc,
+			&i.SpotifyTrackIds,
+			&i.TrackIsrcs,
 		); err != nil {
 			return nil, err
 		}
@@ -133,6 +136,124 @@ func (q *Queries) AlbumCacheInsertBulk(ctx context.Context, arg AlbumCacheInsert
 		arg.ReleaseDatePrecision,
 		arg.Genres,
 		arg.Popularity,
+	)
+	return err
+}
+
+const albumCacheInsertOne = `-- name: AlbumCacheInsertOne :exec
+INSERT INTO SPOTIFY_ALBUM_CACHE(
+    id,
+    uri,
+    name,
+    artist_id,
+    artist_uri,
+    artist_name,
+    album_group,
+    album_type,
+    image_url,
+    release_date,
+    release_date_precision,
+    genres,
+    popularity,
+    upc,
+    spotify_track_ids,
+    track_isrcs)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15,
+    $16)
+`
+
+type AlbumCacheInsertOneParams struct {
+	ID                   string     `json:"id"`
+	URI                  string     `json:"uri"`
+	Name                 string     `json:"name"`
+	ArtistID             string     `json:"artist_id"`
+	ArtistURI            string     `json:"artist_uri"`
+	ArtistName           string     `json:"artist_name"`
+	AlbumGroup           *string    `json:"album_group"`
+	AlbumType            *string    `json:"album_type"`
+	ImageUrl             *string    `json:"image_url"`
+	ReleaseDate          *time.Time `json:"release_date"`
+	ReleaseDatePrecision *string    `json:"release_date_precision"`
+	Genres               []string   `json:"genres"`
+	Popularity           *int32     `json:"popularity"`
+	Upc                  *string    `json:"upc"`
+	SpotifyTrackIds      []string   `json:"spotify_track_ids"`
+	TrackIsrcs           []string   `json:"track_isrcs"`
+}
+
+func (q *Queries) AlbumCacheInsertOne(ctx context.Context, arg AlbumCacheInsertOneParams) error {
+	_, err := q.db.Exec(ctx, albumCacheInsertOne,
+		arg.ID,
+		arg.URI,
+		arg.Name,
+		arg.ArtistID,
+		arg.ArtistURI,
+		arg.ArtistName,
+		arg.AlbumGroup,
+		arg.AlbumType,
+		arg.ImageUrl,
+		arg.ReleaseDate,
+		arg.ReleaseDatePrecision,
+		arg.Genres,
+		arg.Popularity,
+		arg.Upc,
+		arg.SpotifyTrackIds,
+		arg.TrackIsrcs,
+	)
+	return err
+}
+
+const albumCacheUpdateOne = `-- name: AlbumCacheUpdateOne :exec
+UPDATE
+    SPOTIFY_ALBUM_CACHE
+SET
+    name = $1,
+    image_url = $2,
+    genres = $3,
+    popularity = $4,
+    upc = $5,
+    spotify_track_ids = $6,
+    track_isrcs = $7
+WHERE
+    id = $8
+`
+
+type AlbumCacheUpdateOneParams struct {
+	Name            string   `json:"name"`
+	ImageUrl        *string  `json:"image_url"`
+	Genres          []string `json:"genres"`
+	Popularity      *int32   `json:"popularity"`
+	Upc             *string  `json:"upc"`
+	SpotifyTrackIds []string `json:"spotify_track_ids"`
+	TrackIsrcs      []string `json:"track_isrcs"`
+	ID              string   `json:"id"`
+}
+
+func (q *Queries) AlbumCacheUpdateOne(ctx context.Context, arg AlbumCacheUpdateOneParams) error {
+	_, err := q.db.Exec(ctx, albumCacheUpdateOne,
+		arg.Name,
+		arg.ImageUrl,
+		arg.Genres,
+		arg.Popularity,
+		arg.Upc,
+		arg.SpotifyTrackIds,
+		arg.TrackIsrcs,
+		arg.ID,
 	)
 	return err
 }

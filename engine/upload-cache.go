@@ -1,17 +1,5 @@
 package engine
 
-import (
-	"context"
-	"log"
-	"time"
-
-	"github.com/andrewbenington/queue-share-api/db"
-	"github.com/andrewbenington/queue-share-api/service"
-	"github.com/samber/lo"
-	"github.com/zmb3/spotify/v2"
-	"golang.org/x/exp/maps"
-)
-
 // func uploadTrackCache(ctx context.Context) error {
 // 	cache := service.GetTrackCache()
 
@@ -53,44 +41,15 @@ import (
 // 	return nil
 // }
 
-func uploadAlbumCache(ctx context.Context) error {
-	cache := service.GetAlbumCache()
+// func uploadAlbumCache(ctx context.Context) error {
+// 	cache := service.GetAlbumCache()
 
-	albumPtrs := lo.Map(
-		maps.Values(cache),
-		func(album spotify.FullAlbum, _ int) *spotify.FullAlbum { return &album },
-	)
+// 	albumPtrs := lo.Map(
+// 		maps.Values(cache),
+// 		func(album spotify.FullAlbum, _ int) *spotify.FullAlbum { return &album },
+// 	)
 
-	log.Printf("There are %d albums in the cache", len(albumPtrs))
+// 	log.Printf("There are %d albums in the cache", len(albumPtrs))
 
-	tx, err := db.Service().BeginTx(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	for i := range (len(albumPtrs) / 100) + 1 {
-		start := i * 100
-		end := start + 100
-		if end > len(albumPtrs) {
-			end = len(albumPtrs)
-		}
-
-		params := service.InsertParamsFromFullAlbums(albumPtrs[start:end])
-
-		err = db.New(tx).AlbumCacheInsertBulkNullable(ctx, params)
-		if err != nil {
-			log.Println(err)
-		}
-
-		log.Printf("Uploaded %d/%d", end, len(albumPtrs))
-		time.Sleep(time.Millisecond)
-	}
-
-	err = tx.Commit(ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
+// 	return service.CacheSpotifyAlbums(ctx, albumPtrs)
+// }

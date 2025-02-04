@@ -30,6 +30,11 @@ sql:
             go_type:
               type: time.Time
               pointer: true
+          - db_type: date
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
           - db_type: pg_catalog.timestamptz
             nullable: true
             go_type:
@@ -59,4 +64,13 @@ sql:
           - column: spotify_track_cache.external_ids
             go_type:
               type: TrackExternalIDs
+          - column: spotify_album_cache.spotify_track_ids
+            go_type:
+              type: "[]string"
+          - column: spotify_album_cache.spotify_track_ids
+            go_type:
+              type: "[]string"
+          - column: spotify_album_cache.track_isrcs
+            go_type:
+              type: "[]string"
     strict_order_by: false

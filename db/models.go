@@ -8,23 +8,25 @@ import (
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AlbumData struct {
-	ID                   string      `json:"id"`
-	URI                  string      `json:"uri"`
-	Name                 string      `json:"name"`
-	ArtistID             string      `json:"artist_id"`
-	ArtistURI            string      `json:"artist_uri"`
-	ArtistName           string      `json:"artist_name"`
-	AlbumGroup           *string     `json:"album_group"`
-	AlbumType            *string     `json:"album_type"`
-	ImageUrl             *string     `json:"image_url"`
-	ReleaseDate          pgtype.Date `json:"release_date"`
-	ReleaseDatePrecision *string     `json:"release_date_precision"`
-	Genres               []string    `json:"genres"`
-	Popularity           *int32      `json:"popularity"`
+	ID                   string     `json:"id"`
+	URI                  string     `json:"uri"`
+	Name                 string     `json:"name"`
+	ArtistID             string     `json:"artist_id"`
+	ArtistURI            string     `json:"artist_uri"`
+	ArtistName           string     `json:"artist_name"`
+	AlbumGroup           *string    `json:"album_group"`
+	AlbumType            *string    `json:"album_type"`
+	ImageUrl             *string    `json:"image_url"`
+	ReleaseDate          *time.Time `json:"release_date"`
+	ReleaseDatePrecision *string    `json:"release_date_precision"`
+	Genres               []string   `json:"genres"`
+	Popularity           *int32     `json:"popularity"`
+	Upc                  *string    `json:"upc"`
+	SpotifyTrackIds      []string   `json:"spotify_track_ids"`
+	TrackIsrcs           []string   `json:"track_isrcs"`
 }
 
 type ArtistData struct {

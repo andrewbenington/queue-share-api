@@ -11,13 +11,12 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/gorilla/mux"
-	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
 type TopAlbumsResponse struct {
-	Rankings  []*history.AlbumRankings     `json:"rankings"`
-	AlbumData map[string]spotify.FullAlbum `json:"album_data"`
+	Rankings  []*history.AlbumRankings `json:"rankings"`
+	AlbumData map[string]db.AlbumData  `json:"album_data"`
 }
 
 func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http.Request) {
@@ -71,7 +70,7 @@ func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http
 }
 
 type AlbumStatsResponse struct {
-	Album      *spotify.FullAlbum      `json:"album"`
+	Album      *db.AlbumData           `json:"album"`
 	Streams    []*Stream               `json:"streams"`
 	Tracks     map[string]db.TrackData `json:"tracks"`
 	TrackRanks []*history.TrackStreams `json:"track_ranks"`

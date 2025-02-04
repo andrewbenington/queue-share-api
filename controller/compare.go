@@ -14,7 +14,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/google/uuid"
-	"github.com/zmb3/spotify/v2"
 	"golang.org/x/exp/maps"
 )
 
@@ -275,7 +274,7 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 type CompareAlbumsResp struct {
 	StreamsByURI  map[string]map[uuid.UUID]int64        `json:"streams_by_uri"`
 	RanksByURI    map[string]map[uuid.UUID]int64        `json:"ranks_by_uri"`
-	AlbumData     map[string]spotify.FullAlbum          `json:"album_data"`
+	AlbumData     map[string]db.AlbumData               `json:"album_data"`
 	FriendData    map[uuid.UUID]*db.User                `json:"friend_data"`
 	FriendStreams map[uuid.UUID][]*history.AlbumStreams `json:"friend_streams"`
 }
