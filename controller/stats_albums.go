@@ -11,7 +11,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/gorilla/mux"
-	"golang.org/x/exp/maps"
+	"github.com/samber/lo"
 )
 
 type TopAlbumsResponse struct {
@@ -56,7 +56,7 @@ func (c *StatsController) GetTopAlbumsByTimeframe(w http.ResponseWriter, r *http
 		return
 	}
 
-	albumResults, err := service.GetAlbums(ctx, spClient, maps.Keys(albumIDs))
+	albumResults, err := service.GetAlbums(ctx, spClient, lo.Keys(albumIDs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -153,7 +153,7 @@ func (c *StatsController) GetAlbumStatsByURI(w http.ResponseWriter, r *http.Requ
 		trackIDs[id] = true
 	}
 
-	tracks, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	tracks, err := service.GetTracks(ctx, spClient, lo.Keys(trackIDs))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("couldn't get streamed tracks: %s", err), http.StatusInternalServerError)
 		return
@@ -226,3 +226,54 @@ func (c *StatsController) GetAlbumRankingsByURI(w http.ResponseWriter, r *http.R
 
 	json.NewEncoder(w).Encode(rankings)
 }
+
+// func (c *StatsController) GetTopAlbumByReleaseInterval(w http.ResponseWriter, r *http.Request) {
+// 	ctx := r.Context()
+
+// 	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+// 	if err != nil {
+// 		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
+// 		return
+// 	}
+// 	code, spClient, err := client.ForUser(ctx, userUUID)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("couldn't get client: %s", err), code)
+// 		return
+// 	}
+
+// 	album, err := service.GetAlbum(ctx, spClient, albumID)
+// 	if err != nil {
+// 		http.Error(w, fmt.Sprintf("couldn't get album: %s", err), http.StatusInternalServerError)
+// 		return
+// 	}
+
+// 	rankings := []TimeframeRanking{}
+
+// 	tx, err := db.Service().BeginTx(ctx)
+// 	if err != nil {
+// 		http.Error(w, "Error connecting to database", http.StatusInternalServerError)
+// 		return
+// 	}
+// 	defer tx.Commit(ctx)
+
+// 	filter := getFilterParams(r)
+// 	allRankings, responseCode, err := history.AlbumStreamRankingsByTimeframe(ctx, tx, userUUID, filter, nil, nil)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), responseCode)
+// 	}
+
+// 	for _, timeframeRankings := range allRankings {
+// 		for _, albumStreams := range timeframeRankings.AlbumStreams {
+// 			if albumStreams.ID == string(album.ID) {
+// 				ranking := TimeframeRanking{
+// 					Position:             int(albumStreams.Rank),
+// 					Timeframe:            timeframeRankings.Timeframe,
+// 					StartDateUnixSeconds: timeframeRankings.StartDateUnixSeconds,
+// 				}
+// 				rankings = append(rankings, ranking)
+// 			}
+// 		}
+// 	}
+
+// 	json.NewEncoder(w).Encode(rankings)
+// }

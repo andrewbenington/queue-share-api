@@ -70,21 +70,9 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 	}
 	defer tx.Rollback(ctx)
 
-	albumURIs := lo.Map(
-		req.AlbumIDs,
-		func(id string, _ int) string {
-			if id == "" {
-				fmt.Printf("MISSING ALBUM")
-			}
-			return fmt.Sprintf("spotify:album:%s", id)
-		})
-
-	albumStreams, err := db.New(tx).HistoryGetAlbumStreams(ctx, db.HistoryGetAlbumStreamsParams{
-		UserID:    userUUID,
-		AlbumUris: albumURIs,
-	})
+	albums, err := service.GetAlbums(ctx, spClient, req.AlbumIDs)
 	if err != nil {
-		fmt.Println(err, "could not get album streams")
+		fmt.Println(err, "could not get albums")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -108,9 +96,10 @@ func (c *StatsController) AddMixToQueue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	shuffledTrackURIs := shuffleAndSeparateSameArtist(artistStreams, albumStreams, playlistTracks)
+	shuffledTrackURIs := shuffleAndSeparateSameArtist(artistStreams, albums, playlistTracks)
 
-	for _, uri := range shuffledTrackURIs[:40] {
+	uriCount := min(len(shuffledTrackURIs), 60)
+	for _, uri := range shuffledTrackURIs[:uriCount] {
 		err = service.PushToUserQueue(r.Context(), spClient, service.IDFromURIMust(uri))
 		if err != nil && strings.Contains(err.Error(), "No active device found") {
 			requests.RespondWithError(w, http.StatusBadRequest, "Host is not playing music")
@@ -150,38 +139,39 @@ func (t *ArtistTrackToShuffle) source() string {
 }
 
 type AlbumTrackToShuffle struct {
-	row *db.HistoryGetAlbumStreamsRow
+	spotifyTrackURI string
+	album           db.AlbumData
 }
 
 func (t *AlbumTrackToShuffle) artistURI() string {
-	return *t.row.SpotifyArtistUri
+	return t.album.URI
 }
 
 func (t *AlbumTrackToShuffle) trackURI() string {
-	return t.row.SpotifyTrackUri
+	return t.spotifyTrackURI
 }
 
 func (t *AlbumTrackToShuffle) source() string {
 	return "album"
 }
 
-type PlaylistTrackToShuffle struct {
+type SpotifyTrackToShuffle struct {
 	track spotify.FullTrack
 }
 
-func (t *PlaylistTrackToShuffle) artistURI() string {
+func (t *SpotifyTrackToShuffle) artistURI() string {
 	return string(t.track.Artists[0].URI)
 }
 
-func (t *PlaylistTrackToShuffle) trackURI() string {
+func (t *SpotifyTrackToShuffle) trackURI() string {
 	return string(t.track.URI)
 }
 
-func (t *PlaylistTrackToShuffle) source() string {
+func (t *SpotifyTrackToShuffle) source() string {
 	return "track"
 }
 
-func shuffleAndSeparateSameArtist(fromArtists []*db.HistoryGetRecentArtistStreamsRow, fromAlbums []*db.HistoryGetAlbumStreamsRow, fromPlaylists []spotify.FullTrack) []string {
+func shuffleAndSeparateSameArtist(fromArtists []*db.HistoryGetRecentArtistStreamsRow, fromAlbums map[string]db.AlbumData, fromPlaylists []spotify.FullTrack) []string {
 
 	toShuffle := []TrackToShuffle{}
 	included := map[string]struct{}{}
@@ -196,21 +186,25 @@ func shuffleAndSeparateSameArtist(fromArtists []*db.HistoryGetRecentArtistStream
 		included[row.SpotifyTrackUri] = struct{}{}
 	}
 
-	for _, row := range fromAlbums {
-		if _, ok := included[row.SpotifyTrackUri]; ok {
-			continue
+	for _, album := range fromAlbums {
+		for _, trackID := range album.SpotifyTrackIds {
+			uri := fmt.Sprintf("spotify:track:%s", trackID)
+			if _, ok := included[uri]; ok {
+				continue
+			}
+			toShuffle = append(toShuffle, &AlbumTrackToShuffle{
+				spotifyTrackURI: uri,
+				album:           album,
+			})
+			included[uri] = struct{}{}
 		}
-		toShuffle = append(toShuffle, &AlbumTrackToShuffle{
-			row: row,
-		})
-		included[row.SpotifyTrackUri] = struct{}{}
 	}
 
 	for _, track := range fromPlaylists {
 		if _, ok := included[string(track.URI)]; ok {
 			continue
 		}
-		toShuffle = append(toShuffle, &PlaylistTrackToShuffle{
+		toShuffle = append(toShuffle, &SpotifyTrackToShuffle{
 			track: track,
 		})
 		included[string(track.URI)] = struct{}{}

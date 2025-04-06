@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -11,33 +12,33 @@ import (
 )
 
 func (c *Controller) GetPlaylist(w http.ResponseWriter, r *http.Request) {
+
+	log.Printf("GetPlaylist")
 	ctx := r.Context()
 
-	reqCtx, err := getRoomRequestContext(ctx, r)
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
 	if err != nil {
-		requests.RespondWithDBError(w, err)
+		fmt.Println(err)
+		requests.RespondWithError(w, 401, fmt.Sprintf("parse user UUID: %s", err))
 		return
 	}
 
-	if reqCtx.PermissionLevel < Moderator {
-		requests.RespondAuthError(w)
-		return
-	}
-
-	status, client, err := client.ForRoom(ctx, reqCtx.Room.Code)
+	code, spClient, err := client.ForUser(ctx, userUUID)
 	if err != nil {
-		requests.RespondWithError(w, status, err.Error())
+		http.Error(w, err.Error(), code)
 		return
 	}
 
-	id := (r.URL.Query().Get("id"))
+	id := (r.URL.Query().Get("playlist_id"))
 	if id == "" {
-		requests.RespondBadRequest(w)
+		requests.RespondWithError(w, http.StatusBadRequest, "ID is empty")
 		return
 	}
+
+	log.Printf("getting playlist '%s'", id)
 
 	playlistID := spotify.ID(id)
-	playlist, err := client.GetPlaylist(ctx, playlistID)
+	playlist, err := spClient.GetPlaylist(ctx, playlistID)
 	if err != nil {
 		log.Printf("error getting playlist: %s", err)
 		requests.RespondWithError(w, http.StatusBadRequest, err.Error())

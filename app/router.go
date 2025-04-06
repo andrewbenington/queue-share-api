@@ -90,6 +90,8 @@ func (a *App) initRouter() {
 	a.Router.HandleFunc("/spotify/tracks-by-uri", a.Controller.GetTracksByURIs).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/spotify/artists-by-uri", a.Controller.GetArtistsByURIs).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/spotify/albums-by-uri", a.Controller.GetAlbumsByURIs).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/spotify/playlist/{playlist_id}/full", a.Controller.GetSpotifyPlaylistFull).Methods("GET", "OPTIONS")
+	a.Router.HandleFunc("/spotify/playlist/{playlist_id}", a.Controller.GetSpotifyPlaylist).Methods("GET", "OPTIONS")
 
 	a.Router.HandleFunc("/auth/token", a.Controller.GetToken).Methods("GET", "OPTIONS")
 	a.Router.HandleFunc("/auth/spotify-url", a.Controller.GetSpotifyLoginURL).Methods("GET", "OPTIONS")

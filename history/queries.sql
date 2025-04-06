@@ -441,7 +441,7 @@ WITH SongStreamCounts AS (
     WHERE
         user_id = @user_id
         AND spotify_artist_uri = ANY (@artist_uris::text[])
-        AND timestamp >= CURRENT_DATE - INTERVAL '6 months'
+        AND timestamp >= CURRENT_DATE - INTERVAL '18 months'
     GROUP BY
         spotify_artist_uri,
         spotify_track_uri
@@ -465,46 +465,6 @@ WHERE
     rank <= 10
 ORDER BY
     spotify_artist_uri,
-    rank;
-
--- name: HistoryGetAlbumStreams :many
-WITH SongStreamCounts AS (
-    SELECT
-        spotify_album_uri,
-        spotify_artist_uri,
-        spotify_track_uri,
-        COUNT(*) AS stream_count
-    FROM
-        spotify_history
-    WHERE
-        user_id = @user_id
-        AND spotify_album_uri = ANY (@album_uris::text[])
-    GROUP BY
-        spotify_album_uri,
-        spotify_artist_uri,
-        spotify_track_uri
-),
-RankedStreams AS (
-    SELECT
-        spotify_album_uri,
-        spotify_artist_uri,
-        spotify_track_uri,
-        stream_count,
-        ROW_NUMBER() OVER (PARTITION BY spotify_album_uri ORDER BY stream_count DESC) AS rank
-    FROM
-        SongStreamCounts
-)
-SELECT
-    spotify_album_uri,
-    spotify_artist_uri,
-    spotify_track_uri,
-    stream_count
-FROM
-    RankedStreams
-WHERE
-    rank <= 10
-ORDER BY
-    spotify_album_uri,
     rank;
 
 -- name: HistoryGetNewArtists :many
@@ -547,4 +507,42 @@ WHERE
     count > 5
     AND array_length(distinct_dates, 1) > 1
 LIMIT 100;
+
+-- name: HistoryGetTopAlbumsByRelease :many
+WITH history AS (
+    SELECT
+        sh.spotify_album_uri,
+        date_trunc(@interval, ac.release_date)::date AS release_interval
+    FROM
+        spotify_history sh
+        JOIN spotify_album_cache ac ON ac.uri = sh.spotify_album_uri
+    WHERE
+        sh.user_id = @user_id
+        AND ac.album_type = 'album'
+),
+grouped_history AS (
+    SELECT DISTINCT ON (release_interval)
+        *,
+        count(*)
+    FROM
+        history
+    GROUP BY
+        spotify_album_uri,
+        release_interval
+    ORDER BY
+        release_interval,
+        count DESC
+)
+SELECT
+    release_interval,
+    count AS streams,
+    name,
+    artist_name
+FROM
+    grouped_history h
+    JOIN spotify_album_cache ac ON ac.uri = h.spotify_album_uri
+ORDER BY
+    release_interval DESC,
+    count DESC
+LIMIT 1000;
 

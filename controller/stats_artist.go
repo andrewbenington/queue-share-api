@@ -12,7 +12,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/gorilla/mux"
-	"golang.org/x/exp/maps"
+	"github.com/samber/lo"
 )
 
 type TopArtistsResponse struct {
@@ -64,7 +64,7 @@ func (c *StatsController) GetTopArtistsByTimeframe(w http.ResponseWriter, r *htt
 	// 	}
 	// }
 
-	// tracks, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	// tracks, err := service.GetTracks(ctx, spClient, lo.Keys(trackIDs))
 	// if err != nil {
 	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
 	// 	return
@@ -77,7 +77,7 @@ func (c *StatsController) GetTopArtistsByTimeframe(w http.ResponseWriter, r *htt
 		}
 	}
 
-	artistResults, err := service.GetArtists(ctx, spClient, maps.Keys(artistIDs))
+	artistResults, err := service.GetArtists(ctx, spClient, lo.Keys(artistIDs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -186,7 +186,7 @@ func (c *StatsController) GetArtistStatsByURI(w http.ResponseWriter, r *http.Req
 		trackIDs[id] = true
 	}
 
-	tracks, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	tracks, err := service.GetTracks(ctx, spClient, lo.Keys(trackIDs))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("couldn't get streamed tracks: %s", err), http.StatusInternalServerError)
 		return

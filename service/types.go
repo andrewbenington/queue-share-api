@@ -196,3 +196,69 @@ func AlbumDataFromSpotifyAlbum(a spotify.FullAlbum) (*db.AlbumData, error) {
 		TrackIsrcs:           trackISRCs,
 	}, nil
 }
+
+type baseQSPlaylist struct {
+	ID            string     `json:"id"`
+	URI           string     `json:"uri"`
+	Name          string     `json:"name"`
+	Description   string     `json:"description"`
+	ImageUrl      *string    `json:"image_url"`
+	FirstAdded    *time.Time `json:"first_added"`
+	IsPublic      bool       `json:"is_public"`
+	Collaborative bool       `json:"collaborative"`
+}
+
+type QSPlaylist struct {
+	baseQSPlaylist
+	TrackCount int `json:"track_count"`
+}
+
+type QSPlaylistWithTracks struct {
+	baseQSPlaylist
+	Tracks []db.TrackData `json:"tracks"`
+}
+
+func baseQSPlaylistFromSpotify(p spotify.SimplePlaylist) baseQSPlaylist {
+	image := GetSpotifyPlaylist128Image(p)
+	var imageURL *string
+	if image != nil {
+		imageURL = &image.URL
+	}
+
+	return baseQSPlaylist{
+		ID:            p.ID.String(),
+		URI:           string(p.URI),
+		Collaborative: p.Collaborative,
+		Description:   p.Description,
+		ImageUrl:      imageURL,
+		Name:          p.Name,
+		IsPublic:      p.IsPublic,
+	}
+}
+
+func QSPlaylistFromSpotify(p spotify.SimplePlaylist) *QSPlaylist {
+	base := baseQSPlaylistFromSpotify(p)
+
+	return &QSPlaylist{
+		baseQSPlaylist: base,
+		TrackCount:     int(p.Tracks.Total),
+	}
+}
+
+func QSPlaylistWithTracksFromSpotifyFull(p spotify.FullPlaylist) *QSPlaylistWithTracks {
+	base := baseQSPlaylistFromSpotify(p.SimplePlaylist)
+
+	tracks := make([]db.TrackData, 0, len(p.Tracks.Tracks))
+	for _, playlistTrack := range p.Tracks.Tracks {
+		tracks = append(tracks, TrackDataFromFullTrack(playlistTrack.Track))
+		t, err := time.Parse("2006-01-02T15:04:05Z", playlistTrack.AddedAt)
+		if err == nil && base.FirstAdded == nil || t.Before(*base.FirstAdded) {
+			base.FirstAdded = &t
+		}
+	}
+
+	return &QSPlaylistWithTracks{
+		baseQSPlaylist: base,
+		Tracks:         tracks,
+	}
+}

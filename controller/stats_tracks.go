@@ -12,7 +12,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/gorilla/mux"
-	"golang.org/x/exp/maps"
+	"github.com/samber/lo"
 )
 
 type TopTracksResponse struct {
@@ -57,7 +57,7 @@ func (c *StatsController) GetTopTracksByTimeframe(w http.ResponseWriter, r *http
 		return
 	}
 
-	trackResults, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	trackResults, err := service.GetTracks(ctx, spClient, lo.Keys(trackIDs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

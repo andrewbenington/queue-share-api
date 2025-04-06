@@ -8,6 +8,8 @@ import (
 
 	"github.com/andrewbenington/queue-share-api/client"
 	"github.com/andrewbenington/queue-share-api/requests"
+	"github.com/andrewbenington/queue-share-api/service"
+	"github.com/gorilla/mux"
 	"github.com/zmb3/spotify/v2"
 )
 
@@ -63,7 +65,10 @@ func (c *Controller) UserPlaylists(w http.ResponseWriter, r *http.Request) {
 		requests.RespondWithError(w, status, err.Error())
 		return
 	}
-	allPlaylists := playlists
+	allPlaylists := []service.QSPlaylist{}
+	for _, playlist := range playlists.Playlists {
+		allPlaylists = append(allPlaylists, *service.QSPlaylistFromSpotify(playlist))
+	}
 
 	offset := 40
 	for playlists.Next != "" {
@@ -74,10 +79,74 @@ func (c *Controller) UserPlaylists(w http.ResponseWriter, r *http.Request) {
 			requests.RespondWithError(w, status, err.Error())
 			return
 		}
-		allPlaylists.Playlists = append(allPlaylists.Playlists, playlists.Playlists...)
+		for _, playlist := range playlists.Playlists {
+			allPlaylists = append(allPlaylists, *service.QSPlaylistFromSpotify(playlist))
+		}
 		offset += len(playlists.Playlists)
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(allPlaylists)
+}
+
+func (c *Controller) GetSpotifyPlaylist(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, err.Error())
+		return
+	}
+
+	status, client, err := client.ForUser(ctx, userUUID)
+	if err != nil {
+		requests.RespondWithError(w, status, err.Error())
+		return
+	}
+
+	id := mux.Vars(r)["playlist_id"]
+	log.Printf("getting playlist '%s'", id)
+
+	spotifyPlaylist, err := client.GetPlaylist(ctx, spotify.ID(id))
+	if err != nil {
+		log.Printf("error getting playlist: %s", err)
+		requests.RespondWithError(w, status, err.Error())
+		return
+	}
+
+	qsPlaylist := service.QSPlaylistFromSpotify(spotifyPlaylist.SimplePlaylist)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(qsPlaylist)
+}
+
+func (c *Controller) GetSpotifyPlaylistFull(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, err.Error())
+		return
+	}
+
+	status, client, err := client.ForUser(ctx, userUUID)
+	if err != nil {
+		requests.RespondWithError(w, status, err.Error())
+		return
+	}
+
+	id := mux.Vars(r)["playlist_id"]
+	log.Printf("getting playlist '%s'", id)
+
+	spotifyPlaylist, err := client.GetPlaylist(ctx, spotify.ID(id))
+	if err != nil {
+		log.Printf("error getting playlist: %s", err)
+		requests.RespondWithError(w, status, err.Error())
+		return
+	}
+
+	qsPlaylist := service.QSPlaylistWithTracksFromSpotifyFull(*spotifyPlaylist)
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(qsPlaylist)
 }

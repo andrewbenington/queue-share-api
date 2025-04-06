@@ -14,7 +14,7 @@ import (
 	"github.com/andrewbenington/queue-share-api/requests"
 	"github.com/andrewbenington/queue-share-api/service"
 	"github.com/google/uuid"
-	"golang.org/x/exp/maps"
+	"github.com/samber/lo"
 )
 
 type CompareTracksResp struct {
@@ -131,7 +131,7 @@ func (c *StatsController) UserCompareFriendTopTracks(w http.ResponseWriter, r *h
 		}
 	}
 
-	trackResults, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	trackResults, err := service.GetTracks(ctx, spClient, lo.Keys(trackIDs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -261,7 +261,7 @@ func (c *StatsController) UserCompareFriendTopArtists(w http.ResponseWriter, r *
 		}
 	}
 
-	artistResults, err := service.GetArtists(ctx, spClient, maps.Keys(artistIDs))
+	artistResults, err := service.GetArtists(ctx, spClient, lo.Keys(artistIDs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -391,7 +391,7 @@ func (c *StatsController) UserCompareFriendTopAlbums(w http.ResponseWriter, r *h
 		}
 	}
 
-	albumResults, err := service.GetAlbums(ctx, spClient, maps.Keys(albumIDs))
+	albumResults, err := service.GetAlbums(ctx, spClient, lo.Keys(albumIDs))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

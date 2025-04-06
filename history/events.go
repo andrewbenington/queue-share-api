@@ -12,7 +12,6 @@ import (
 	"github.com/andrewbenington/queue-share-api/util"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"golang.org/x/exp/maps"
 )
 
 type RankEvent interface {
@@ -92,7 +91,7 @@ func GetTrackRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	if err != nil {
 		return nil, err
 	}
-	tracksByID, err := service.GetTracks(ctx, spClient, maps.Keys(trackIDs))
+	tracksByID, err := service.GetTracks(ctx, spClient, lo.Keys(trackIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +186,7 @@ func GetArtistRankEvents(ctx context.Context, tx db.DBTX, userUUID uuid.UUID, fi
 	if err != nil {
 		return nil, err
 	}
-	artistsByID, err := service.GetArtists(ctx, spClient, maps.Keys(artistIDs))
+	artistsByID, err := service.GetArtists(ctx, spClient, lo.Keys(artistIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +286,7 @@ func GetAlbumRankEvents(ctx context.Context, transaction db.DBTX, userUUID uuid.
 	if err != nil {
 		return nil, err
 	}
-	albumsByID, err := service.GetAlbums(ctx, spClient, maps.Keys(albumIDs))
+	albumsByID, err := service.GetAlbums(ctx, spClient, lo.Keys(albumIDs))
 	if err != nil {
 		return nil, err
 	}

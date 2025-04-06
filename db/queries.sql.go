@@ -482,84 +482,6 @@ func (q *Queries) HistoryGetAlbumStreamCountByYear(ctx context.Context, arg Hist
 	return items, nil
 }
 
-const historyGetAlbumStreams = `-- name: HistoryGetAlbumStreams :many
-WITH SongStreamCounts AS (
-    SELECT
-        spotify_album_uri,
-        spotify_artist_uri,
-        spotify_track_uri,
-        COUNT(*) AS stream_count
-    FROM
-        spotify_history
-    WHERE
-        user_id = $1
-        AND spotify_album_uri = ANY ($2::text[])
-    GROUP BY
-        spotify_album_uri,
-        spotify_artist_uri,
-        spotify_track_uri
-),
-RankedStreams AS (
-    SELECT
-        spotify_album_uri,
-        spotify_artist_uri,
-        spotify_track_uri,
-        stream_count,
-        ROW_NUMBER() OVER (PARTITION BY spotify_album_uri ORDER BY stream_count DESC) AS rank
-    FROM
-        SongStreamCounts
-)
-SELECT
-    spotify_album_uri,
-    spotify_artist_uri,
-    spotify_track_uri,
-    stream_count
-FROM
-    RankedStreams
-WHERE
-    rank <= 10
-ORDER BY
-    spotify_album_uri,
-    rank
-`
-
-type HistoryGetAlbumStreamsParams struct {
-	UserID    uuid.UUID `json:"user_id"`
-	AlbumUris []string  `json:"album_uris"`
-}
-
-type HistoryGetAlbumStreamsRow struct {
-	SpotifyAlbumUri  *string `json:"spotify_album_uri"`
-	SpotifyArtistUri *string `json:"spotify_artist_uri"`
-	SpotifyTrackUri  string  `json:"spotify_track_uri"`
-	StreamCount      int64   `json:"stream_count"`
-}
-
-func (q *Queries) HistoryGetAlbumStreams(ctx context.Context, arg HistoryGetAlbumStreamsParams) ([]*HistoryGetAlbumStreamsRow, error) {
-	rows, err := q.db.Query(ctx, historyGetAlbumStreams, arg.UserID, arg.AlbumUris)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*HistoryGetAlbumStreamsRow
-	for rows.Next() {
-		var i HistoryGetAlbumStreamsRow
-		if err := rows.Scan(
-			&i.SpotifyAlbumUri,
-			&i.SpotifyArtistUri,
-			&i.SpotifyTrackUri,
-			&i.StreamCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const historyGetAll = `-- name: HistoryGetAll :many
 SELECT
     TIMESTAMP,
@@ -980,7 +902,7 @@ WITH SongStreamCounts AS (
     WHERE
         user_id = $1
         AND spotify_artist_uri = ANY ($2::text[])
-        AND timestamp >= CURRENT_DATE - INTERVAL '6 months'
+        AND timestamp >= CURRENT_DATE - INTERVAL '18 months'
     GROUP BY
         spotify_artist_uri,
         spotify_track_uri
@@ -1058,6 +980,82 @@ func (q *Queries) HistoryGetTimestampRange(ctx context.Context, userID uuid.UUID
 	var i HistoryGetTimestampRangeRow
 	err := row.Scan(&i.First, &i.Last)
 	return &i, err
+}
+
+const historyGetTopAlbumsByRelease = `-- name: HistoryGetTopAlbumsByRelease :many
+WITH history AS (
+    SELECT
+        sh.spotify_album_uri,
+        date_trunc($1, ac.release_date)::date AS release_interval
+    FROM
+        spotify_history sh
+        JOIN spotify_album_cache ac ON ac.uri = sh.spotify_album_uri
+    WHERE
+        sh.user_id = $2
+        AND ac.album_type = 'album'
+),
+grouped_history AS (
+    SELECT DISTINCT ON (release_interval)
+        spotify_album_uri, release_interval,
+        count(*)
+    FROM
+        history
+    GROUP BY
+        spotify_album_uri,
+        release_interval
+    ORDER BY
+        release_interval,
+        count DESC
+)
+SELECT
+    release_interval,
+    count AS streams,
+    name,
+    artist_name
+FROM
+    grouped_history h
+    JOIN spotify_album_cache ac ON ac.uri = h.spotify_album_uri
+ORDER BY
+    release_interval DESC,
+    count DESC
+LIMIT 1000
+`
+
+type HistoryGetTopAlbumsByReleaseParams struct {
+	Interval string    `json:"interval"`
+	UserID   uuid.UUID `json:"user_id"`
+}
+
+type HistoryGetTopAlbumsByReleaseRow struct {
+	ReleaseInterval pgtype.Date `json:"release_interval"`
+	Streams         int64       `json:"streams"`
+	Name            string      `json:"name"`
+	ArtistName      string      `json:"artist_name"`
+}
+
+func (q *Queries) HistoryGetTopAlbumsByRelease(ctx context.Context, arg HistoryGetTopAlbumsByReleaseParams) ([]*HistoryGetTopAlbumsByReleaseRow, error) {
+	rows, err := q.db.Query(ctx, historyGetTopAlbumsByRelease, arg.Interval, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*HistoryGetTopAlbumsByReleaseRow
+	for rows.Next() {
+		var i HistoryGetTopAlbumsByReleaseRow
+		if err := rows.Scan(
+			&i.ReleaseInterval,
+			&i.Streams,
+			&i.Name,
+			&i.ArtistName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const historyGetTopAlbumsInTimeframe = `-- name: HistoryGetTopAlbumsInTimeframe :many
