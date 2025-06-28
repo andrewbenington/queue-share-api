@@ -66,7 +66,6 @@ INSERT INTO SPOTIFY_HISTORY(
     shuffle,
     skipped,
     offline,
-    offline_timestamp,
     incognito_mode,
     from_history,
     isrc)
@@ -108,8 +107,6 @@ VALUES (
     unnest(
         @offline::boolean[]),
     unnest(
-        @offline_timestamp::timestamp[]),
-    unnest(
         @incognito_mode::boolean[]),
     unnest(
         @from_history::boolean[]),
@@ -137,6 +134,8 @@ FROM
 WHERE
     user_id = @user_id
     AND ms_played >= @min_ms_played
+    AND spotify_album_uri != ''
+    AND spotify_album_uri IS NOT NULL
     AND (sqlc.narg(start_date)::timestamp IS NULL
         OR sqlc.narg(end_date)::timestamp IS NULL
         OR timestamp BETWEEN sqlc.narg(start_date)::timestamp AND sqlc.narg(end_date)::timestamp)

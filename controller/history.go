@@ -188,6 +188,7 @@ func (c *StatsController) UploadHistory(w http.ResponseWriter, r *http.Request) 
 		entryData := []history.StreamingEntry{}
 		err = json.NewDecoder(zippedFile).Decode(&entryData)
 		if err != nil {
+			log.Printf("Error decoding Spotify JSON: %s", err)
 			http.Error(w, "Error decoding JSON", http.StatusInternalServerError)
 			return
 		}
@@ -306,4 +307,35 @@ func getFilterParams(r *http.Request) history.FilterParams {
 		End:         &end,
 		Timeframe:   timeframe,
 	}
+}
+
+func (c *StatsController) GetSpotifyHistory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	userUUID, err := userOrFriendUUIDFromRequest(ctx, r)
+	if err != nil {
+		requests.RespondWithError(w, 401, err.Error())
+		return
+	}
+
+	tx, err := db.Service().BeginTx(r.Context())
+	if err != nil {
+		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer tx.Commit(ctx)
+
+	user, err := db.New(tx).UserGetByID(ctx, userUUID)
+	if err != nil {
+		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	history, err := history.GetSpotifyHistoryForUser(ctx, user)
+	if err != nil {
+		requests.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	json.NewEncoder(w).Encode(history)
 }

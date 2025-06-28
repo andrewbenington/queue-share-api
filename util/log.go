@@ -100,7 +100,8 @@ func WriteLogsToFile(date time.Time, entries []LogEntry) {
 	}
 	csvFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	if err != nil {
-		log.Fatalf("failed creating file: %s", err)
+		log.Printf("failed creating file: %s", err)
+		return
 	}
 	defer csvFile.Close()
 

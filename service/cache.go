@@ -243,7 +243,7 @@ func getArtistsFromCache(ctx context.Context, tx db.DBTX, ids []string) (map[str
 	return cacheHits, nil
 }
 
-func strPtrsDiffer(p1 *string, p2 *string) bool {
+func strDiffDeref(p1 *string, p2 *string) bool {
 	if p1 == nil && p2 == nil {
 		return false
 	}
@@ -298,7 +298,7 @@ func CacheSpotifyAlbums(ctx context.Context, albumsToCache []*spotify.FullAlbum)
 			trackIDsHaveChanges := stringSlicesDiffer(existingData.SpotifyTrackIds, newData.SpotifyTrackIds)
 			trackISRCsHaveChanges := stringSlicesDiffer(existingData.TrackIsrcs, newData.TrackIsrcs)
 
-			if strPtrsDiffer(existingData.ImageUrl, newData.ImageUrl) ||
+			if strDiffDeref(existingData.ImageUrl, newData.ImageUrl) ||
 				existingData.Name != newData.Name ||
 				genresHaveChanges ||
 				trackIDsHaveChanges || trackISRCsHaveChanges ||

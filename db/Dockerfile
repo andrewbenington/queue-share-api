@@ -1,4 +1,4 @@
-FROM --platform=linux/arm64 library/postgres
+FROM --platform=linux/amd64 library/postgres:16
 
 COPY init.sql /docker-entrypoint-initdb.d/
 COPY schema.sql /docker-entrypoint-initdb.d/

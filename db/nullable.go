@@ -93,28 +93,27 @@ func (q *Queries) AlbumCacheInsertBulkNullable(ctx context.Context, arg AlbumCac
 }
 
 type HistoryInsertBulkNullableParams struct {
-	UserIds          []uuid.UUID  `json:"user_ids"`
-	Timestamp        []time.Time  `json:"timestamp"`
-	Platform         []string     `json:"platform"`
-	MsPlayed         []int32      `json:"ms_played"`
-	ConnCountry      []string     `json:"conn_country"`
-	IpAddr           []*string    `json:"ip_addr"`
-	UserAgent        []*string    `json:"user_agent"`
-	TrackName        []string     `json:"track_name"`
-	ArtistName       []string     `json:"artist_name"`
-	AlbumName        []string     `json:"album_name"`
-	SpotifyTrackUri  []string     `json:"spotify_track_uri"`
-	SpotifyArtistUri []*string    `json:"spotify_artist_uri"`
-	SpotifyAlbumUri  []*string    `json:"spotify_album_uri"`
-	ReasonStart      []*string    `json:"reason_start"`
-	ReasonEnd        []*string    `json:"reason_end"`
-	Shuffle          []bool       `json:"shuffle"`
-	Skipped          []*bool      `json:"skipped"`
-	Offline          []bool       `json:"offline"`
-	OfflineTimestamp []*time.Time `json:"offline_timestamp"`
-	IncognitoMode    []bool       `json:"incognito_mode"`
-	FromHistory      []bool       `json:"from_history"`
-	ISRC             []*string    `json:"isrc"`
+	UserIds          []uuid.UUID `json:"user_ids"`
+	Timestamp        []time.Time `json:"timestamp"`
+	Platform         []string    `json:"platform"`
+	MsPlayed         []int32     `json:"ms_played"`
+	ConnCountry      []string    `json:"conn_country"`
+	IpAddr           []*string   `json:"ip_addr"`
+	UserAgent        []*string   `json:"user_agent"`
+	TrackName        []string    `json:"track_name"`
+	ArtistName       []string    `json:"artist_name"`
+	AlbumName        []string    `json:"album_name"`
+	SpotifyTrackUri  []string    `json:"spotify_track_uri"`
+	SpotifyArtistUri []*string   `json:"spotify_artist_uri"`
+	SpotifyAlbumUri  []*string   `json:"spotify_album_uri"`
+	ReasonStart      []*string   `json:"reason_start"`
+	ReasonEnd        []*string   `json:"reason_end"`
+	Shuffle          []bool      `json:"shuffle"`
+	Skipped          []*bool     `json:"skipped"`
+	Offline          []bool      `json:"offline"`
+	IncognitoMode    []bool      `json:"incognito_mode"`
+	FromHistory      []bool      `json:"from_history"`
+	ISRC             []*string   `json:"isrc"`
 }
 
 func (q *Queries) HistoryInsertBulkNullable(ctx context.Context, arg HistoryInsertBulkNullableParams) error {
@@ -137,7 +136,6 @@ func (q *Queries) HistoryInsertBulkNullable(ctx context.Context, arg HistoryInse
 		pq.Array(arg.Shuffle),
 		pq.Array(arg.Skipped),
 		pq.Array(arg.Offline),
-		pq.Array(arg.OfflineTimestamp),
 		pq.Array(arg.IncognitoMode),
 		pq.Array(arg.FromHistory),
 		pq.Array(arg.ISRC),

@@ -90,24 +90,23 @@ import (
 // }
 
 type StreamingEntry struct {
-	Timestamp        string     `json:"ts"`
-	Username         string     `json:"username"`
-	Platform         string     `json:"platform"`
-	MsPlayed         int32      `json:"ms_played"`
-	ConnCountry      string     `json:"conn_country"`
-	IpAddr           *string    `json:"ip_addr_decrypted"`
-	UserAgent        *string    `json:"user_agent_decrypted"`
-	TrackName        string     `json:"master_metadata_track_name"`
-	ArtistName       string     `json:"master_metadata_album_artist_name"`
-	AlbumName        string     `json:"master_metadata_album_album_name"`
-	SpotifyTrackUri  string     `json:"spotify_track_uri"`
-	ReasonStart      *string    `json:"reason_start"`
-	ReasonEnd        *string    `json:"reason_end"`
-	Shuffle          bool       `json:"shuffle"`
-	Skipped          *bool      `json:"skipped"`
-	Offline          bool       `json:"offline"`
-	OfflineTimestamp *time.Time `json:"offline_timestamp"`
-	IncognitoMode    bool       `json:"incognito_mode"`
+	Timestamp       string  `json:"ts"`
+	Username        string  `json:"username"`
+	Platform        string  `json:"platform"`
+	MsPlayed        int32   `json:"ms_played"`
+	ConnCountry     string  `json:"conn_country"`
+	IpAddr          *string `json:"ip_addr_decrypted"`
+	UserAgent       *string `json:"user_agent_decrypted"`
+	TrackName       string  `json:"master_metadata_track_name"`
+	ArtistName      string  `json:"master_metadata_album_artist_name"`
+	AlbumName       string  `json:"master_metadata_album_album_name"`
+	SpotifyTrackUri string  `json:"spotify_track_uri"`
+	ReasonStart     *string `json:"reason_start"`
+	ReasonEnd       *string `json:"reason_end"`
+	Shuffle         bool    `json:"shuffle"`
+	Skipped         *bool   `json:"skipped"`
+	Offline         bool    `json:"offline"`
+	IncognitoMode   bool    `json:"incognito_mode"`
 }
 
 func InsertEntry(ctx context.Context, transaction db.DBTX, entry db.HistoryInsertOneParams) error {
@@ -116,26 +115,25 @@ func InsertEntry(ctx context.Context, transaction db.DBTX, entry db.HistoryInser
 
 func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.HistoryInsertOneParams) error {
 	params := db.HistoryInsertBulkNullableParams{
-		UserIds:          []uuid.UUID{},
-		Timestamp:        []time.Time{},
-		Platform:         []string{},
-		MsPlayed:         []int32{},
-		ConnCountry:      []string{},
-		IpAddr:           []*string{},
-		UserAgent:        []*string{},
-		TrackName:        []string{},
-		ArtistName:       []string{},
-		AlbumName:        []string{},
-		SpotifyTrackUri:  []string{},
-		ReasonStart:      []*string{},
-		ReasonEnd:        []*string{},
-		Shuffle:          []bool{},
-		Skipped:          []*bool{},
-		Offline:          []bool{},
-		IncognitoMode:    []bool{},
-		OfflineTimestamp: []*time.Time{},
-		FromHistory:      []bool{},
-		ISRC:             []*string{},
+		UserIds:         []uuid.UUID{},
+		Timestamp:       []time.Time{},
+		Platform:        []string{},
+		MsPlayed:        []int32{},
+		ConnCountry:     []string{},
+		IpAddr:          []*string{},
+		UserAgent:       []*string{},
+		TrackName:       []string{},
+		ArtistName:      []string{},
+		AlbumName:       []string{},
+		SpotifyTrackUri: []string{},
+		ReasonStart:     []*string{},
+		ReasonEnd:       []*string{},
+		Shuffle:         []bool{},
+		Skipped:         []*bool{},
+		Offline:         []bool{},
+		IncognitoMode:   []bool{},
+		FromHistory:     []bool{},
+		ISRC:            []*string{},
 	}
 
 	for _, entry := range entries {
@@ -164,7 +162,6 @@ func InsertEntries(ctx context.Context, transaction db.DBTX, entries []db.Histor
 		params.Skipped = append(params.Skipped, entry.Skipped)
 		params.Offline = append(params.Offline, entry.Offline)
 		params.IncognitoMode = append(params.IncognitoMode, entry.IncognitoMode)
-		params.OfflineTimestamp = append(params.OfflineTimestamp, entry.OfflineTimestamp)
 		params.FromHistory = append(params.FromHistory, entry.FromHistory)
 		params.ISRC = append(params.ISRC, entry.Isrc)
 	}
@@ -181,26 +178,25 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 	}
 
 	params := db.HistoryInsertBulkNullableParams{
-		UserIds:          []uuid.UUID{},
-		Timestamp:        []time.Time{},
-		Platform:         []string{},
-		MsPlayed:         []int32{},
-		ConnCountry:      []string{},
-		IpAddr:           []*string{},
-		UserAgent:        []*string{},
-		TrackName:        []string{},
-		ArtistName:       []string{},
-		AlbumName:        []string{},
-		SpotifyTrackUri:  []string{},
-		ReasonStart:      []*string{},
-		ReasonEnd:        []*string{},
-		Shuffle:          []bool{},
-		Skipped:          []*bool{},
-		Offline:          []bool{},
-		IncognitoMode:    []bool{},
-		OfflineTimestamp: []*time.Time{},
-		FromHistory:      []bool{},
-		ISRC:             []*string{},
+		UserIds:         []uuid.UUID{},
+		Timestamp:       []time.Time{},
+		Platform:        []string{},
+		MsPlayed:        []int32{},
+		ConnCountry:     []string{},
+		IpAddr:          []*string{},
+		UserAgent:       []*string{},
+		TrackName:       []string{},
+		ArtistName:      []string{},
+		AlbumName:       []string{},
+		SpotifyTrackUri: []string{},
+		ReasonStart:     []*string{},
+		ReasonEnd:       []*string{},
+		Shuffle:         []bool{},
+		Skipped:         []*bool{},
+		Offline:         []bool{},
+		IncognitoMode:   []bool{},
+		FromHistory:     []bool{},
+		ISRC:            []*string{},
 	}
 
 	for _, entry := range entries {
@@ -240,7 +236,6 @@ func InsertEntriesFromHistory(ctx context.Context, transaction db.DBTX, userID u
 		params.Skipped = append(params.Skipped, entry.Skipped)
 		params.Offline = append(params.Offline, entry.Offline)
 		params.IncognitoMode = append(params.IncognitoMode, entry.IncognitoMode)
-		params.OfflineTimestamp = append(params.OfflineTimestamp, entry.OfflineTimestamp)
 		params.FromHistory = append(params.FromHistory, true)
 	}
 	return db.New(transaction).HistoryInsertBulkNullable(ctx, params)

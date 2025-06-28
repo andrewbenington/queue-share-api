@@ -56,7 +56,7 @@ func (d *DBService) Initialize() error {
 
 	err = dbpool.Ping(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't connect to db: %w", err)
+		return fmt.Errorf("couldn't connect to db (host %s): %w", config.GetDBString(), err)
 	}
 
 	d.Pool = dbpool

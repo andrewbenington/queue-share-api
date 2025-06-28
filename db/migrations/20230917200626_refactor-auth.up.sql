@@ -1,4 +1,4 @@
-CREATE EXTENSION pgcrypto;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE users(
     id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -18,12 +18,18 @@ CREATE TABLE user_passwords(
     encrypted_password text NOT NULL
 );
 
-INSERT INTO users(id, username, display_name)
-    VALUES ('00000000-0000-0000-0000-000000000000', 'default', 'Unknown User');
+INSERT INTO users(
+    id,
+    username,
+    display_name)
+VALUES (
+    '00000000-0000-0000-0000-000000000000',
+    'default',
+    'Unknown User');
 
 ALTER TABLE rooms
     ALTER COLUMN created SET NOT NULL,
-    ADD COLUMN host_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000' REFERENCES users(id) ON DELETE CASCADE,
+    ADD COLUMN host_id uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000' REFERENCES users(id) ON DELETE CASCADE,
     DROP COLUMN encrypted_access_token,
     DROP COLUMN access_token_expiry,
     DROP COLUMN encrypted_refresh_token;

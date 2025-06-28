@@ -19,6 +19,10 @@ reset-db:
 
 .PHONY: start
 start:
+	@go run ./cmd/main.go --no-engine
+
+.PHONY: start-with-engine
+start-with-engine:
 	@go run ./cmd/main.go
 
 .PHONY: build
@@ -34,18 +38,18 @@ build-pi:
 	GOOS=linux GOARCH=arm64 go build -ldflags '${LD_FLAGS}' -o bin/queue-share ./cmd/main.go
 
 .PHONY: docker-build
-docker-build: build-pi
+docker-build: build-linux
 	@docker build -t andrewb57/queue-share-api:latest .
 	@docker build -t andrewb57/queue-share-api:${GIT_VERSION} .
 
 .PHONY: docker-push
 docker-push:
 	@docker push andrewb57/queue-share-api:latest
-	@docker push andrewb57/queue-share-api:${GIT_VERSION}
+	@docker push andrewb57/queue-share-db:latest
 
 .PHONY: migrate-up
 migrate-up:
-	@migrate -path db/migrations -database 'postgres://postgres:postgres@localhost:5432/queue_share?sslmode=disable' up 1
+	@migrate -path db/migrations -database 'postgres://queue_share:queue_share@localhost:5431/queue_share?sslmode=disable' up 1
 
 .PHONY: migrate-down
 migrate-down:
@@ -87,7 +91,7 @@ sqlc:
 
 .PHONY: docker-build-db
 docker-build-db:
-	@docker build -t andrewb57/queue-share-api:latest ./db
+	@docker build -t andrewb57/queue-share-db:latest ./db
 
 .PHONY: docker-run-db
 docker-run-db:
@@ -99,4 +103,4 @@ docker-save:
 
 .PHONY: docker-save-db
 docker-save-db:
-	@docker save -o db-image.tar andrewb57/queue-share-api:latest
+	@docker save -o db-image.tar andrewb57/queue-share-db:latest

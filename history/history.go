@@ -1,6 +1,15 @@
 package history
 
-import "time"
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/andrewbenington/queue-share-api/client"
+	"github.com/andrewbenington/queue-share-api/db"
+	"github.com/zmb3/spotify/v2"
+)
 
 type Timeframe string
 
@@ -43,7 +52,6 @@ func (t Timeframe) DefaultFirstStartTime() *time.Time {
 	}
 }
 
-
 func (t Timeframe) GetEarliestStartTime(end time.Time) *time.Time {
 	switch t {
 	case TimeframeDay:
@@ -55,4 +63,46 @@ func (t Timeframe) GetEarliestStartTime(end time.Time) *time.Time {
 	default:
 		return nil
 	}
+}
+
+func GetSpotifyHistoryForUser(ctx context.Context, user *db.UserGetByIDRow) ([]spotify.RecentlyPlayedItem, error) {
+	tx, err := db.Service().BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not connect to database to get missing artist URIs %w", err)
+	}
+	defer tx.Commit(ctx)
+
+	_, spClient, err := client.ForUser(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	token, _ := spClient.Token()
+	log.Printf("%+v", token)
+
+	var rows []spotify.RecentlyPlayedItem
+	var before *time.Time
+
+	for rows == nil || len(rows) > 0 {
+		opts := spotify.RecentlyPlayedOptions{Limit: 50}
+		if before != nil {
+			opts.BeforeEpochMs = before.UnixMilli()
+		}
+
+		recentlyPlayed, err := spClient.PlayerRecentlyPlayedOpt(ctx, &opts)
+		if err != nil {
+			return nil, err
+		} else {
+			log.Printf("%d history entries found for %s", len(recentlyPlayed), user.Username)
+		}
+		if len(recentlyPlayed) == 0 {
+			break
+		}
+
+		rows = append(rows, recentlyPlayed...)
+		before = &recentlyPlayed[len(recentlyPlayed)-1].PlayedAt
+
+	}
+
+	return rows, nil
 }

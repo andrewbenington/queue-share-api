@@ -39,11 +39,17 @@ func shouldDoCycle(last *time.Time, period time.Duration) bool {
 }
 
 func cycle() {
-	// fmt.Println("good morning: starting engine cycle")
+	fmt.Println("good morning: starting engine cycle")
 	ctx := context.Background()
 	now := time.Now()
 
-	// uploadAlbumCache(ctx)
+	// if last_cycle_load_uris == nil {
+	// 	last_cycle_load_uris = &now
+	// 	last_cycle_history = &now
+	// 	last_cycle_spotify_profile = &now
+	// 	last_cycle_save_logs = &now
+	// 	return
+	// }
 
 	if config.GetIsProd() {
 		if shouldDoCycle(last_cycle_load_uris, cycle_period_load_uris) {
@@ -73,7 +79,7 @@ func cycle() {
 	}
 
 	if shouldDoCycle(last_cycle_save_logs, cycle_period_save_logs) {
-		// fmt.Println("doing log cycle")
+		fmt.Println("doing log cycle")
 		util.WriteChannelLogsToFile()
 		last_cycle_save_logs = &now
 	}

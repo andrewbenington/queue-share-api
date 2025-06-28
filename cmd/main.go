@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/andrewbenington/queue-share-api/app"
@@ -29,12 +30,27 @@ func main() {
 	}
 
 	addr := "0.0.0.0:8080"
-	if len(os.Args) > 1 {
-		addr = os.Args[1]
+
+	shouldRunEngine := true
+
+	for _, arg := range os.Args {
+		if arg == "--no-engine" {
+			shouldRunEngine = false
+			continue
+		}
+
+		if specifiedAddr, ok := strings.CutPrefix(arg, "--addr="); ok {
+			addr = specifiedAddr
+		}
 	}
-	now := time.Now()
-	engine.LastFetch = &now
-	go engine.Run()
+
+	if shouldRunEngine {
+		now := time.Now()
+		engine.LastFetch = &now
+
+		go engine.Run()
+
+	}
 
 	a.Run(addr)
 }
